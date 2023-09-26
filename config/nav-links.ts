@@ -10,7 +10,7 @@ export const navItems: { name: string; items: navItem[] }[] = [
     items: [
       {
         name: 'Órdenes de producción',
-        slug: '',
+        slug: 'production-orders',
         description: 'Crea órdenes de produccion para piso',
       },
       {
