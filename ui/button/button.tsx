@@ -12,7 +12,7 @@ const Button = ({ styleButton, nameButton, disabled, onClickButton }: ButtonProp
     <button
       disabled={disabled}
       className={styleButton}
-      onClick={onClickButton()}
+      onClick={() => onClickButton()}
     >{nameButton}</button>
   );
 }
