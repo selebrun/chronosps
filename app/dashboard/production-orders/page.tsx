@@ -2,23 +2,21 @@ import Link from 'next/link';
 import { getOrders, getProductionOrders } from '@/app/api/orders/getOrders';
 
 const testUser = {
-  name: 'Simon Lebrun Sposito',
-  email: 'simon@chronosps.com',
-  mobile: 'false',
-  password: 'ffffe4c9c6ef337d5a9b60d6423782a1',
-  odoo_id: 686,
-  odoo_user_id: 0,
-  document: '10203040',
+  name: 'Alfonso Schiavino',
+  email: 'alfonso@chronosps.com',
+  mobile: '+56 9 3431 2199',
+  password: 'f05c9eb802ba34adc664326a72a27f8b',
+  odoo_id: 7,
+  odoo_user_id: 6,
+  document: '23400447-6',
   role: 'Operario',
-  hash: 'fbebfaed3f02007236b5075c64b5d8e2392ed46e93d53859e83f3e5df8d8bfef',
+  hash: 'f47a8632fb94c9f081fe429c33136b39f29153b7698e22d7a32d3ffb597280f0',
   active: true,
 }
-const testCompanyId = "7ac7aa42-008b-11ee-be56-0242ac120002";//"889cd134-00b2-11ee-be56-0242ac120002";
-
+const testCompanyId = "889cd134-00b2-11ee-be56-0242ac120002";
 
 
 export default async function Page() {
-  const orders = await getOrders();
   const odooOrders: any = await getProductionOrders(testUser, testCompanyId);
 
   return (
@@ -36,7 +34,6 @@ export default async function Page() {
           different layouts and pages that are Server Components.
         </p>
       </div>
-
 
       <div className="relative overflow-y-auto h-fit">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
