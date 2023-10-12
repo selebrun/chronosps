@@ -16,8 +16,8 @@ export const config = {
             "id": "889cd134-00b2-11ee-be56-0242ac120002",
             "company": "pdemo",
             "odoo_connection": {
-                "domain": "demol.chronosps.com",
-                "url": "https://demol.chronosps.com/",
+                "domain": "demo.chronosps.com",
+                "url": "https://demo.chronosps.com/",
                 "port": 443,
                 "db": "demo",
                 "username": "admin",
