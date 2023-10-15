@@ -4,7 +4,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from 'next/image'
 
-function Signin() {
+function SignIn() {
   const [error, setError] = useState("");
   const router = useRouter();
 
@@ -83,4 +83,4 @@ function Signin() {
   );
 }
 
-export default Signin;
+export default SignIn;
