@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 // Ui Components
 import { BreadcrumbsBar } from '@/ui/breadcrumbs-bar/breadcrumbs-bar';
 
-
 export const metadata: Metadata = {
   title: 'Chronos Piso App Dashboard',
   description: '',
@@ -15,6 +14,7 @@ export default async function Layout({
 }: {
   children: React.ReactNode;  
 }) {
+
   return (
     <>
       <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">

@@ -2,10 +2,20 @@
 import { navItems } from '@/config/nav-links';
 import Link from 'next/link';
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from 'next/navigation';
 
 export default  function Page() {
   const { data: session, status } = useSession();
+  const router = useRouter();
 
+  if (status === 'loading') {
+    return <div>Loading...</div>;
+  }
+
+  if (!session) {
+    router.push('/login');
+    return null;
+  }
 
   return (
     <div className="space-y-8">
