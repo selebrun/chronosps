@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -9,13 +9,20 @@ import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 function SignIn() {
   const [error, setError] = useState("");
   const router = useRouter();
-
+  const [showPassword, setShowPassword] = useState(false);
+  const [companyId, setCompanyId] = useState<string | null>();
   const [formData, setFormData] = useState({
     dniUser: "",
     password: "",
   });
 
-  const [showPassword, setShowPassword] = useState(false);
+  useEffect(()=>{
+    // Get Company Id from URL QueryParams
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    const companyId = urlParams.get('company_id');
+    setCompanyId(companyId);
+  }, [])
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -32,9 +39,15 @@ function SignIn() {
   const handleSubmit = async (event: { preventDefault: () => void; }) => {
     event.preventDefault();
 
+    if (!companyId) {
+      setError('No es posible determinar la compañia, debe especificar el companyId en la url');
+      return;
+    }
+
     const res = await signIn("credentials", {
       username: formData.dniUser,
       password: formData.password,
+      companyId: companyId,
       redirect: false,
     });
 
@@ -49,14 +62,19 @@ function SignIn() {
         <div className="mx-auto flex justify-center items-center mt-10 font-bold">
           Welcome to
         </div>
-        <div className="mx-auto flex justify-center items-center">
-          <div>
-            <Image src="/logo.png" width="235" height="64" alt="Logo" />
-          </div>
+        <div className="mx-auto flex justify-center items-center mb-[70px]">
+          <Image src="/logo.png" width="235" height="64" alt="Logo" />
         </div>
+
+        {error &&
+          <div className="p-4 mb-0 mx-3 text-sm text-blue-800 rounded-lg bg-blue-50" role="alert">
+            <span className="font-medium">Importante</span> {error}
+          </div>
+        }
+
         <form
           onSubmit={handleSubmit}
-          className="rounded m-3 px-8 pt-5 mb-4 bg-white mt-[74px]"
+          className="rounded m-3 px-8 pt-5 mb-4 bg-white"
         >
           <div className="mb-4">
             <label
