@@ -1,4 +1,3 @@
-import User from "@/models/user";
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
@@ -15,7 +14,6 @@ const handler = NextAuth({
         const user = { id: "42", name: "dave", password: "12" }
 
         if (credentials?.username === user.name && credentials?.password === user.password) {
-          console.log('entreeee--->', user)
             return user
         } else {
             return null
