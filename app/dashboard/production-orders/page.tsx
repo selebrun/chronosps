@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import Image from 'next/image'
+import eyeDetails from '@/public/eyeDetails.svg'
 import { getOrders, getProductionOrders } from '@/app/api/orders/getOrders';
 
 const testUser = {
@@ -91,10 +93,11 @@ export default async function Page() {
                     <td className="px-3 py-2">
                     <Link
                       href={`production-orders/${order.id}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 37 37" fill="none" className="text-black">
-                              <path fillRule="evenodd" clipRule="evenodd" d="M18.5003 7.70825C10.792 7.70825 4.20908 12.5028 1.54199 19.2708C4.20908 26.0387 10.792 30.8333 18.5003 30.8333C26.2087 30.8333 32.7916 26.0387 35.4587 19.2708C32.7916 12.5028 26.2087 7.70825 18.5003 7.70825ZM18.5003 26.9791C14.2453 26.9791 10.792 23.5258 10.792 19.2708C10.792 15.0158 14.2453 11.5624 18.5003 11.5624C22.7553 11.5624 26.2087 15.0158 26.2087 19.2708C26.2087 23.5258 22.7553 26.9791 18.5003 26.9791ZM18.5003 14.6458C15.9412 14.6458 13.8753 16.7116 13.8753 19.2708C13.8753 21.8299 15.9412 23.8958 18.5003 23.8958C21.0595 23.8958 23.1253 21.8299 23.1253 19.2708C23.1253 16.7116 21.0595 14.6458 18.5003 14.6458Z"
-                                fill="currentColor"/>
-                        </svg>
+                      <Image
+                        src={eyeDetails}
+                        alt="Eye Details"
+                        className='w-20 h-5'
+                      />
                     </Link>
                     </td>
                 </tr>
