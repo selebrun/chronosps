@@ -3,6 +3,7 @@ import { navItems } from '@/config/nav-links';
 import Link from 'next/link';
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from 'next/navigation';
+import Image from "next/image";
 
 export default  function Page() {
   const { data: session, status } = useSession();
@@ -19,8 +20,6 @@ export default  function Page() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-xl font-medium ">Chronos App</h1>
-
       <div className="space-y-10">
         {navItems.map((section) => {
           return (
