@@ -1,6 +1,9 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+//Services
+import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
+
 const handler = NextAuth({
   providers: [
     CredentialsProvider({
@@ -11,13 +14,18 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials: any) {
-        const user = { id: "42", name: "dave", password: "12" }
 
-        if (credentials?.username === user.name && credentials?.password === user.password) {
-            return user
-        } else {
-            return null
-        }
+        const odooUsers: any = await getUsersFromOdoo(credentials.company_id);
+
+        if (!odooUsers.length) return;
+
+        console.log("odooUsersvvvvv", odooUsers)
+        
+        const user = odooUsers.find((user: any) => user.vat === credentials.username && user.password === credentials.password );
+
+        if (user) return user
+        
+        return null
       },
     }),
   ],
