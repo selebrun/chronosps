@@ -47,7 +47,7 @@ function SignIn() {
     const res = await signIn("credentials", {
       username: formData.dniUser,
       password: formData.password,
-      companyId: companyId,
+      company_id: companyId,
       redirect: false,
     });
 
