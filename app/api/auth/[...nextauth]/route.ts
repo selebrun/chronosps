@@ -16,7 +16,6 @@ const handler = NextAuth({
       },
       async authorize(credentials: any) {
         const odooUsers: any = await getUsersFromOdoo(credentials.company_id);
-        console.log(credentials,'hh')
         if (!odooUsers.length) return;
 
         const user = odooUsers.find((user: any) => user.vat === credentials.username && user.x_studio_password === credentials.password );
