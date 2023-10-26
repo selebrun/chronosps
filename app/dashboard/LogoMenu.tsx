@@ -15,7 +15,6 @@ function LogoMenu() {
   }
 
   const logout = () => {
-    console.log('aquii')
     signOut({ redirect: false });
     router.push('/login'); 
   };
