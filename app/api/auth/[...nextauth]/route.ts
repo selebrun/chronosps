@@ -19,6 +19,9 @@ const handler = NextAuth({
        
         const user = odooUsers.find((user: any) => user.vat === credentials.username && user.x_studio_password === credentials.password );
         
+    
+        if (!user)  return;
+  
         const user_data = {
           name: user?.name,
           email: user?.email,
@@ -30,10 +33,9 @@ const handler = NextAuth({
           materiales: user?.x_studio_agregar_materiales,
           active: true
         }
+
+        return user_data
     
-        if (user) return user_data
-    
-        return null
       },
     }),
   ],
