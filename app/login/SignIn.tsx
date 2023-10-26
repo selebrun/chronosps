@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
+import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 function SignIn() {
   const [error, setError] = useState("");
@@ -45,7 +46,8 @@ function SignIn() {
       setError('No es posible determinar la compañia, debe especificar el companyId en la url');
       return;
     }
-    const dni = formData.dniUser.replace(/[^\w\s]/gi, '')
+    const dni = removeSpecialCharacters(formData.dniUser)
+
     const res = await signIn("credentials", {
       username: dni,
       password: formData.password,

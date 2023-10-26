@@ -3,7 +3,6 @@ import CredentialsProvider from "next-auth/providers/credentials";
 
 //Services
 import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
-import { Console } from "console";
 
 const handler = NextAuth({
   providers: [
@@ -17,24 +16,23 @@ const handler = NextAuth({
       async authorize(credentials: any) {
         const odooUsers: any = await getUsersFromOdoo(credentials.company_id);
         if (!odooUsers.length) return;
-
-        const user = odooUsers.find((user: any) => user.vat === credentials.username && user.x_studio_password === credentials.password );
-      
-        if (user) {
-          const user_data = {
-            name: user.name,
-            email: user.email,
-            mobile: user.mobile,
-            password: user.x_studio_password,
-            odoo_id: user.id,
-            document: user.vat,
-            role: user.x_studio_rol_en_produccin,
-            materiales: user.x_studio_agregar_materiales,
-            active: true
-          }
-          return user_data
-        }
        
+        const user = odooUsers.find((user: any) => user.vat === credentials.username && user.x_studio_password === credentials.password );
+        
+        const user_data = {
+          name: user?.name,
+          email: user?.email,
+          mobile: user?.mobile,
+          password: user?.x_studio_password,
+          odoo_id: user?.id,
+          document: user?.vat,
+          role: user?.x_studio_rol_en_produccin,
+          materiales: user?.x_studio_agregar_materiales,
+          active: true
+        }
+    
+        if (user) return user_data
+    
         return null
       },
     }),
