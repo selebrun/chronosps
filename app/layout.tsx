@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import './globals.css'
 // Providers
 import AuthProvider from './context/AuthProvider'
-import { useRouter } from 'next/navigation'
 
 export const metadata: Metadata = {
   title: 'Chronos Piso App',

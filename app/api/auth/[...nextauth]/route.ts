@@ -14,18 +14,28 @@ const handler = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials: any) {
-
         const odooUsers: any = await getUsersFromOdoo(credentials.company_id);
-
         if (!odooUsers.length) return;
-
-        console.log("odooUsersvvvvv", odooUsers)
+       
+        const user = odooUsers.find((user: any) => user.vat === credentials.username && user.x_studio_password === credentials.password );
         
-        const user = odooUsers.find((user: any) => user.vat === credentials.username && user.password === credentials.password );
+    
+        if (!user)  return;
+  
+        const user_data = {
+          name: user?.name,
+          email: user?.email,
+          mobile: user?.mobile,
+          password: user?.x_studio_password,
+          odoo_id: user?.id,
+          document: user?.vat,
+          role: user?.x_studio_rol_en_produccin,
+          materiales: user?.x_studio_agregar_materiales,
+          active: true
+        }
 
-        if (user) return user
-        
-        return null
+        return user_data
+    
       },
     }),
   ],
