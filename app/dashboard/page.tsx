@@ -1,9 +1,8 @@
 'use client'
 import { navItems } from '@/config/nav-links';
 import Link from 'next/link';
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { useRouter } from 'next/navigation';
-import Image from "next/image";
 
 export default  function Page() {
   const { data: session, status } = useSession();
@@ -12,6 +11,7 @@ export default  function Page() {
   if (status === 'loading') {
     return <div>Loading...</div>;
   }
+
 
   if (!session) {
     router.push('/login');

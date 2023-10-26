@@ -30,21 +30,4 @@ export const navItems: { name: string; items: navItem[] }[] = [
       },
     ],
   },
-  {
-    name: 'Usuario',
-    items: [
-      {
-        name: 'Cambiar contraseña',
-        slug: '',
-        description:
-          'Cambiar contraseña del usuario actual',
-      },
-      {
-        name: 'Cerrar Sessión',
-        slug: '',
-        description:
-          'Cierra sessión en el sistema',
-      },
-    ],
-  },
 ];
