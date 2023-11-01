@@ -1,27 +1,27 @@
-import type { Metadata } from 'next'
 import './globals.css'
+import type { Metadata } from 'next'
 // Providers
-import AuthProvider from './context/AuthProvider'
+import SessionProvider from '@/app/context/SessionProvider'
 
 export const metadata: Metadata = {
   title: 'Chronos Piso App',
   description: '',
 }
 
-export default function Layout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  
+
   return (
     <html lang="en" className="[color-scheme:light]">
-      <body >
-        <AuthProvider>
+      <body>
+        <SessionProvider>
           <div className="main">
-            <div >{children}</div>
+            {children}
           </div>
-        </AuthProvider>
+        </SessionProvider>
       </body>
     </html>
   )
