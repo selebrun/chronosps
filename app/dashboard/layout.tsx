@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import Image from "next/image";
 
 // Ui Components
-import { BreadcrumbsBar } from '@/ui/breadcrumbs-bar/breadcrumbs-bar';
 import LogoMenu from './LogoMenu';
 
 export const metadata: Metadata = {

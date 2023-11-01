@@ -27,7 +27,7 @@ export async function getOrders() {
   return orders.results;
 }
 
-export async function getProductionOrders(user: any, company_id:any) {
+export async function getProductionOrders(user: any) {
 	switch(user.role) {
     case 'Operario':
       return new Promise(async (resolve, reject) => {
@@ -37,7 +37,7 @@ export async function getProductionOrders(user: any, company_id:any) {
           ['id', 'state', 'production_id'],
           false,
           false,
-          company_id,
+          user.company_id,
           async (workorders: any) => {
             if (!workorders || !workorders.data) {
               reject({ status: false, message: 'No se encontraron ordenes de trabajo.', data: false });
@@ -51,13 +51,13 @@ export async function getProductionOrders(user: any, company_id:any) {
               ['id', 'state', 'name', 'product_id', 'product_qty', 'qty_producing', 'lot_producing_id', 'date_planned_start', 'user_id', 'bom_id', 'move_raw_ids'],
               false,
               false,
-              company_id,
+              user.company_id,
               async (productions: any) => {
                 if (!productions || !productions.data) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data: productions.data, block_reasons: 'block_reasons' });
+                resolve({ status: true, message: '', data: productions.data });
               }
             );
           }
@@ -65,20 +65,48 @@ export async function getProductionOrders(user: any, company_id:any) {
       });
 
     case 'Lider':
-      if(!user.odoo_user_id) return {status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en '}
-      getOdooData('mrp.production',[['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]],['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],false,false, company_id,(productions: any) => {
-        if(!productions || !productions.data) return {status: false, message: "No tiene ninguna orden de produccion asignada."}
-        return {status: true, message: '', data: productions.data, block_reasons: 'block_reasons'}
-      })
-      break
+      return new Promise(async (resolve, reject) => {
+        if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+
+        getOdooData(
+          'mrp.production',
+          [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]],
+          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
+          false,
+          false,
+          user.company_id,
+          async (productions: any) => {
+            if (!productions || !productions.data) {
+              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+              return;
+            }
+            resolve({ status: true, message: '', data: productions.data });
+          }
+        )
+      });
+
     case 'Jefe':
-      getOdooData('mrp.production',[['state','in',['confirmed','progress']]],['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],false,false, company_id,(productions: any) => {
-        if(!productions || !productions.data) return {status: false, message: "No tiene ninguna orden de produccion asignada."}
-        return {status: true, message: '', data: productions.data, block_reasons: 'block_reasons'}
+      return new Promise(async (resolve, reject) => {
+        getOdooData(
+          'mrp.production',
+          [['state','in',['confirmed','progress']]],
+          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
+          false,
+          false,
+          user.company_id,
+          async (productions: any) => {
+            if (!productions || !productions.data) {
+              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+              return;
+            }
+            resolve({ status: true, message: '', data: productions.data });
+          })
       })
-      break;
+
     default:
-      return {status: false, message: "Usted no tiene definido un tipo de usuario."}
+      return new Promise(async (resolve, reject) => {
+        reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
+      })
   }
 }
 

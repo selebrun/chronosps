@@ -1,42 +1,20 @@
 import Link from 'next/link';
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
-import { getOrders, getProductionOrders } from '@/app/api/orders/getOrders';
-
-const testUser = {
-  name: 'Alfonso Schiavino',
-  email: 'alfonso@chronosps.com',
-  mobile: '+56 9 3431 2199',
-  password: 'f05c9eb802ba34adc664326a72a27f8b',
-  odoo_id: 7,
-  odoo_user_id: 6,
-  document: '23400447-6',
-  role: 'Operario',
-  hash: 'f47a8632fb94c9f081fe429c33136b39f29153b7698e22d7a32d3ffb597280f0',
-  active: true,
-}
-const testCompanyId = "889cd134-00b2-11ee-be56-0242ac120002";
-
+import { getProductionOrders } from '@/app/api/orders/getOrders'
+import { getServerSession } from 'next-auth'
+import { config } from '@/auth';
 
 export default async function Page() {
-  const odooOrders: any = await getProductionOrders(testUser, testCompanyId);
+  const session = await getServerSession(config);
+  const user = session.user;
+  const odooOrders: any = await getProductionOrders(user).then( res => res).catch((err) => console.log(err));
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
       <h1 className="text-xl font-bold mb-3">Órdenes de producción</h1>
 
-      <div className='mb-7'>
-        <p>
-          This example uses context to share state between Client Components
-          that cross the Server/Client Component boundary.
-        </p>
-        <p>
-          Try incrementing the counter and navigating between pages. Note how
-          the counter state is shared across the app even though they are inside
-          different layouts and pages that are Server Components.
-        </p>
-      </div>
-
+      { odooOrders?.data.length ? (
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
             <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white">
@@ -105,7 +83,16 @@ export default async function Page() {
             </tbody>
         </table>
       </div>
+      ) : (
 
+        <div className="text-center block p-6 bg-white border border-gray-200 rounded-lg shadow bg-gray-100">
+          <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">No hay órdenes asignadas</h5>
+          <p className="mb-3 font-normal text-gray-700 dark:text-gray-400">Usted no tiene ninguna orden de produccion asignada.</p>
+          <a href="/dashboard" className="inline-flex justify-center items-center py-2 px-5 text-base font-medium text-center text-white rounded-lg bg-blue-700 hover:bg-blue-600 focus:ring-4 focus:ring-blue-300">
+              Volver al menú
+          </a>
+        </div>
+      )}
     </div>
   );
 }
