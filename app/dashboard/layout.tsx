@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import Image from "next/image";
 
 // Ui Components
-import LogoMenu from './LogoMenu';
+import { LogoMenu } from '../../ui/logo-menu/LogoMenu';
 
 export const metadata: Metadata = {
   title: 'Chronos Piso App Dashboard',
