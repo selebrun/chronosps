@@ -5,7 +5,7 @@ import { useState } from "react";
 import { signOut } from "next-auth/react";
 
 
-function LogoMenu() {
+export function LogoMenu() {
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const pathName = usePathname();
   const isDashboardRoute = pathName === '/dashboard';
@@ -49,5 +49,3 @@ function LogoMenu() {
     </>
   );
 }
-
-export default LogoMenu;
