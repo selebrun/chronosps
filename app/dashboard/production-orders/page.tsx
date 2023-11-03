@@ -5,6 +5,9 @@ import { getProductionOrders } from '@/app/api/orders/getOrders'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
 
+//UI Components
+import { StatusBadge } from '@/ui/status-badge/status-badge';
+
 export default async function Page() {
   const session = await getServerSession(config);
   const user = session.user;
@@ -15,15 +18,18 @@ export default async function Page() {
       <h1 className="text-xl font-bold mb-3">Órdenes de producción</h1>
 
       { odooOrders?.data.length ? (
-      <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
-        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
+      <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[80vh] rounded">
+        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto table-auto">
             <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white">
                 <tr>
                   <th scope="col" className="px-6 py-3 ">
-                    Nombre
+                    NO. de Orden
                   </th>
                   <th scope="col" className="px-6 py-3">
                     Estado
+                  </th>
+                  <th scope="col" className="px-6 py-3">
+                    Producto
                   </th>
                   <th scope="col" className="px-6 py-3">
                     Cantidad
@@ -42,19 +48,19 @@ export default async function Page() {
             </thead>
             <tbody>
               {odooOrders?.data?.map((order: any) => (
-                <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:bg-white dark:border-white bg-lightCyan text-black">
-                    <th scope="row" className="px-5 font-medium text-black dark:text-white w-5">
-                      <div className="flex items-center space-x-4 w-60 whitespace-normal">
+                <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
+                    <th scope="row" className="px-5 font-medium text-black">
+                      <div className="flex items-center space-x-4 whitespace-normal">
                           <div className="dark:text-white">
                               <div className="text-sm text-black">{order.name}</div>
                           </div>
                       </div>
                     </th>
                     <td className="px-3 py-2">
-                      <span className={`text-xs font-medium mr-2 px-2.5 py-0.5 rounded
-                        ${order.state === "progress"? "bg-indigo-100 text-indigo-900": order.state === "confirmed"? "bg-green-100 text-green-900" : ""}`}>
-                        {order.state}
-                      </span>
+                      <StatusBadge status={order.state} />
+                    </td>
+                    <td className="px-3 py-2">
+                      {order.product_id[1]}
                     </td>
                     <td className="px-3 py-2">
                       {order.qty_producing}/{order.product_qty}
