@@ -1,3 +1,4 @@
+import { HeaderLink } from '@/ui/header-link/HeaderLink';
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
@@ -26,6 +27,7 @@ export default async function Layout({
   return (
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <LogoMenu></LogoMenu>
+      <HeaderLink userRole={session.user.role}></HeaderLink>
       <div className="mx-auto max-w-7xl space-y-8 px-2 pt-20 lg:px-8 lg:py-8">
         <div className="bg-white rounded-lg p-px shadow-lg shadow-black/20">
           <div className="rounded-lg p-3.5 lg:p-6">{children}</div>

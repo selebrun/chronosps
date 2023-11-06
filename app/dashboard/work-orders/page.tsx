@@ -1,42 +1,37 @@
-import Link from 'next/link';
-import Image from 'next/image'
-import eyeDetails from '@/public/eyeDetails.svg'
-import { getProductionOrders } from '@/app/api/orders/getOrders'
+import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
-
-//UI Components
+import eyeDetails from '@/public/eyeDetails.svg'
+import Link from 'next/link';
+import Image from 'next/image'
 import { StatusBadge } from '@/ui/status-badge/status-badge';
 
 export default async function Page() {
   const session = await getServerSession(config);
   const user = session.user;
-  const odooOrders: any = await getProductionOrders(user).then( res => res).catch((err) => console.log(err));
+  const odooOrders: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err));
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
       { odooOrders?.data.length ? (
-      <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
+      <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
             <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white">
                 <tr>
                   <th scope="col" className="px-6 py-3 ">
-                    NO. de Orden
+                    No.OT
                   </th>
                   <th scope="col" className="px-6 py-3">
                     Estado
                   </th>
                   <th scope="col" className="px-6 py-3">
-                    Producto
+                    Nombre
                   </th>
                   <th scope="col" className="px-6 py-3">
-                    Cantidad
+                   Producción
                   </th>
                   <th scope="col" className="px-6 py-3">
-                    Lote
-                  </th>
-                  <th scope="col" className="px-6 py-3">
-                    Responsable
+                    Centro de trabajo
                   </th>
                   <th scope="col" className="px-6 py-3">
                     Inicio programado
@@ -46,41 +41,26 @@ export default async function Page() {
             </thead>
             <tbody>
               {odooOrders?.data?.map((order: any) => (
-                <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
-                    <th scope="row" className="px-5 font-medium text-black">
-                      <div className="flex items-center space-x-4 whitespace-normal">
-                          <div className="dark:text-white">
-                              <div className="text-sm text-black">{order.name}</div>
-                          </div>
-                      </div>
+                <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:bg-white dark:border-white bg-lightCyan text-black">
+                    <th className="px-3 py-2">
+                      {order.id}
                     </th>
                     <td className="px-3 py-2">
                       <StatusBadge status={order.state} />
                     </td>
+                    <td className="px-3 py-2">{order.name}</td>
+                    <td className="px-3 py-2">{order.production_id[1]}</td>
+                    <td className="px-3 py-2">{order.workcenter_id[1]}</td>
+                    <td className="px-3 py-2">{order.date_planned_start}</td>
                     <td className="px-3 py-2">
-                      {order.product_id[1]}
-                    </td>
-                    <td className="px-3 py-2">
-                      {order.qty_producing}/{order.product_qty}
-                    </td>
-                    <td className="px-3 py-2">
-                      {order.lot_producing_id[1]}
-                    </td>
-                    <td className="px-3 py-2">
-                      {order.user_id[1]}
-                    </td>
-                    <td className="px-3 py-2">
-                      {order.date_planned_start}
-                    </td>
-                    <td className="px-3 py-2">
-                    <Link
-                      href={`production-orders/${order.id}`}>
-                      <Image
-                        src={eyeDetails}
-                        alt="Eye Details"
-                        className='w-20 h-5'
-                      />
-                    </Link>
+                      <Link
+                        href={`production-orders/${order.id}`}>
+                        <Image
+                          src={eyeDetails}
+                          alt="Eye Details"
+                          className='w-20 h-5'
+                        />
+                      </Link>
                     </td>
                 </tr>
                 ))}
