@@ -6,6 +6,7 @@ export function StatusBadge({ status }: { status: string }) {
     waiting: { name: "En espera", color: "bg-gray-400 text-black" },
     pending: { name: "Pendiente", color: "bg-orange-400 text-white" },
     confirmed: { name: "Confirmado", color: "bg-purple-200 text-purple-800" },
+    done: { name: "Terminado", color: "bg-purple-200 text-purple-800" },
   };
 
   const statusInfo = STATUS_DICT[status] || { name: {status}, color: "bg-gray-400 text-black" };
