@@ -32,7 +32,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
           >
             <Image
               src={close}
-              alt="Eye Details"
+              alt="Close"
             />
           </button>
           </div>
