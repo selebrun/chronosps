@@ -11,11 +11,16 @@ import { OrderTableModalWork } from '@/ui/format-table/orderTableModalWork'
 
 export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: any, ordersWork: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
+  const [modalIsOpenJobDetail, setModalIsOpenJobDetail] = useState(false);
   const [orderWorkDetail, setOrderWorkDetail] = useState([]);
 
 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
+  }
+
+  const openJobDetail = () => {
+    setModalIsOpenJobDetail(!modalIsOpenJobDetail)
   }
 
   const onSaveOrderId = (orderId: string) => {
@@ -32,15 +37,35 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
           >
             <Image
               src={close}
-              alt="Eye Details"
+              alt="Close"
             />
           </button>
           </div>
           {orderWorkDetail.length > 0 && 
-           <OrderTableModalWork orderDetail={orderWorkDetail} thOrder={'NO. de Orden'} thStatus={'Estado'} thProduct={'Producto'} />}
+           <OrderTableModalWork 
+           orderDetail={orderWorkDetail} 
+           thOrder={'NO. de Orden'} 
+           thStatus={'Estado'} 
+           thProduct={'Producto'}
+           openJobDetail={openJobDetail}
+           />}
           {orderWorkDetail.length === 0 && 
              <h5 className="mb-2 text-2xl tracking-tight text-gray-700 dark:text-white flex justify-center">No hay órdenes de trabajo</h5>
           }
+      </Modal>
+      <Modal setOpen={modalIsOpenJobDetail} title='Órdenes de trabajo' className='max-w-3xl'>
+        <div className="flex justify-end relative bottom-10">
+          <button
+            type="button"
+            onClick={() => setModalIsOpenJobDetail(false)}
+          >
+            <Image
+              src={close}
+              alt="Close"
+            />
+          </button>
+          </div>
+          yyyg
       </Modal>
 
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
