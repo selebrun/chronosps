@@ -12,7 +12,7 @@ export function HeaderLink({ userRole }: any) {
    isDashboardRoute && 
     <div className="mx-auto max-w-7xl space-y-8 px-2 pt-20 lg:px-8 lg:py-8">
       <div className="bg-white rounded-lg p-px shadow-lg shadow-black/20">
-        <div className="rounded-lg p-3.5 lg:p-6 flex">
+        <div className="rounded-lg p-3.5 lg:p-6 flex flex-wrap ">
           <div> <Image src="/logo-page.png" width={50} height={50} alt="lLogo" /></div>
           <div className="space-x-4 ml-10 mr-4">
             <div className="space-x-4">

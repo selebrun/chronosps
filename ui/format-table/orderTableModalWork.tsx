@@ -10,7 +10,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
     thOrder: string,
     thStatus: string,
     thProduct: string,
-    openJobDetail: () => void
+    openJobDetail: (id: string) => void
   }) => {
 
   return (
@@ -48,7 +48,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
             </td>
             <td className="px-3 py-2">
               <button 
-              onClick={openJobDetail}
+              onClick={() => openJobDetail(order.id)}
               >
                 <Image
                   src={eyeDetails}

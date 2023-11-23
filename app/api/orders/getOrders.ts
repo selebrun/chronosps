@@ -224,7 +224,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data:  productions.data, production_data: productions.data });
+      
+                resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
               }
             );
           }

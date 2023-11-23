@@ -21,7 +21,7 @@ export const config = {
   
           const odooUsers: any = await getUsersFromOdoo(company_id);
           if (!odooUsers.length) return null;
- 
+       
           const user = odooUsers.find((user: any) => user.vat === username && user.x_studio_password === password );        
           if (!user) return null;
           let odoo_user_id = 0

@@ -19,6 +19,7 @@ export default {
         'gray-1000': 'rgb(17,17,19)',
         'gray-1100': 'rgb(10,10,11)',
         strongCyan: '#6BB2D7',
+        whiteInput: '#F2F5FA',
         lightCyan: '#A9D1DC',
         vercel: {
           pink: '#FF0080',
@@ -26,6 +27,9 @@ export default {
           cyan: '#50E3C2',
           orange: '#F5A623',
           violet: '#7928CA',
+        },
+        boxShadow: {
+          'custom': '0px 4px 14px 0px rgba(0, 0, 0, 0.35)',
         },
       },
       backgroundImage: ({ theme }) => ({
