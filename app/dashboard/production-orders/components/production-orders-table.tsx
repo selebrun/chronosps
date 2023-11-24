@@ -7,21 +7,66 @@ import close from '@/public/close.png'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
 import { OrderTableModalWork } from '@/ui/format-table/orderTableModalWork'
+import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
 
 
 export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: any, ordersWork: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
+  const [modalIsOpenJobDetail, setModalIsOpenJobDetail] = useState(false);
   const [orderWorkDetail, setOrderWorkDetail] = useState([]);
+  const [orderProductionSelected, setOrderProductionSelected] = useState<any>({});
+  const [showDetailOrderWork, setShowDetailOrderWork] = useState<any>({});
 
 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
   }
 
-  const onSaveOrderId = (orderId: string) => {
-    const dateilOrden = ordersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderId))
-    setOrderWorkDetail(dateilOrden)
+  const openJobDetail = (orderId: string) => {
+    setModalIsOpenJobDetail(!modalIsOpenJobDetail)
+    getDetailOrderWork(orderId)
   }
+
+  const getDetailOrderWork = (orderId: string) => {
+    const dateilOrden = ordersWork?.data.find((orden:any) => orden.id === parseInt(orderId))
+    let duration_expected = ""
+    let duration = ""
+    let minutes = dateilOrden.duration_expected
+    let k = 0
+
+    if (minutes >= 60*24) {
+      k = Math.floor(minutes/(60*24)); duration_expected += k + "Dias "; minutes -= k*60*24
+    }
+    if(minutes >= 60) {
+      k = Math.floor(minutes/60); duration_expected += k + "Horas "; minutes -= k*60*24
+    }
+    if(minutes >= 1) duration_expected += Math.floor(minutes) + "Minutos"
+
+    minutes = dateilOrden?.duration
+
+    if(minutes >= 60*24) {
+      k = Math.floor(minutes/(60*24)); duration += k + "Dias "; minutes -= k*60*24
+    }
+
+    if(minutes >= 60) {
+      k = Math.floor(minutes/60); duration += k + "Horas "; minutes -= k*60*24
+    }
+
+    if(minutes >= 1) duration += Math.floor(minutes) + "Minutos"
+
+    dateilOrden.theoretical_duration = duration_expected
+    dateilOrden.real_duration = duration
+    setShowDetailOrderWork(dateilOrden)
+  }
+
+  const onSaveOrderId = (order: any) => {
+    const dateilOrden = ordersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(order.id))
+    setOrderWorkDetail(dateilOrden)
+    setOrderProductionSelected(order)
+  }
+  
+
+  const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
   return (
     <>
       <Modal setOpen={modalIsOpen} title='Órdenes de trabajo' className='max-w-3xl'>
@@ -37,12 +82,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
           </button>
           </div>
           {orderWorkDetail.length > 0 && 
-           <OrderTableModalWork orderDetail={orderWorkDetail} thOrder={'NO. de Orden'} thStatus={'Estado'} thProduct={'Producto'} />}
+           <OrderTableModalWork 
+           orderDetail={orderWorkDetail} 
+           thOrder={'NO. de Orden'} 
+           thStatus={'Estado'} 
+           thProduct={'Producto'}
+           openJobDetail={openJobDetail}
+           />}
           {orderWorkDetail.length === 0 && 
              <h5 className="mb-2 text-2xl tracking-tight text-gray-700 dark:text-white flex justify-center">No hay órdenes de trabajo</h5>
           }
       </Modal>
-
+      {modalIsOpenJobDetail && 
+        <ModalDetailWork
+         modalIsOpenJobDetail={modalIsOpenJobDetail}
+         setModalIsOpenJobDetail={(close: any) => setModalIsOpenJobDetail(close)}
+         orderProductionSelected={orderProductionSelected}
+         showDetailOrderWork={showDetailOrderWork}
+         progress={progress}
+        />
+      }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
           <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white">
@@ -102,7 +161,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
                 <td className="px-3 py-2">
                   <button onClick={() => { 
                     openWorkOrders()
-                    onSaveOrderId(order.id)
+                    onSaveOrderId(order)
                   }}>
                     <Image
                       src={eyeDetails}
