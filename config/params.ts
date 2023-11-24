@@ -1,18 +1,6 @@
 export const config = {
     "companies": [
         {
-            "id": "7ac7aa42-008b-11ee-be56-0242ac120002",
-            "company": "pkannoa",
-            "odoo_connection": {
-                "domain": "kannoa-new-test-10442236.dev.odoo.com",
-                "url": "https://kannoa-new-test-10442236.dev.odoo.com/",
-                "port": 443,
-                "db": "kannoa-new-test-10442236",
-                "username": "admin",
-                "password": "f398f1a5e37c9ffe982e39e5fe29949419630505"
-            }
-        },
-        {
             "id": "889cd134-00b2-11ee-be56-0242ac120002",
             "company": "pdemo",
             "odoo_connection": {
@@ -47,6 +35,18 @@ export const config = {
                 "username": "admin",
                 "password": "d66e15abc634f18b6a8464839ba48ec22f9e53de"
             },
+        },
+        {
+            "id": "7ac7aa42-008b-11ee-be56-0242ac120002",
+            "company": "pkannoat",
+            "odoo_connection": {
+                "domain": "kannoa-new-test-10442236.dev.odoo.com",
+                "url": "https://kannoa-new-test-10442236.dev.odoo.com/",
+                "port": 443,
+                "db": "kannoa-new-test-10442236",
+                "username": "admin",
+                "password": "be273be92c809dc970371d836762d3e1fb4046b5"
+            }
         }
     ],
     "web_app": {

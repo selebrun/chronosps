@@ -5,11 +5,12 @@ import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 
 
-export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct }: {
+export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct, openJobDetail }: {
     orderDetail: any, 
     thOrder: string,
     thStatus: string,
     thProduct: string,
+    openJobDetail: (id: string) => void
   }) => {
 
   return (
@@ -46,7 +47,9 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct 
               {order.workcenter_id[1]}
             </td>
             <td className="px-3 py-2">
-              <button >
+              <button 
+              onClick={() => openJobDetail(order.id)}
+              >
                 <Image
                   src={eyeDetails}
                   alt="Eye Details"
