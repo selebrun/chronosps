@@ -35,4 +35,3 @@ export const navItems: { name: string; items: navItem[] }[] = [
     ],
   },
 ];
-
