@@ -41,59 +41,61 @@ export function ModalDetailWork({ modalIsOpenJobDetail, showDetailOrderWork, ord
   
 
   return (
-    <Modal setOpen={modalIsOpenJobDetail} title='Detalle de Trabajo' className='max-w-3xl'>
-      <div className="flex justify-end relative bottom-10">
-        <button
-          type="button"
-          onClick={() => setModalIsOpenJobDetail(false)}
-        >
-          <Image
-            src={close}
-            alt="Close"
-          />
-        </button>
-      </div>
-      <div className='flex justify-between'>
-          <div className='w-[80vh]'>
-              <div className='mb-3 w-90'>
-                  <div className='font-bold text-center'>Nombre de la Orden</div>
-                  <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.name}</div>
-              </div>
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+    <>
+      <Modal setOpen={modalIsOpenJobDetail} title='Detalle de Trabajo' className='max-w-3xl'>
+        <div className="flex justify-end relative bottom-10">
+          <button
+            type="button"
+            onClick={() => setModalIsOpenJobDetail(false)}
+          >
+            <Image
+              src={close}
+              alt="Close"
+            />
+          </button>
+        </div>
+        <div className='flex justify-between'>
+            <div className='w-[80vh]'>
+                <div className='mb-3 w-90'>
+                    <div className='font-bold text-center'>Nombre de la Orden</div>
+                    <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.name}</div>
+                </div>
+                <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    <div className=''>
+                        <div className='font-bold text-center'>Inicio proramado</div>
+                        <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_planned_start ? showDetailOrderWork.date_planned_start : 'No definida'}</div>
+                    </div>
                   <div className=''>
-                      <div className='font-bold text-center'>Inicio proramado</div>
-                      <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_planned_start ? showDetailOrderWork.date_planned_start : 'No definida'}</div>
+                      <div className='font-bold text-center'>Final Programado</div>
+                      <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_planned_finished ? showDetailOrderWork.date_planned_finished : 'No definida'}</div>
                   </div>
-                <div className=''>
-                    <div className='font-bold text-center'>Final Programado</div>
-                    <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_planned_finished ? showDetailOrderWork.date_planned_finished : 'No definida'}</div>
+                  <div className=''>
+                      <div className='font-bold text-center'>Duración teorica</div>
+                      <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.theoretical_duration}</div>
+                  </div>
+                  <div className=''>
+                      <div className='font-bold text-center'>Duración real</div>
+                      <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center'>{showDetailOrderWork?.real_duration}</div>
+                  </div>
+                  <div className=''>
+                      <div className='font-bold text-center'>Centro de trabajo</div>
+                      <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.workcenter_id[1]}</div>
+                  </div>
+                  <div className=''>
+                      <div className='font-bold text-center'>Cantidad</div>
+                      <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{orderProductionSelected?.product_qty}</div>
+                  </div>
                 </div>
-                <div className=''>
-                    <div className='font-bold text-center'>Duración teorica</div>
-                    <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.theoretical_duration}</div>
-                </div>
-                <div className=''>
-                    <div className='font-bold text-center'>Duración real</div>
-                    <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center'>{showDetailOrderWork?.real_duration}</div>
-                </div>
-                <div className=''>
-                    <div className='font-bold text-center'>Centro de trabajo</div>
-                    <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.workcenter_id[1]}</div>
-                </div>
-                <div className=''>
-                    <div className='font-bold text-center'>Cantidad</div>
-                    <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{orderProductionSelected?.product_qty}</div>
-                </div>
-              </div>
-          </div>
-          <div className='ml-10'>
-            {renderButtons(showDetailOrderWork)}
-          </div>
-      </div>
-        <div className='flex mt-5 '>
-          <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.state} /></div>
-          <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'>{progress}%</div>
-      </div>
+            </div>
+            <div className='ml-10'>
+              {renderButtons(showDetailOrderWork)}
+            </div>
+        </div>
+          <div className='flex mt-5 '>
+            <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.state} /></div>
+            <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'>{progress}%</div>
+        </div>
     </Modal>
+    </>
   )
 }

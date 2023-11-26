@@ -28,7 +28,7 @@ export const navItems: { name: string; items: navItem[] }[] = [
       // },
       {
         name: 'Controles de calidad',
-        slug: '',
+        slug: 'quality-control',
         description: 'Procesos de control de calidad',
         role: ['Lider', 'Jefe']
       },
