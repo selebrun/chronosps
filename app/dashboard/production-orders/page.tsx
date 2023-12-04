@@ -1,4 +1,4 @@
-import { getProductionOrders, getWorkOrders, updateOrder } from '@/app/api/orders/getOrders'
+import { getProductionOrders, getWorkOrders } from '@/app/api/orders/getOrders'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
 
