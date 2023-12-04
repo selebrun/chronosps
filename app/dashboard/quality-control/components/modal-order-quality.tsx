@@ -5,11 +5,36 @@ import close from '@/public/close.png'
 // UI Components
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
+import ModalOrderQualityDetails from './modal-order-quality-details'
 
 
-export function ModalOrderQuality({ orderQualityDetail, modalIsOpen, setModalIsOpen }: { orderQualityDetail: any, modalIsOpen: boolean, setModalIsOpen: any }) {
+export function ModalOrderQuality({ 
+  selectedQualityDetails,
+  orderQualityDetail, 
+  modalIsOpen, 
+  setModalIsOpen, 
+  modalDetailsIsOpen,
+  openJobDetail,
+  selectedOrderQuantity
+}: 
+{ selectedQualityDetails: (order: any) => void,
+  orderQualityDetail: any, 
+  modalIsOpen: boolean, 
+  setModalIsOpen: any, 
+  modalDetailsIsOpen: boolean,
+  openJobDetail: any,
+  selectedOrderQuantity:any
+}) {
 
   return (
+    <>
+     {modalDetailsIsOpen && 
+      <ModalOrderQualityDetails 
+        modalWorkOrderDetail={modalDetailsIsOpen}
+        openJobDetail={openJobDetail}
+        orderQualityDetail={orderQualityDetail}
+        selectedOrderQuantity={selectedOrderQuantity}
+        />}
       <Modal setOpen={modalIsOpen} title='Órdenes de trabajo' className='max-w-3xl'>
         <div className="flex justify-end relative bottom-10">
           <button
@@ -56,8 +81,11 @@ export function ModalOrderQuality({ orderQualityDetail, modalIsOpen, setModalIsO
                         {order.product_id[1]}
                       </td>
                       <td className="px-3 py-2">
-                        <button 
-                        // onClick={() => openJobDetail(order.id)}
+                        <button
+                          onClick={() => {
+                            openJobDetail()
+                            selectedQualityDetails(order)
+                          }}
                         >
                           <Image
                             src={eyeDetails}
@@ -76,5 +104,7 @@ export function ModalOrderQuality({ orderQualityDetail, modalIsOpen, setModalIsO
              <h5 className="mb-2 text-2xl tracking-tight text-gray-700 dark:text-white flex justify-center">No hay órdenes de trabajo</h5>
           }
       </Modal>
+    </>
+    
   )
 }

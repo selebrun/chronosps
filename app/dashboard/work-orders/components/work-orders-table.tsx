@@ -6,20 +6,32 @@ import eyeDetails from '@/public/eyeDetails.svg'
 
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
+import { updateOrder } from '@/app/api/updateOrder/updateOrder'
+import { getWorkOrders } from '@/app/api/orders/getOrders'
 
 
-export function WorkOrdersTable({ odooOrders }: { odooOrders: any}) {
+export function WorkOrdersTable({ odooOrders, user }: { odooOrders: any, user: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
+  const [modalIsOpenInstructions, setModalIsOpenInstructions] = useState(false);
   const [orderProduction, setOrderProduction] = useState<any>({});
   const [showDetailOrderWork, setShowDetailOrderWork] = useState<any>({});
+  const [workoOrder, setOrdersWork] = useState<any>(odooOrders);
+  const [loadigAction, setLoadigAction] = useState<boolean>(false)
+  const [orderSelected, setOrderSelectedk] = useState<any>({});
 
 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
   }
 
+
+  const openModalInstructions = () => {
+    setModalIsOpenInstructions(!modalIsOpenInstructions)
+  }
+
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = odooOrders?.data.find((orden:any) => orden.id === parseInt(order.id))
+    setOrderSelectedk(order)
+    const dateilOrden = workoOrder?.data.find((orden:any) => orden.id === parseInt(order.id))
     getDetailOrderWork(dateilOrden)
   }
 
@@ -55,11 +67,25 @@ export function WorkOrdersTable({ odooOrders }: { odooOrders: any}) {
 
     setShowDetailOrderWork(order)
 
-    const dateilOrden = odooOrders?.production_data.find((orden:any) =>  orden.id === order.production_id[0])
+    const dateilOrden = workoOrder?.production_data.find((orden:any) =>  orden.id === order.production_id[0])
     setOrderProduction(dateilOrden)
   }
   
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
+
+  const executeWorkOrderAction = async (action: string) => {
+    setLoadigAction(true)
+    const update = await updateOrder(user, orderSelected, action).then( res => res).catch((err) => console.log(err))
+    if (update.status) {
+      const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
+      setOrdersWork(odooOrdersWork)
+      setLoadigAction(false)
+      setModalIsOpen(!modalIsOpen)
+    } else {
+      setLoadigAction(false)
+    }
+  }
+
 
   return (
     <>
@@ -70,6 +96,10 @@ export function WorkOrdersTable({ odooOrders }: { odooOrders: any}) {
          orderProductionSelected={orderProduction}
          showDetailOrderWork={showDetailOrderWork}
          progress={progress}
+         modalIsOpenInstructions={modalIsOpenInstructions}
+         openModalInstructions={openModalInstructions}
+         executeWorkOrderAction={executeWorkOrderAction}
+         loadigAction={loadigAction}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
@@ -98,7 +128,7 @@ export function WorkOrdersTable({ odooOrders }: { odooOrders: any}) {
                 </tr>
             </thead>
             <tbody>
-              {odooOrders?.data.map((order: any) => (
+              {workoOrder?.data.map((order: any) => (
                 <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:bg-white dark:border-white bg-lightCyan text-black">
                     <th className="px-3 py-2">
                       {order.id}

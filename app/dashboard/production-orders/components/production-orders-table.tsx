@@ -8,16 +8,21 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
 import { OrderTableModalWork } from '@/ui/format-table/orderTableModalWork'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
+import { updateOrder } from '@/app/api/updateOrder/updateOrder'
+import { getWorkOrders } from '@/app/api/orders/getOrders'
 
 
-export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: any, ordersWork: any}) {
+export function ProductionOrdersTable({ odooOrders, ordersWork, user }: { odooOrders: any, ordersWork: any, user: any,}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalIsOpenJobDetail, setModalIsOpenJobDetail] = useState(false);
-  const [orderWorkDetail, setOrderWorkDetail] = useState([]);
+  const [orderWorkDetail, setOrderWorkDetail] = useState<any>([]);
   const [orderProductionSelected, setOrderProductionSelected] = useState<any>({});
   const [showDetailOrderWork, setShowDetailOrderWork] = useState<any>({});
+  const [modalIsOpenInstructions, setModalIsOpenInstructions] = useState(false);
+  const [workoOrder, setOrdersWork] = useState<any>(ordersWork);
+  const [loadigAction, setLoadigAction] = useState<boolean>(false)
 
-
+ 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
   }
@@ -28,7 +33,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
   }
 
   const getDetailOrderWork = (orderId: string) => {
-    const dateilOrden = ordersWork?.data.find((orden:any) => orden.id === parseInt(orderId))
+    const dateilOrden = workoOrder?.data.find((orden:any) => orden.id === parseInt(orderId))
     let duration_expected = ""
     let duration = ""
     let minutes = dateilOrden.duration_expected
@@ -60,13 +65,29 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
   }
 
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = ordersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(order.id))
+    const dateilOrden = workoOrder?.data.filter((orden:any) => orden.production_id[0] === parseInt(order.id))
     setOrderWorkDetail(dateilOrden)
     setOrderProductionSelected(order)
   }
   
+  const openModalInstructions = () => {
+    setModalIsOpenInstructions(!modalIsOpenInstructions)
+  }
+
+
+  const executeWorkOrderAction = async (action: string) => {
+    setLoadigAction(true)
+    const update = await updateOrder(user, orderWorkDetail[0], action).then( res => res).catch((err) => console.log(err))
+    if (update.status) {
+      const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
+      setOrdersWork(odooOrdersWork)
+      setLoadigAction(false)
+      setModalIsOpenJobDetail(!modalIsOpenJobDetail)
+    } 
+  }
 
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
+
   return (
     <>
       <Modal setOpen={modalIsOpen} title='Órdenes de trabajo' className='max-w-3xl'>
@@ -100,6 +121,10 @@ export function ProductionOrdersTable({ odooOrders, ordersWork }: { odooOrders: 
          orderProductionSelected={orderProductionSelected}
          showDetailOrderWork={showDetailOrderWork}
          progress={progress}
+         modalIsOpenInstructions={modalIsOpenInstructions}
+         openModalInstructions={openModalInstructions}
+         executeWorkOrderAction={executeWorkOrderAction}
+         loadigAction={loadigAction}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
