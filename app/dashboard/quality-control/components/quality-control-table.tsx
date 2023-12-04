@@ -8,7 +8,7 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
 
 
-export function QualityOrdersTable({ odooOrders, qualityControlData }: { odooOrders: any, qualityControlData: any }) {
+export function QualityOrdersTable({ odooOrders, qualityControlData }: { odooOrders: any, qualityControlData: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [qualityControls, setQualityControls] = useState<any[]>();
   const [qualityDetails, setQualityDetails] = useState<any>({id: null});
@@ -24,6 +24,7 @@ export function QualityOrdersTable({ odooOrders, qualityControlData }: { odooOrd
   const viewDeatails = (qualityCtrlData: any) => {
     setQualityDetails(qualityCtrlData)
   }
+
 
   return (
     <>

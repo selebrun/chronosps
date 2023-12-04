@@ -1,3 +1,4 @@
+'use server'
 import { notFound } from 'next/navigation';
 import { getOdooData } from '@/app/api/odoo/odooService';
 
@@ -5,7 +6,7 @@ import { getOdooData } from '@/app/api/odoo/odooService';
 // will never run on the client. Even though this particular api
 // doesn't currently use sensitive environment variables, it's
 // good practise to add `server-only` preemptively.
-import 'server-only';
+// import 'server-only';
 
 export async function getOrders() {
   const res = await fetch(
@@ -39,6 +40,7 @@ export async function getProductionOrders(user: any) {
           false,
           user.company_id,
           async (workorders: any) => {
+            console.log(workorders)
             if (!workorders || !workorders.data) {
               reject({ status: false, message: 'No se encontraron ordenes de trabajo.', data: false });
               return;
@@ -224,7 +226,7 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-      
+        
                 resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
               }
             );
@@ -327,3 +329,4 @@ export async function getQualityControl(user: any) {
 
   }
 }
+
