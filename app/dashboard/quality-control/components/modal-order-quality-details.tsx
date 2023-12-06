@@ -99,7 +99,6 @@ function ModalOrderQualityDetails({
               <div className="bg-red-500 shadow-md p-2 mt-6 rounded-md text-center text-color-black font-bold">
               <button
                 className="font-bold text-color-black focus:outline-none"
-                // onClick={() => console.log("first")}
                 >{declineLabel}
                 </button>
               </div>
