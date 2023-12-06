@@ -129,7 +129,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user }: { odooOr
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
-          <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white">
+          <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
             <tr>
               <th scope="col" className="px-6 py-3 ">
                 NO. de Orden
