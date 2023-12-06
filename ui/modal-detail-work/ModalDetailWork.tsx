@@ -6,6 +6,7 @@ import close from '@/public/close.png'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 
 
+
 export function ModalDetailWork({ 
   modalIsOpenJobDetail, 
   showDetailOrderWork, 
@@ -16,6 +17,13 @@ export function ModalDetailWork({
   openModalInstructions,
   executeWorkOrderAction,
   loadigAction,
+  modalIsOpenBlocks,
+  setModalIsOpenBlocks,
+  blockReasons,
+  modalIsMaterials,
+  setModalIsMaterials,
+  getMaterials,
+  materials
 }: {
   modalIsOpenJobDetail: boolean
   showDetailOrderWork?: any 
@@ -24,9 +32,18 @@ export function ModalDetailWork({
   setModalIsOpenJobDetail: any
   modalIsOpenInstructions: boolean
   openModalInstructions: () => void
-  executeWorkOrderAction: (action:string) => void
+  executeWorkOrderAction: (action:string, block_reason?: any) => void
   loadigAction: boolean
+  modalIsOpenBlocks: boolean 
+  setModalIsOpenBlocks: any
+  blockReasons: any
+  modalIsMaterials: boolean
+  setModalIsMaterials: any
+  getMaterials: any
+  materials: any
 }) {
+  const [valueSelect, setValueSelect] = useState('');
+  const [disabledBtnBlock, setDisabledBtnBlock] = useState(true);
 
   const renderButtons = (showDetailOrderWork: any) => {
     const isBlocked = showDetailOrderWork.working_state === "blocked";
@@ -36,9 +53,9 @@ export function ModalDetailWork({
     if (!isBlocked && !isUserWorking) {
       buttons.push(<div className="mb-3"><button onClick={() => executeWorkOrderAction('start_work_order')} key="start" className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
     }
-  
+
     if (!isBlocked) {
-      buttons.push(<div className="mb-3"><button onClick={() => executeWorkOrderAction('block_work_order')} key="block" className='font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
+      buttons.push(<div className="mb-3"><button onClick={() => setModalIsOpenBlocks(true)} key="block" className='font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
     } else {
       buttons.push(<div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>)
     }
@@ -49,11 +66,21 @@ export function ModalDetailWork({
     }
   
     buttons.push(<div className="mb-3"><button onClick={() => openModalInstructions()} key="instructions" className='font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>Instrucciones</button></div>);
-    buttons.push(<div className="mb-3"><button key="materials" className='font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
+    buttons.push(<div className="mb-3"><button onClick={() => {setModalIsMaterials(true), getMaterials()}}  key="materials" className='font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
   
     return <>{buttons}</>
   }
   
+
+  const onChangeSelection = (e: any) => {
+    if (e !== '') {
+      setValueSelect(e)
+      setDisabledBtnBlock(false)
+    } else {
+      setDisabledBtnBlock(true)
+    }
+  }
+
 
   return (
     <>
@@ -78,7 +105,9 @@ export function ModalDetailWork({
           <div className="flex justify-end relative bottom-10">
             <button
               type="button"
-              onClick={() => setModalIsOpenJobDetail(false)}
+              onClick={() => {
+                setModalIsOpenJobDetail(false)
+              }}
             >
               <Image
                 src={close}
@@ -136,11 +165,15 @@ export function ModalDetailWork({
               <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'>{progress}%</div>
           </div>
       </Modal>
-       {/* <Modal setOpen={true} title='Motivo del bloqueo' className='max-w-xs'>
+       <Modal setOpen={modalIsOpenBlocks} title='Motivo del bloqueo' className='max-w-xs'>
           <div className="flex justify-end relative bottom-10">
             <button
               type="button"
-              onClick={() => setModalIsOpenJobDetail(false)}
+              onClick={() => {
+                setModalIsOpenBlocks(false)
+                setValueSelect('')
+                setDisabledBtnBlock(true)
+              }}
             >
               <Image
                 src={close}
@@ -150,12 +183,80 @@ export function ModalDetailWork({
           </div>
           <div>
             <div>Seleccione un motivo de bloqueo</div>
-            <select className="w-full " placeholder='Seleccionar motivo'>
-
+            <select 
+            onChange={(e) => onChangeSelection(e.target.value)}
+            className="w-full border border-solid border-gray-400 rounded-full mt-5 p-2" placeholder='Seleccionar motivo'>
+            <option
+            value={''}
+            >{'Seleccione una razon'}</option>
+              {blockReasons?.block_reasons?.map((reason: any) =>
+                <option value={reason.id} key={reason.id}>{reason.name}</option>
+              )}
             </select>
           </div>
+          <div className="mb-3 mt-5 text-center">
+            <button 
+            disabled={disabledBtnBlock}
+            onClick={() => executeWorkOrderAction('block_work_order', valueSelect)} key="block" className='font-bold bg-red-500 p-3 rounded-md w-[400] disabled:opacity-50'>Bloquear</button>
+          </div>
             
-      </Modal> */}
+      </Modal>
+      <Modal setOpen={modalIsMaterials} title='Materiales' className='max-w-3xl'>
+          <div className="flex justify-end relative bottom-10">
+            <button
+              type="button"
+              onClick={() => {
+                setModalIsMaterials(false)
+              }}
+            >
+              <Image
+                src={close}
+                alt="Close"
+              />
+            </button>
+          </div>
+          <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
+        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
+            <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
+                <tr>
+                  <th scope="col" className="px-6 py-3 ">
+                    Nombre
+                  </th>
+                  <th scope="col" className="px-6 py-3">
+                    Cantidad
+                  </th>
+                  <th scope="col" className="px-6 py-3">
+                    U/M
+                  </th>
+                  <th scope="col" className="px-6 py-3">
+                   Ubicación
+                  </th>
+                </tr>
+            </thead>
+            <tbody>
+              {materials?.map((material: any) => (
+                <tr key={`production-order-${material.id}`} className="border-b-8 border-white dark:bg-white dark:border-white bg-lightCyan text-black">
+                    <td className="px-3 py-2">
+                      {material?.product_id[1]}
+                    </td>
+                    <td className="px-3 py-2">{material?.quantity_done}</td>
+                    <td className="px-3 py-2">{material?.product_uom[1]}</td>
+                    <td className="px-3 py-2">{material?.location_id[1]}</td>
+                    
+                </tr>
+                ))}
+            </tbody>
+        </table>
+      </div>
+      <div className="mb-3 mt-5 text-center flex justify-center ">
+        <div>
+          <button className='bg-[#2FD28E] font-bold p-2 rounded-md mr-4'>Guardar Material</button>
+        </div>
+        <div>
+         <button className='bg-[#020630] font-bold text-[#FEC400] p-2 rounded-md mr-4'>Agregar Material</button>
+        </div>
+      </div>
+      </Modal>
     </>
   )
 }

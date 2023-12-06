@@ -2,11 +2,11 @@
 
 import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
 
-export async function updateOrder (user: any, workorder: any, action: string): Promise<any>{
+export async function updateOrder (user: any, workorder: any, action: string, block_reason: any = false ): Promise<any>{
   return new Promise(async (resolve, reject) => {
     getOdooData(
       'mrp.workorder',
-      [['id','=', 1523]],
+      [['id','=', workorder.id]],
       ['id','name','state','x_studio_nro_ot','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working'],
       false,
       false,
@@ -36,19 +36,18 @@ export async function updateOrder (user: any, workorder: any, action: string): P
             if(user.role == 'Operario') return resolve({status: false, message: "Solo los responsables de produccion y administradores pueden desbloquear las ordenes de trabajo."})
             break
           case 'block_work_order':
-            // if(!req.body.block_reason) return resolve({status: false, message: "Para bloquear una OT necesita seleccionar una razon de bloqueo."})
             break
           default:
             resolve({status: false, message: "No se encontro la accion que desea ejecutar."})
             return
         }
-        
+        const blockReason = block_reason === false ?   false : parseInt(block_reason)
           createOdooData('x_acciones_remotas', 
           {x_studio_ejecutado_por: user.odoo_id, 
             x_studio_workorder_id: workorder.id, 
             x_studio_production: workorder.production_id[0], 
             x_studio_accion_a_ejecutar: action, 
-            x_studio_motivo_del_bloqueo: (false)}, user.company_id, (data: any) => {
+            x_studio_motivo_del_bloqueo: blockReason}, user.company_id, (data: any) => {
               if(!data || !data.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo."})
              return resolve({status: true, message: "Accion realizada con exito."})
           })
@@ -56,3 +55,4 @@ export async function updateOrder (user: any, workorder: any, action: string): P
       })
   })
 }
+

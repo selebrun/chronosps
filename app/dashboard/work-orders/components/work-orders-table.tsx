@@ -8,9 +8,10 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
+import { getMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 
 
-export function WorkOrdersTable({ odooOrders, user }: { odooOrders: any, user: any}) {
+export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalIsOpenInstructions, setModalIsOpenInstructions] = useState(false);
   const [orderProduction, setOrderProduction] = useState<any>({});
@@ -18,6 +19,9 @@ export function WorkOrdersTable({ odooOrders, user }: { odooOrders: any, user: a
   const [workoOrder, setOrdersWork] = useState<any>(odooOrders);
   const [loadigAction, setLoadigAction] = useState<boolean>(false)
   const [orderSelected, setOrderSelectedk] = useState<any>({});
+  const [modalIsOpenBlocks, setModalIsOpenBlocks] = useState(false);
+  const [modalIsMaterials, setModalIsMaterials] = useState(false);
+  const [materials, setMaterials] = useState<any>([]);
 
 
   const openWorkOrders = () => {
@@ -73,19 +77,28 @@ export function WorkOrdersTable({ odooOrders, user }: { odooOrders: any, user: a
   
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
 
-  const executeWorkOrderAction = async (action: string) => {
+  const executeWorkOrderAction = async (action: string, block_reason?: any) => {
     setLoadigAction(true)
-    const update = await updateOrder(user, orderSelected, action).then( res => res).catch((err) => console.log(err))
+    setModalIsOpenBlocks(false)
+    const update = await updateOrder(user, orderSelected, action, block_reason).then( res => res).catch((err) => console.log(err))
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
       setModalIsOpen(!modalIsOpen)
+
     } else {
       setLoadigAction(false)
     }
   }
 
+  const getMaterials = async () => {
+    setMaterials([])
+    const materials = await getMaterialsOrder(user, orderProduction.move_raw_ids).then( res => res).catch((err) => console.log(err))
+    if(materials.status) {
+      setMaterials(materials.data)
+    }
+  }
 
   return (
     <>
@@ -100,6 +113,13 @@ export function WorkOrdersTable({ odooOrders, user }: { odooOrders: any, user: a
          openModalInstructions={openModalInstructions}
          executeWorkOrderAction={executeWorkOrderAction}
          loadigAction={loadigAction}
+         modalIsOpenBlocks={modalIsOpenBlocks}
+         setModalIsOpenBlocks={setModalIsOpenBlocks}
+         blockReasons={blockReasons}
+         modalIsMaterials={modalIsMaterials}
+         setModalIsMaterials={setModalIsMaterials}
+         getMaterials={getMaterials}
+         materials={materials}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
