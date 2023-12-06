@@ -8,6 +8,7 @@ import { getOdooData } from '@/app/api/odoo/odooService';
 // good practise to add `server-only` preemptively.
 // import 'server-only';
 
+
 export async function getOrders() {
   const res = await fetch(
     `https://rickandmortyapi.com/api/character`,
@@ -330,3 +331,18 @@ export async function getQualityControl(user: any) {
   }
 }
 
+export async function getBlockReasons(user: any) {
+  return new Promise(async (resolve, reject) => {
+        getOdooData(
+          'mrp.workcenter.productivity.loss',
+          [],
+          ['id','name','loss_id','loss_type','manual'],
+          false,
+          false,
+          user.company_id,
+          async (data: any) => {
+           return resolve({ block_reasons :data.data });
+          }
+        )
+    })
+  }
