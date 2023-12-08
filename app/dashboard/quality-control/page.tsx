@@ -11,7 +11,7 @@ export default async function Page() {
   return (
     <div className="prose prose-sm prose-invert max-w-none">
       {odooOrders?.production_data.length ? (
-         <QualityOrdersTable odooOrders={odooOrders}  />
+         <QualityOrdersTable odooOrders={odooOrders} user={user} />
       ) : (
       <div className="text-center block p-6 bg-white border border-gray-200 rounded-lg shadow bg-gray-100">
         <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">No hay órdenes asignadas</h5>

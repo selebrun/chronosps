@@ -10,7 +10,8 @@ import { OrderTableModalWork } from '@/ui/format-table/orderTableModalWork'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
-import { getMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
+import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
+
 
 
 export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReasons }: { odooOrders: any, ordersWork: any, user: any, blockReasons: any}) {
@@ -25,14 +26,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [modalIsOpenBlocks, setModalIsOpenBlocks] = useState(false);
   const [modalIsMaterials, setModalIsMaterials] = useState(false);
   const [materials, setMaterials] = useState<any>([]);
+  const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
+  const [orderWorkSelected, seOrderWorkSelected] = useState<any>({});
+  const [loadigSaveMaterials, setLoadigSaveMaterials] = useState(false);
+  const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
+  const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
   
+  useEffect(()=>{
+    if(!user.materiales) {
+      setDisabledBtnSaveMaterial(true)
+    }
+  }, [])
+
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
   }
 
-  const openJobDetail = (orderId: string) => {
+  const openJobDetail = (orderId: any) => {
+    seOrderWorkSelected(orderId)
     setModalIsOpenJobDetail(!modalIsOpenJobDetail)
-    getDetailOrderWork(orderId)
+    getDetailOrderWork(orderId.id)
   }
 
   const getDetailOrderWork = (orderId: string) => {
@@ -85,6 +98,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
+      const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
+      setOrderWorkDetail(dateilOrden)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
       setModalIsOpenJobDetail(false)
@@ -99,6 +114,29 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     if(materials.status) {
       setMaterials(materials.data)
     }
+  }
+
+  const onAddMaterial = async (material: any, total: number) => { 
+    const objeto = { material: material }; 
+    const materialSelected = materials.find((material: any) => material.id === parseInt(objeto.material))
+    materialSelected.product_uom_qty = total
+    materialSelected.quantity_done = total
+    setOrderMaterialsSelected(materialSelected)
+    setDisabledBtnSaveMaterial(false)
+  }
+
+  const onSaveMaterialsOrder = async () => {
+    setLoadigSaveMaterials(true)
+    const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.quantity_done, materials)
+
+    if (data.status) {
+      setLoadigSaveMaterials(false)
+    } else {
+      setLoadigSaveMaterials(false)
+    }
+    setDisabledBtnSaveMaterial(true)
+    setModalIsMaterials(false)
+    setOrderMaterialsSelected({})
   }
 
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
@@ -145,8 +183,16 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          blockReasons={blockReasons}
          modalIsMaterials={modalIsMaterials}
          setModalIsMaterials={setModalIsMaterials}
+         modalIsAddMaterials={modalIsAddMaterials}
+         setModalIsAddMaterials={setModalIsAddMaterials}
          getMaterials={getMaterials}
          materials={materials}
+         onAddMaterial={onAddMaterial}
+         loadigSaveMaterials={loadigSaveMaterials}
+         onSaveMaterialsOrder={onSaveMaterialsOrder}
+         disabledBtnSaveMaterial={disabledBtnSaveMaterial}
+         setDisabledBtnSaveMaterial={setDisabledBtnSaveMaterial}
+         user={user}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">

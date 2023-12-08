@@ -20,6 +20,7 @@ export const config = {
           const { username, password, company_id } = credentials;
   
           const odooUsers: any = await getUsersFromOdoo(company_id);
+
           if (!odooUsers.length) return null;
        
           const user = odooUsers.find((user: any) => user.vat === username && user.x_studio_password === password );      
@@ -28,7 +29,7 @@ export const config = {
           getOdooData('res.users',[['partner_id','=',user.id],['active','=',true]],['id'],false, false, company_id, (odoo_user: any) => {
             if( odoo_user && odoo_user.data && odoo_user.data[0] && odoo_user.data[0].id) odoo_user_id = odoo_user.data[0].id
           })
-  
+
           const user_data = {
             name: user?.name,
             email: user?.email,
@@ -38,7 +39,7 @@ export const config = {
             odoo_user_id: odoo_user_id,
             document: user?.vat,
             role: user?.x_studio_rol_en_produccin,
-            materiales: user?.x_studio_agregar_materiales,
+            materiales: user?.x_studio_new_material,
             active: true
           }
   

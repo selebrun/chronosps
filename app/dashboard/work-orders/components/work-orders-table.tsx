@@ -1,5 +1,5 @@
 "use client"
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 // UI Components
@@ -8,7 +8,7 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
-import { getMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
+import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 
 
 export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
@@ -18,11 +18,20 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const [showDetailOrderWork, setShowDetailOrderWork] = useState<any>({});
   const [workoOrder, setOrdersWork] = useState<any>(odooOrders);
   const [loadigAction, setLoadigAction] = useState<boolean>(false)
-  const [orderSelected, setOrderSelectedk] = useState<any>({});
+  const [orderSelected, setOrderSelected] = useState<any>({});
   const [modalIsOpenBlocks, setModalIsOpenBlocks] = useState(false);
   const [modalIsMaterials, setModalIsMaterials] = useState(false);
   const [materials, setMaterials] = useState<any>([]);
+  const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
+  const [loadigSaveMaterials, setLoadigSaveMaterials] = useState(false);
+  const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
+  const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
 
+  useEffect(()=>{
+    if(!user.materiales) {
+      setDisabledBtnSaveMaterial(true)
+    }
+  }, [])
 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
@@ -34,7 +43,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   }
 
   const onSaveOrderId = (order: any) => {
-    setOrderSelectedk(order)
+    setOrderSelected(order)
     const dateilOrden = workoOrder?.data.find((orden:any) => orden.id === parseInt(order.id))
     getDetailOrderWork(dateilOrden)
   }
@@ -100,6 +109,29 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     }
   }
 
+  const onAddMaterial = async (material: any, total: number) => { 
+    const objeto = { material: material }; 
+    const materialSelected = materials.find((material: any) => material.id === parseInt(objeto.material))
+    materialSelected.product_uom_qty = total
+    materialSelected.quantity_done = total
+    setOrderMaterialsSelected(materialSelected)
+    setDisabledBtnSaveMaterial(false)
+  }
+
+  const onSaveMaterialsOrder = async () => {
+    setLoadigSaveMaterials(true)
+    const data = await saveMaterialsOrder(user, orderSelected.id, orderProduction.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.quantity_done, materials)
+    if (data.status) {
+      setLoadigSaveMaterials(false)
+    } else {
+      setLoadigSaveMaterials(false)
+    }
+    setDisabledBtnSaveMaterial(true)
+    setModalIsMaterials(false)
+    setOrderMaterialsSelected({})
+  }
+
+
   return (
     <>
       {modalIsOpen && 
@@ -120,6 +152,14 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          setModalIsMaterials={setModalIsMaterials}
          getMaterials={getMaterials}
          materials={materials}
+         modalIsAddMaterials={modalIsAddMaterials}
+         setModalIsAddMaterials={setModalIsAddMaterials}
+         onAddMaterial={onAddMaterial}
+         loadigSaveMaterials={loadigSaveMaterials}
+         onSaveMaterialsOrder={onSaveMaterialsOrder}
+         disabledBtnSaveMaterial={disabledBtnSaveMaterial}
+         setDisabledBtnSaveMaterial={setDisabledBtnSaveMaterial}
+         user={user}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">

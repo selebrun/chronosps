@@ -6,9 +6,10 @@ import close from '@/public/close.png'
 // UI Components
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalOrderQuality } from './modal-order-quality'
+import { acceptQualityControl } from '@/app/api/accionQualityControl/accionQualityControl'
 
 
-export function QualityOrdersTable({ odooOrders }:{ odooOrders: any }) {
+export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user: any }) {
   const [orderQualityDetail, setOrderQualityDetail] = useState([]);
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalDetailsIsOpen, setModalDetailsIsOpen] = useState(false);
@@ -31,6 +32,11 @@ export function QualityOrdersTable({ odooOrders }:{ odooOrders: any }) {
     setSelectedOrderQuantity(order)
   }
 
+  const acceptOrder = async () => {
+    const accept: any = await acceptQualityControl(user, selectedOrderQuantity).then( res => res).catch((err) => console.log(err))
+    console.log(accept, 'accept')
+  }
+
   return (
     <>
       <ModalOrderQuality 
@@ -41,6 +47,7 @@ export function QualityOrdersTable({ odooOrders }:{ odooOrders: any }) {
         openJobDetail={()=> openJobDetail()}
         selectedQualityDetails={selectedQualityDetails}
         selectedOrderQuantity={selectedOrderQuantity}
+        acceptOrder={acceptOrder}
       /> 
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
