@@ -34,7 +34,6 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
 
   const acceptOrder = async () => {
     const accept: any = await acceptQualityControl(user, selectedOrderQuantity).then( res => res).catch((err) => console.log(err))
-    console.log(accept, 'accept')
   }
 
   return (

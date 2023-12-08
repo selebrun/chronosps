@@ -176,7 +176,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
                     Nombre
                   </th>
                   <th scope="col" className="px-6 py-3">
-                   Producción
+                    Producción
                   </th>
                   <th scope="col" className="px-6 py-3">
                     Centro de trabajo

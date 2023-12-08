@@ -10,6 +10,7 @@ function ModalOrderQualityDetails({
   openJobDetail,
   selectedOrderQuantity,
   acceptOrder
+
 }: {
   orderQualityDetail: any;
   modalWorkOrderDetail: boolean;
@@ -18,92 +19,73 @@ function ModalOrderQualityDetails({
   acceptOrder: () => void;
 }) {
   
+  const labels = {
+    originalTitle: "Detalles de calidad",
+    qualityControlLabel: "Control de calidad",
+    orderProductionLabel: "Orden de producción",
+    aproveLabel: "Aprobar",
+    declineLabel: "Declinar",
+    workCenterLabel: "Centro de trabajo",
+    workOrderLabel: "Orden de trabajo",
+    mesureLabel: "Medida",
+    notesLabel: "Notas",
+    instructionsLabel: "Instrucciones",
+  };
+
+
   return (
     <Modal
-      setOpen={modalWorkOrderDetail}
-      title={"Detalles de calidad"}
-      className="max-w-3xl"
-    >
-      <div className="flex justify-end relative bottom-10">
-        <button type="button" onClick={openJobDetail}>
-          <Image src={close} alt="Close" />
-        </button>
-      </div>
-
-      <div className="flex justify-between">
-        <div className="w-[80vh]">
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-            <div className="">
-              <div className="font-bold text-center">Control de calidad</div>
-              <div className="bg-whiteInput shadow-md p-2 rounded-md text-center">
-                {selectedOrderQuantity?.name}
-              </div>
-            </div>
-            <div className="">
-              <div className="font-bold text-center">
-                Orden de producción
-              </div>
-              <div className="bg-whiteInput shadow-md p-2 rounded-md text-center">
-              {selectedOrderQuantity?.production_id[1]}
-              </div>
-            </div>
-            <div className="">
-              <div className="bg-[#2FD28E] shadow-md p-2 mt-6 rounded-md text-center text-color-black font-bold">
-              <button
-                onClick={() => acceptOrder()}
-                className="font-bold text-color-black focus:outline-none transition duration-300 ease-in-out transform hover:bg-[#228D6D]"
-                >Aprobar
-                </button>
-              </div>
-            </div>
-            <div className="">
-              <div className="font-bold text-center">Centro de trabajo</div>
-              <div className="bg-whiteInput shadow-md p-2 rounded-md h-10 text-center">
-              ººº
-              </div>
-            </div>
-            <div className="">
-              <div className="font-bold text-center">Orden de trabajo</div>
-              <div className="overflow-x-auto bg-whiteInput shadow-md p-2 rounded-md text-center whitespace-nowrap">
-                {selectedOrderQuantity?.workorder_id}
-              </div>
-            </div>
-            <div className="">
-              <div className="bg-red-500 shadow-md p-2 mt-6 rounded-md text-center text-color-black font-bold">
-              <button
-                className="font-bold text-color-black focus:outline-none"
-                >Declinar
-                </button>
-              </div>
+    setOpen={modalWorkOrderDetail}
+    title={labels.originalTitle}
+    className="max-w-3xl"
+  >
+    <div className="flex justify-end relative bottom-10">
+      <button type="button" onClick={openJobDetail}>
+        <Image src={close} alt="Close" />
+      </button>
+    </div>
+    <div className='flex justify-between'>
+      <div className='w-[55vh]'>
+        <div className='mb-3 w-90'>
+          <div className='font-bold text-center'>{labels.orderProductionLabel}</div>
+          <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{selectedOrderQuantity?.production_id[1]}</div>
+        </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className=''>
+            <div className='font-bold text-center'>{labels.qualityControlLabel}</div>
+            <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{selectedOrderQuantity?.name}</div>
+          </div>
+          <div className=''>
+            <div className='font-bold text-center'>{labels.workCenterLabel}</div>
+            <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{}</div>
+          </div>
+          <div className=''>
+            <div className='font-bold text-center'>{labels.workOrderLabel}</div>
+            <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{selectedOrderQuantity?.workorder_id}</div>
+          </div>
+          <div className=''>
+            <div className='font-bold text-center'>{labels.mesureLabel}</div>
+            <div className='flex'>
+              <input type="number"min="0" className='bg-whiteInput h-10 w-full shadow-md rounded-md text-center focus:outline-none' placeholder="Medida"/>
             </div>
           </div>
         </div>
-      </div>
-      <div className="flex mt-2 ">
-        <div className="">
-          <div className="font-bold text-center">Medidas</div>
-          <div className="w-[40vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center">
-          <input
-            type="number"
-            className="w-full p-2 border-none focus:outline-none"
-            placeholder="Ingrese la medida"
-            min="0"
+        <div className='mt-3 w-90'>
+          <div className='font-bold text-center'>{labels.notesLabel}</div>
+          <div className='bg-whiteInput h-[12vh] shadow-md p-2 rounded-md text-center'>
+          <textarea
+            className="h-[10vh] w-full p-2 border focus:border-primary rounded-md"
+            placeholder="Escribe tus notas aquí..."
           />
           </div>
         </div>
-
-        <div className="">
-          <div className="font-bold text-center">Notas</div>
-          <div className="h-[15vh] w-[36vh] mr-3 bg-whiteInput shadow-md pb-12 rounded-md text-center">
-            <textarea
-              className="h-[15vh] w-full p-2 border focus:border-primary rounded-md"
-              placeholder="Escribe tus notas aquí..."
-            />
-          </div>
-        </div>
       </div>
-      
-    </Modal>
+      <div className='mb-3'>
+        <button className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>{labels.aproveLabel}</button>
+        <button className='font-bold bg-red-500 p-3 rounded-md w-full mt-2'>{labels.declineLabel}</button>
+      </div>
+    </div>
+  </Modal>
   );
 }
 
