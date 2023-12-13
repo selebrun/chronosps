@@ -6,7 +6,6 @@ import close from '@/public/close.png'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 
 
-
 export function ModalDetailWork({ 
   modalIsOpenJobDetail, 
   showDetailOrderWork, 
@@ -68,7 +67,7 @@ export function ModalDetailWork({
     const isBlocked = showDetailOrderWork.working_state === "blocked";
     const isUserWorking = showDetailOrderWork.is_user_working;
     const buttons = [];
-  
+
     if (!isBlocked && !isUserWorking) {
       buttons.push(<div className="mb-3"><button onClick={() => executeWorkOrderAction('start_work_order')} key="start" className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
     }

@@ -92,10 +92,10 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     const update = await updateOrder(user, orderSelected, action, block_reason).then( res => res).catch((err) => console.log(err))
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
+      const orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderSelected.id)
+      setShowDetailOrderWork(orderWorkSelected)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
-      setModalIsOpen(!modalIsOpen)
-
     } else {
       setLoadigAction(false)
     }

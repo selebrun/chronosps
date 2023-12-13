@@ -41,7 +41,6 @@ export async function getProductionOrders(user: any) {
           false,
           user.company_id,
           async (workorders: any) => {
-            console.log(workorders)
             if (!workorders || !workorders.data) {
               reject({ status: false, message: 'No se encontraron ordenes de trabajo.', data: false });
               return;
