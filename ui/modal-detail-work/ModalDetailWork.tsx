@@ -67,13 +67,14 @@ export function ModalDetailWork({
     const isBlocked = showDetailOrderWork.working_state === "blocked";
     const isUserWorking = showDetailOrderWork.is_user_working;
     const buttons = [];
+    const disabledBtns = showDetailOrderWork.state.includes('done')
 
     if (!isBlocked && !isUserWorking) {
-      buttons.push(<div className="mb-3"><button onClick={() => executeWorkOrderAction('start_work_order')} key="start" className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
+      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order')} key="start" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
     }
 
     if (!isBlocked) {
-      buttons.push(<div className="mb-3"><button onClick={() => setModalIsOpenBlocks(true)} key="block" className='font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
+      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => setModalIsOpenBlocks(true)} key="block" className='disabled:opacity-50 font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
     } else {
       buttons.push(<div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>)
     }
@@ -84,7 +85,7 @@ export function ModalDetailWork({
     }
   
     buttons.push(<div className="mb-3"><button onClick={() => openModalInstructions()} key="instructions" className='font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>Instrucciones</button></div>);
-    buttons.push(<div className="mb-3"><button onClick={() => {setModalIsMaterials(true), getMaterials()}}  key="materials" className='font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
+    buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => {setModalIsMaterials(true), getMaterials()}}  key="materials" className='disabled:opacity-50 font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
   
     return <>{buttons}</>
   }
@@ -130,6 +131,8 @@ export function ModalDetailWork({
         <div dangerouslySetInnerHTML={{ __html: showDetailOrderWork?.operation_note }} />}
         {!showDetailOrderWork.operation_note && 
         <div className="font-bold text-center" >No posee instrucciones</div>}
+        {showDetailOrderWork?.worksheet && 
+        <div ><iframe width={'100%'} height="600px"  src={`data:application/pdf;base64,${showDetailOrderWork?.worksheet}`} ></iframe></div>}
       </Modal>
       <Modal setOpen={modalIsOpenJobDetail} title='Detalle de Trabajo' className='max-w-3xl'>
           <div className="flex justify-end relative bottom-10">
@@ -195,7 +198,7 @@ export function ModalDetailWork({
               <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'>{progress}%</div>
           </div>
       </Modal>
-       <Modal setOpen={modalIsOpenBlocks} title='Motivo del bloqueo' className='max-w-xs'>
+      <Modal setOpen={modalIsOpenBlocks} title='Motivo del bloqueo' className='max-w-xs'>
           <div className="flex justify-end relative bottom-10">
             <button
               type="button"
