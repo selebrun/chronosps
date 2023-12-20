@@ -40,12 +40,12 @@ export const config = {
             "id": "7ac7aa42-008b-11ee-be56-0242ac120002",
             "company": "pkannoat",
             "odoo_connection": {
-                "domain": "kannoa-new-test-10442236.dev.odoo.com",
-                "url": "https://kannoa-new-test-10442236.dev.odoo.com/",
+                "domain": "selebrun-kannoa-test-10908340.dev.odoo.com",
+                "url": "https://selebrun-kannoa-test-10908340.dev.odoo.com/",
                 "port": 443,
-                "db": "kannoa-new-test-10442236",
+                "db": "selebrun-kannoa-test-10908340",
                 "username": "admin",
-                "password": "be273be92c809dc970371d836762d3e1fb4046b5"
+                "password": "a2e343db073f2dda8379814775909fc796422326"
             }
         }
     ],

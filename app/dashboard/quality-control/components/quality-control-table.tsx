@@ -86,7 +86,7 @@ export function QualityOrdersTable({ odooOrders, qualityControlData }: { odooOrd
                         <Image
                         src={eyeDetails}
                         alt="Eye Details"
-                        className='w-20 h-5'
+                        className='h-5'
                         />
                     </button>
                     </td>
@@ -165,7 +165,7 @@ export function QualityOrdersTable({ odooOrders, qualityControlData }: { odooOrd
                     <Image
                       src={eyeDetails}
                       alt="Eye Details"
-                      className='w-20 h-5'
+                      className='h-5'
                     />
                   </button>
                 </td>
