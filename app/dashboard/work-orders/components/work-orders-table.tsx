@@ -209,7 +209,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
                         <Image
                           src={eyeDetails}
                           alt="Eye Details"
-                          className='w-20 h-5'
+                          className='h-5'
                         />
                     </button>
                     </td>

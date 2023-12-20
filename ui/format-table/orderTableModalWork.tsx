@@ -46,14 +46,14 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
             <td className="px-3 py-2">
               {order.workcenter_id[1]}
             </td>
-            <td className="px-3 py-2">
+            <td className="py-2">
               <button 
               onClick={() => openJobDetail(order)}
               >
                 <Image
                   src={eyeDetails}
                   alt="Eye Details"
-                  className='w-20 h-5'
+                  className='h-5'
                 />
               </button>
             </td>
