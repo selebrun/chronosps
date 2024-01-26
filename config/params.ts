@@ -43,7 +43,7 @@ export const config = {
                 "domain": "kannoa.chronosps.com",
                 "url": "https://kannoa.chronosps.com",
                 "port": 443,
-                "db": "slebrun-kannoa-new-prod-11274479",
+                "db": "selebrun-kannoa-new-prod-11274479",
                 "username": "admin",
                 "password": "a6a183f913eb2be5110b2d542cc0aad6758a68af"
             }
