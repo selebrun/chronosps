@@ -12,7 +12,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
     thProduct: string,
     openJobDetail: (id: string) => void
   }) => {
-console.log('entreee', orderDetail)
+
   return (
     <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
