@@ -96,7 +96,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     setModalIsOpenBlocks(false)
     const update = await updateOrder(user, orderWorkDetail[0], action, block_reason).then( res => res).catch((err) => console.log(err))
 
-    if (update.status) {
+    if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
       const orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderWorkDetail[0].id)
@@ -112,7 +112,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const getMaterials = async () => {
     setMaterials([])
     const materials = await getMaterialsOrder(user, orderProductionSelected.move_raw_ids).then( res => res).catch((err) => console.log(err))
-    if(materials.status) {
+    if(materials?.status) {
       setMaterials(materials.data)
     }
   }
@@ -130,7 +130,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     setLoadigSaveMaterials(true)
     const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.quantity_done, materials)
 
-    if (data.status) {
+    if (data?.status) {
       setLoadigSaveMaterials(false)
     } else {
       setLoadigSaveMaterials(false)
@@ -141,6 +141,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
+
 
   return (
     <>
