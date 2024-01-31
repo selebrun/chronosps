@@ -12,7 +12,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
     thProduct: string,
     openJobDetail: (id: string) => void
   }) => {
-
+console.log('entreee', orderDetail)
   return (
     <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
     <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
@@ -31,20 +31,20 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
         </tr>
       </thead>
       <tbody>
-        {orderDetail.map((order: any) => (
-          <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
+        {orderDetail?.map((order: any) => (
+          <tr key={`production-order-${order?.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
             <th scope="row" className="px-5 font-medium text-black">
               <div className="flex items-center space-x-4 whitespace-normal">
                 <div className="dark:text-white">
-                  <div className="text-sm text-black">{order.id}</div>
+                  <div className="text-sm text-black">{order?.id}</div>
                 </div>
               </div>
             </th>
             <td className="px-3 py-2">
-              <StatusBadge status={order.state} />
+              <StatusBadge status={order?.state} />
             </td>
             <td className="px-3 py-2">
-              {order.workcenter_id[1]}
+              {order?.workcenter_id[1]}
             </td>
             <td className="py-2">
               <button 

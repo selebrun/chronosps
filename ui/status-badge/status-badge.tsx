@@ -10,6 +10,7 @@ export function StatusBadge({ status }: { status: string }) {
     none: { name: "Por realizar", color: "bg-purple-200 text-purple-800" },
     pass: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
     normal: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
+    ready: { name: "Completado", color: "bg-green-400 text-white" },
   };
 
   const statusInfo = STATUS_DICT[status] || { name: {status}, color: "bg-gray-400 text-black" };
