@@ -80,7 +80,7 @@ export function ModalDetailWork({
     }
   
     if (!isBlocked && isUserWorking) {
-      buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Detener</button></div>)
+      buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Pausar</button></div>)
       buttons.push(<div className="mb-3"><button key="done" onClick={() => executeWorkOrderAction('finish_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Hecho</button></div>)
     }
   
