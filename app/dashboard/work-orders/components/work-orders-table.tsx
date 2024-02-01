@@ -93,7 +93,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       const orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderSelected.id)
-      setShowDetailOrderWork(orderWorkSelected)
+      getDetailOrderWork(orderWorkSelected)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
     } else {

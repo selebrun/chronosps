@@ -99,8 +99,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
-      const orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderWorkDetail[0].id)
-      setShowDetailOrderWork(orderWorkSelected)
+      const orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === orderWorkSelected.id)
+
+      setShowDetailOrderWork(orderWorkSelected1)
       setOrderWorkDetail(dateilOrden)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)

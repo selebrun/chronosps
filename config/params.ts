@@ -47,6 +47,18 @@ export const config = {
                 "username": "admin",
                 "password": "a6a183f913eb2be5110b2d542cc0aad6758a68af"
             }
+        },
+        {
+            "id": "7ac7aa42-008b-11ee-be56-0242ac120003",
+            "company": "pkannoat",
+            "odoo_connection": {
+                "domain": "kannoa-test-11562530.dev.odoo.com",
+                "url": "https://kannoa-test-11562530.dev.odoo.com/",
+                "port": 443,
+                "db": "kannoa-test-11562530",
+                "username": "admin",
+                "password": "8eb7c3efe29517e358240b582248af1b6c7bd830"
+            }
         }
     ],
     "web_app": {
