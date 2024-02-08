@@ -212,6 +212,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                 Producto
               </th>
               <th scope="col" className="px-6 py-3">
+                PO/Origen
+              </th>
+              <th scope="col" className="px-6 py-3">
                 Cantidad
               </th>
               <th scope="col" className="px-6 py-3">
@@ -241,6 +244,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                 </td>
                 <td className="px-3 py-2">
                   {order.product_id[1]}
+                </td>
+                <td className="px-3 py-2">
+                 {order?.x_studio_po}
                 </td>
                 <td className="px-3 py-2">
                   {order.qty_producing}/{order.product_qty}
