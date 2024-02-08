@@ -52,12 +52,12 @@ export const config = {
             "id": "7ac7aa42-008b-11ee-be56-0242ac120003",
             "company": "pkannoat",
             "odoo_connection": {
-                "domain": "kannoa-test-11562530.dev.odoo.com",
-                "url": "https://kannoa-test-11562530.dev.odoo.com/",
+                "domain": "kannoa-test-11627549.dev.odoo.com",
+                "url": "https://kannoa-test-11627549.dev.odoo.com/",
                 "port": 443,
-                "db": "kannoa-test-11562530",
+                "db": "kannoa-test-11627549",
                 "username": "admin",
-                "password": "8eb7c3efe29517e358240b582248af1b6c7bd830"
+                "password": "sim9096"
             }
         }
     ],

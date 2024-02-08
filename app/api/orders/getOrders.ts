@@ -50,7 +50,7 @@ export async function getProductionOrders(user: any) {
             getOdooData(
               'mrp.production',
               [['state', 'in', ['confirmed', 'progress']], ['id', 'in', production_order_ids]],
-              ['id', 'state', 'name', 'product_id', 'product_qty', 'qty_producing', 'lot_producing_id', 'date_planned_start', 'user_id', 'bom_id', 'move_raw_ids'],
+              ['id', 'state', 'name', 'product_id', 'product_qty', 'qty_producing', 'lot_producing_id', 'date_planned_start', 'user_id', 'bom_id', 'move_raw_ids', 'x_studio_po'],
               false,
               false,
               user.company_id,
@@ -73,7 +73,7 @@ export async function getProductionOrders(user: any) {
         getOdooData(
           'mrp.production',
           [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]],
-          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
+          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids', 'x_studio_po'],
           false,
           false,
           user.company_id,
@@ -92,7 +92,7 @@ export async function getProductionOrders(user: any) {
         getOdooData(
           'mrp.production',
           [['state','in',['confirmed','progress']]],
-          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
+          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids', 'x_studio_po'],
           false,
           false,
           user.company_id,
