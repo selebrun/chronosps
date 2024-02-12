@@ -52,10 +52,10 @@ export const config = {
             "id": "7ac7aa42-008b-11ee-be56-0242ac120003",
             "company": "pkannoat",
             "odoo_connection": {
-                "domain": "kannoa-test-11627549.dev.odoo.com",
-                "url": "https://kannoa-test-11627549.dev.odoo.com/",
+                "domain": "kannoa-Test.chronosps.com",
+                "url": "https://kannoa-Test.chronosps.com",
                 "port": 443,
-                "db": "kannoa-test-11627549",
+                "db": "kannoa-test-11690657",
                 "username": "admin",
                 "password": "sim9096"
             }
