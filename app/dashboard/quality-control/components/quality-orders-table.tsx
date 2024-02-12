@@ -1,5 +1,5 @@
 "use client"
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 import close from '@/public/close.png'
@@ -14,6 +14,16 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalDetailsIsOpen, setModalDetailsIsOpen] = useState(false);
   const [selectedOrderQuantity, setSelectedOrderQuantity] = useState({});
+  const [ordersQualityControl, setOrdersQualityControl] = useState<any[]>([]);
+
+  useEffect(()=>{
+    let orders:any[] = []
+    odooOrders?.data.filter((work: any) => (
+    orders =  odooOrders?.production_data.filter((pro: any) =>  pro.product_id[0] === work.product_id[0])
+    ))
+    setOrdersQualityControl(orders)
+  }, [])
+
 
   const  openJobDetail= () => {
     setModalDetailsIsOpen(!modalDetailsIsOpen)
@@ -77,7 +87,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
             </tr>
           </thead>
           <tbody>
-            {odooOrders?.production_data?.map((order: any) => (
+            {ordersQualityControl?.map((order: any) => (
               <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
                 <th scope="row" className="px-5 font-medium text-black">
                   <div className="flex items-center space-x-4 whitespace-normal">
@@ -120,6 +130,10 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
             ))}
           </tbody>
         </table>
+        {ordersQualityControl.length  === 0 && 
+              <div className='text-center w-full text-xl mt-10'>
+                No se encontro ordenes
+              </div>}
       </div>
     </>
   )
