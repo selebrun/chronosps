@@ -107,9 +107,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       } else {
         orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === orderWorkSelected.id)
       }
-      console.log(orderWorkSelected1)
-      getDetailOrderWork(orderWorkSelected1.id)
-      // setShowDetailOrderWork(orderWorkSelected1)
+
+      setShowDetailOrderWork(orderWorkSelected1)
       setOrderWorkDetail(dateilOrden)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
