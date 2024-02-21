@@ -5,7 +5,6 @@ import { config } from '@/auth'
 
 // Config
 import { LOGIN_URL } from '@/config/constants'
-import { DASHBOARD_URL } from '@/config/constants'
 
 // Ui Components
 import { LogoMenu } from '@/ui/logo-menu/LogoMenu';
