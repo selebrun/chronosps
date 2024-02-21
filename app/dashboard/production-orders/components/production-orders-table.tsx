@@ -24,6 +24,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [workoOrder, setOrdersWork] = useState<any>(ordersWork);
   const [loadigAction, setLoadigAction] = useState<boolean>(false)
   const [modalIsOpenBlocks, setModalIsOpenBlocks] = useState(false);
+  const [modalIsOpenCompleteOrder, setModalIsOpenCompleteOrder] = useState(false);
   const [modalIsMaterials, setModalIsMaterials] = useState(false);
   const [materials, setMaterials] = useState<any>([]);
   const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
@@ -52,7 +53,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     const dateilOrden = workoOrder?.data.find((orden:any) => orden.id === parseInt(orderId))
     let duration_expected = ""
     let duration = ""
-    let minutes = dateilOrden.duration_expected
+    let minutes = dateilOrden?.duration_expected
     let k = 0
 
     if (minutes >= 60*24) {
@@ -91,17 +92,24 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
 
-  const executeWorkOrderAction = async (action: string, block_reason?: any ) => {
+  const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
-    const update = await updateOrder(user, orderWorkDetail[0], action, block_reason).then( res => res).catch((err) => console.log(err))
+    const update = await updateOrder(user, orderWorkDetail[0], action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
 
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
-      const orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === orderWorkSelected.id)
 
-      setShowDetailOrderWork(orderWorkSelected1)
+      let orderWorkSelected1 = orderWorkSelected;
+      if (action === 'finish_work_order') {
+        orderWorkSelected1 = {...orderWorkSelected, state: 'completed'}
+      } else {
+        orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === orderWorkSelected.id)
+      }
+      console.log(orderWorkSelected1)
+      getDetailOrderWork(orderWorkSelected1.id)
+      // setShowDetailOrderWork(orderWorkSelected1)
       setOrderWorkDetail(dateilOrden)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
@@ -183,6 +191,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          loadigAction={loadigAction}
          modalIsOpenBlocks={modalIsOpenBlocks}
          setModalIsOpenBlocks={setModalIsOpenBlocks}
+         modalIsOpenCompleteOrder={modalIsOpenCompleteOrder}
+         setModalIsOpenCompleteOrder={setModalIsOpenCompleteOrder}
          blockReasons={blockReasons}
          modalIsMaterials={modalIsMaterials}
          setModalIsMaterials={setModalIsMaterials}

@@ -20,6 +20,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const [loadigAction, setLoadigAction] = useState<boolean>(false)
   const [orderSelected, setOrderSelected] = useState<any>({});
   const [modalIsOpenBlocks, setModalIsOpenBlocks] = useState(false);
+  const [modalIsOpenCompleteOrder, setModalIsOpenCompleteOrder] = useState(false);
   const [modalIsMaterials, setModalIsMaterials] = useState(false);
   const [materials, setMaterials] = useState<any>([]);
   const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
@@ -86,13 +87,19 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
 
-  const executeWorkOrderAction = async (action: string, block_reason?: any) => {
+  const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
-    const update = await updateOrder(user, orderSelected, action, block_reason).then( res => res).catch((err) => console.log(err))
+    const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
-      const orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderSelected.id)
+      let orderWorkSelected = orderSelected;
+      if (action === 'finish_work_order') {
+        orderWorkSelected = {...orderWorkSelected, state: 'completed'}
+      } else {
+        orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderSelected.id)
+      }
+
       getDetailOrderWork(orderWorkSelected)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
@@ -147,6 +154,8 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          loadigAction={loadigAction}
          modalIsOpenBlocks={modalIsOpenBlocks}
          setModalIsOpenBlocks={setModalIsOpenBlocks}
+         modalIsOpenCompleteOrder={modalIsOpenCompleteOrder}
+         setModalIsOpenCompleteOrder={setModalIsOpenCompleteOrder}
          blockReasons={blockReasons}
          modalIsMaterials={modalIsMaterials}
          setModalIsMaterials={setModalIsMaterials}
