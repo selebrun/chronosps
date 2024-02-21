@@ -18,6 +18,8 @@ export function ModalDetailWork({
   loadigAction,
   modalIsOpenBlocks,
   setModalIsOpenBlocks,
+  modalIsOpenCompleteOrder,
+  setModalIsOpenCompleteOrder,
   blockReasons,
   modalIsMaterials,
   setModalIsMaterials,
@@ -39,10 +41,12 @@ export function ModalDetailWork({
   setModalIsOpenJobDetail: any
   modalIsOpenInstructions: boolean
   openModalInstructions: () => void
-  executeWorkOrderAction: (action:string, block_reason?: any) => void
+  executeWorkOrderAction: (action:string, block_reason?: any | undefined, qtyDone?: number | undefined ) => void
   loadigAction: boolean
   modalIsOpenBlocks: boolean 
   setModalIsOpenBlocks: any
+  modalIsOpenCompleteOrder: boolean
+  setModalIsOpenCompleteOrder: any
   blockReasons: any
   modalIsMaterials: boolean
   setModalIsMaterials: any
@@ -58,6 +62,7 @@ export function ModalDetailWork({
   user: any
 }) {
   const [valueSelect, setValueSelect] = useState('');
+  const [qtyDone, setQtyDone] = useState<number>(0);
   const [disabledBtnBlock, setDisabledBtnBlock] = useState(true);
   const [valueSelectMaterial, setvValueSelectMaterial] = useState('');
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
@@ -81,7 +86,7 @@ export function ModalDetailWork({
   
     if (!isBlocked && isUserWorking) {
       buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Pausar</button></div>)
-      buttons.push(<div className="mb-3"><button key="done" onClick={() => executeWorkOrderAction('finish_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Hecho</button></div>)
+      buttons.push(<div className="mb-3"><button key="done" onClick={() => setModalIsOpenCompleteOrder(true)} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Hecho</button></div>)
     }
   
     buttons.push(<div className="mb-3"><button onClick={() => openModalInstructions()} key="instructions" className='font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>Instrucciones</button></div>);
@@ -129,7 +134,7 @@ export function ModalDetailWork({
         </div>
         {showDetailOrderWork?.operation_note &&
         <div dangerouslySetInnerHTML={{ __html: showDetailOrderWork?.operation_note }} />}
-        {!showDetailOrderWork.operation_note && 
+        {!showDetailOrderWork?.operation_note && 
         <div className="font-bold text-center" >No posee instrucciones</div>}
         {showDetailOrderWork?.worksheet && 
         <div ><iframe width={'100%'} height="600px"  src={`data:application/pdf;base64,${showDetailOrderWork?.worksheet}`} ></iframe></div>}
@@ -231,6 +236,37 @@ export function ModalDetailWork({
             <button 
             disabled={disabledBtnBlock}
             onClick={() => executeWorkOrderAction('block_work_order', valueSelect)} key="block" className='font-bold bg-red-500 p-3 rounded-md w-[400] disabled:opacity-50'>Bloquear</button>
+          </div>
+            
+      </Modal>
+      <Modal setOpen={modalIsOpenCompleteOrder} title='Ingresa la cantidad' className='max-w-xs'>
+          <div className="flex justify-end relative bottom-10">
+            <button
+              type="button"
+              onClick={() => {
+                setModalIsOpenCompleteOrder(false)
+                setQtyDone(0)
+              }}
+            >
+              <Image
+                src={close}
+                alt="Close"
+              />
+            </button>
+          </div>
+          <div className="mb-5 z-50">
+            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ingresa la cantidad</label>
+            <input  min="1" type="number" onChange={(e) => setQtyDone(parseInt(e.target.value))} className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required />
+          </div>
+          <div className="mb-3 mt-5 text-center">
+            <button 
+            disabled={qtyDone === 0}
+            onClick={() => {
+              setModalIsOpenCompleteOrder(false)
+              setQtyDone(0)
+              executeWorkOrderAction('finish_work_order', undefined, qtyDone)
+            }}
+            className='w-full font-bold bg-indigo-100 p-3 rounded-md disabled:opacity-50'>Aceptar</button>
           </div>
             
       </Modal>

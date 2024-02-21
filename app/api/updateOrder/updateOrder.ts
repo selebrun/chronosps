@@ -2,7 +2,7 @@
 
 import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
 
-export async function updateOrder (user: any, workorder: any, action: string, block_reason: any = false ): Promise<any>{
+export async function updateOrder (user: any, workorder: any, action: string, block_reason: any = false, qtyDone: number | undefined = 0): Promise<any>{
   return new Promise(async (resolve, reject) => {
     getOdooData(
       'mrp.workorder',
@@ -29,7 +29,7 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
           case 'stop_work_order':
             break
           case 'finish_work_order':
-            // if(!req.body.qty_done || req.body.qty_done < 1) return resolve({status: false, message: "Debe definir la cantidad producida."})
+            if(!qtyDone || qtyDone < 1) return resolve({status: false, message: "Debe definir la cantidad producida."})
             break
           case 'unblock_work_order':
             //Si se desea eliminar la restriccion de que operarios no puedan desbloquear, se debe comentar la siguiente linea.
