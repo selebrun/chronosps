@@ -255,7 +255,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                   {order.product_id[1]}
                 </td>
                 <td className="px-3 py-2">
-                 {order?.x_studio_po}
+                 {order?.x_studio_po || order?.origin }
                 </td>
                 <td className="px-3 py-2">
                   {order.qty_producing}/{order.product_qty}

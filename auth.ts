@@ -20,7 +20,7 @@ export const config = {
           const { username, password, company_id } = credentials;
   
           const odooUsers: any = await getUsersFromOdoo(company_id);
-     
+          console.log(odooUsers, 'odooUsers')
 
           if (!odooUsers.length) return null;
        
