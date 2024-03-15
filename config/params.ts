@@ -19,7 +19,7 @@ export const config = {
                 "domain": "hidrosumi.chronosps.com",
                 "url": "https://hidrosumi.chronosps.com/",
                 "port": 443,
-                "db": "hidrosumi-prod-11765695",
+                "db": "hidrosumi",
                 "username": "admin",
                 "password": "sim9096"
             }
