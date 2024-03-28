@@ -25,6 +25,18 @@ export const config = {
             }
         },
         {
+            "id": "1238edea-ed04-11ee-b038-325096b39f47",
+            "company": "Demo17",
+            "odoo_connection": {
+                "domain": "demo17.chronosps.com",
+                "url": "https://demo17.chronosps.com/",
+                "port": 443,
+                "db": "Demo17",
+                "username": "admin",
+                "password": "fd59e79b38704736d1065bf264a607953cb26d09"
+            }
+        },
+        {
             "id": "889cd134-00b2-11ee-be56-0242ac120002",
             "company": "pdemo",
             "odoo_connection": {
