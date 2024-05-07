@@ -17,7 +17,7 @@ interface FormData {
   "password"?: string;
 }
 
-function CompaniesList({companies} : any) {
+function CompaniesList({ companies } : { companies: any }) {
   const [formData, setFormData] = useState<any>({});
   const [showForm, setShowForm] = useState(false);
   const [companiesCurrent, setCompaniesCurrent] = useState(companies);
