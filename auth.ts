@@ -19,8 +19,10 @@ export const config = {
         },
         async authorize(credentials: any) {
           const { username, password, company_id } = credentials;
-  
+      
           const odooUsers: any = await getUsersFromOdoo(company_id);
+       
+
           if (!odooUsers.length) return null;
        
           const user = odooUsers.find((user: any) => removeSpecialCharacters(user.vat) === username && user.x_studio_password === password );      
@@ -42,7 +44,7 @@ export const config = {
             materiales: user?.x_studio_new_material,
             active: true
           }
-  
+
           return user_data as any;
   
         },
@@ -70,3 +72,4 @@ export const config = {
 export function auth(...args: [GetServerSidePropsContext["req"], GetServerSidePropsContext["res"]] | [NextApiRequest, NextApiResponse] | []) {
   return getServerSession(...args, config)
 }
+

@@ -11,7 +11,7 @@ import { signOut } from "next-auth/react";
 export function LogoMenu({ userRole }: { userRole: string }) {
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const pathName = usePathname();
-  const isDashboardRoute = pathName === '/dashboard';
+  const isDashboardRoute = pathName === '/dashboard' ||  pathName === '/admin/test';
   const router = useRouter();
   const onShowMenu = (): any => {
     setShowMenu(!showMenu)
@@ -19,6 +19,7 @@ export function LogoMenu({ userRole }: { userRole: string }) {
 
   const logout = () => {
     signOut({ redirect: false });
+    localStorage.removeItem('admin');
     router.push('/login'); 
   };
 

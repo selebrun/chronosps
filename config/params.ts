@@ -69,8 +69,8 @@ export const config = {
                 "port": 443,
                 "db": "kannoa-test-11690657",
                 "username": "admin",
-                "password": "sim9096"
-            }
+                "password": "sim909 6"
+              }
         }
     ],
     "web_app": {
