@@ -18,9 +18,9 @@ export default async function RootLayout({
     <html lang="en" className="[color-scheme:light]">
       <body>
         <SessionProvider>
-          <div className="main">
-            {children}
-          </div>
+            <div className="main">
+              {children}
+            </div>
         </SessionProvider>
       </body>
     </html>
