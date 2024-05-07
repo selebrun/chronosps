@@ -32,6 +32,7 @@
     "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/pg": "^8.11.4"
+    "@types/pg": "^8.11.4",
+    "@types/uuid": "^9.0.8"
   }
 }

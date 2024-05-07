@@ -17,7 +17,7 @@ interface FormData {
   "password"?: string;
 }
 
-export default  function CompaniesList({ companies } : { companies: any })  {
+export function CompaniesList({ companies  }:{ companies: any }) {
   const [formData, setFormData] = useState<any>({});
   const [showForm, setShowForm] = useState(false);
   const [companiesCurrent, setCompaniesCurrent] = useState(companies);
@@ -32,7 +32,7 @@ export default  function CompaniesList({ companies } : { companies: any })  {
   }
 
   const handleChange = (value: any, name: any) => {
-    setFormData((prevFormData: any) => ({
+    setFormData((prevFormData:any) => ({
       ...prevFormData,
       [name]: value,
     }));
@@ -125,7 +125,7 @@ export default  function CompaniesList({ companies } : { companies: any })  {
         {companiesCurrent.length > 0 && 
           !showForm &&
             <div>
-            {companiesCurrent?.map((item:any) => (
+            {companiesCurrent?.map((item:any)=> (
               <div key={item.name} className="flex justify-center mb-5">
                   <div className="rounded border border-blue-[#020630] bg-[#F2F5FA] p-2 w-full">{item.name}</div>
                   <div className="ml-20">
@@ -194,5 +194,4 @@ export default  function CompaniesList({ companies } : { companies: any })  {
     </div>
   );
 }
-
 
