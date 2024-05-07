@@ -1,35 +1,28 @@
 /* use client */
 "use client";
-import { useState  } from "react";
+import { useState, useEffect  } from "react";
 import { v4 as uuidv4 } from 'uuid';
 import NewCompanyForm from "@/ui/new-company-form/NewCompanyForm";
 import { useRouter } from "next/navigation";
 
 
-interface FormData {
-  "name_of_the_company"?: string;
-  "id_of_the_company"?: number;
-  "domain"?: string;
-  "URL"?: string;
-  "port"?: number;
-  "DB"?: string;
-  "username"?: string;
-  "password"?: string;
-}
 
-export function CompaniesList({ companies }:{ companies: any }) {
+export function CompaniesList({ currentCompanies }:{ currentCompanies: any }) {
   const [formData, setFormData] = useState<any>({});
   const [showForm, setShowForm] = useState(false);
-  const [companiesCurrent, setCompaniesCurrent] = useState(companies);
+  const [companiesCurrent, setCompaniesCurrent] = useState(currentCompanies);
   const [onEdit, setOnEdit] = useState(false);
-  const userAdmin = localStorage.getItem('admin')?.replace(/^['"](.*)['"]$/, '$1');
   const router = useRouter();
 
+  useEffect(()=>{
+    const userAdmin = localStorage?.getItem('admin')?.replace(/^['"](.*)['"]$/, '$1');
+     if (userAdmin !== process.env.NEXT_PUBLIC_USER_ADMIN) {
+      localStorage.removeItem('admin')
+      return router.push("/admin/login")
+    }
+  }, [])
 
-  if (userAdmin !== process.env.NEXT_PUBLIC_USER_ADMIN) {
-    localStorage.removeItem('admin')
-    return router.push("/admin/login")
-  }
+ 
 
   const handleChange = (value: any, name: any) => {
     setFormData((prevFormData:any) => ({
@@ -109,89 +102,90 @@ export function CompaniesList({ companies }:{ companies: any }) {
   };
 
   return (
-    <div className="space-y-8 relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
-      <div className="space-y-10">
-        <div className="flex justify-between items-center ">
-          <div className="font-semibold"> Historial de Compañia</div>
-          <div>
-            <button
-              className="bg-[#4584CE] p-2 rounded-md"
-              onClick={toggleForm}
-            >
-              {showForm ? "X" : "Crear Nueva Compañía"}
-            </button>
-          </div>
-        </div>
-        {companiesCurrent.length > 0 && 
-          !showForm &&
+    <>
+      <div className="space-y-8 relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
+        <div className="space-y-10">
+          <div className="flex justify-between items-center ">
+            <div className="font-semibold"> Historial de Compañia</div>
             <div>
-            {companiesCurrent?.map((item:any)=> (
-              <div key={item.name} className="flex justify-center mb-5">
-                  <div className="rounded border border-blue-[#020630] bg-[#F2F5FA] p-2 w-full">{item.name}</div>
-                  <div className="ml-20">
-                      <button
-                      className="bg-[#4584CE] p-2 rounded-md"
-                      onClick={() => onEditCompany(item)}
-                    >
-                      Editar
-                    </button>
-                  </div>
-              </div>
-            ))}
-          </div>}
-        {showForm && (
-          <div>
-            <NewCompanyForm
-              handleChange={handleChange}
-              label="Name of the company"
-              name='name'
-              value={formData["name"]}
-            />
-            <NewCompanyForm
-              handleChange={handleChange}
-              label="Domain"
-              name="domain"
-              value={formData["domain"]}
-            />
-            <NewCompanyForm
-              handleChange={handleChange}
-              label="URL"
-              name="url"
-              value={formData["url"]}
-            />
-            <NewCompanyForm
-              handleChange={handleChange}
-              label="DB"
-              name="database"
-              value={formData["database"]}
-            />
-            <NewCompanyForm
-              handleChange={handleChange}
-              label="Username"
-              name="user_default"
-              value={formData["user_default"]}
-            />
-            <NewCompanyForm
-              handleChange={handleChange}
-              label="Password"
-              name="password"
-              value={formData["password"]}
-            />
-            <div className="flex justify-center pt-3">
               <button
-                type="submit"
-                className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
-                onClick={() => onEdit ?editCompanies() : handleSave()}
-                disabled={formData.name_of_the_company === ''}
-
+                className="bg-[#4584CE] p-2 rounded-md"
+                onClick={toggleForm}
               >
-                Guardar
+                {showForm ? "X" : "Crear Nueva Compañía"}
               </button>
             </div>
           </div>
-        )}
+          {companiesCurrent.length > 0 && 
+            !showForm &&
+              <div>
+              {companiesCurrent?.map((item:any)=> (
+                <div key={item.name} className="flex justify-center mb-5">
+                    <div className="rounded border border-blue-[#020630] bg-[#F2F5FA] p-2 w-full">{item.name}</div>
+                    <div className="ml-20">
+                        <button
+                        className="bg-[#4584CE] p-2 rounded-md"
+                        onClick={() => onEditCompany(item)}
+                      >
+                        Editar
+                      </button>
+                    </div>
+                </div>
+              ))}
+            </div>}
+          {showForm && (
+            <div>
+              <NewCompanyForm
+                handleChange={handleChange}
+                label="Name of the company"
+                name='name'
+                value={formData["name"]}
+              />
+              <NewCompanyForm
+                handleChange={handleChange}
+                label="Domain"
+                name="domain"
+                value={formData["domain"]}
+              />
+              <NewCompanyForm
+                handleChange={handleChange}
+                label="URL"
+                name="url"
+                value={formData["url"]}
+              />
+              <NewCompanyForm
+                handleChange={handleChange}
+                label="DB"
+                name="database"
+                value={formData["database"]}
+              />
+              <NewCompanyForm
+                handleChange={handleChange}
+                label="Username"
+                name="user_default"
+                value={formData["user_default"]}
+              />
+              <NewCompanyForm
+                handleChange={handleChange}
+                label="Password"
+                name="password"
+                value={formData["password"]}
+              />
+              <div className="flex justify-center pt-3">
+                <button
+                  type="submit"
+                  className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
+                  onClick={() => onEdit ?editCompanies() : handleSave()}
+                  disabled={formData.name_of_the_company === ''}
+
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
-
