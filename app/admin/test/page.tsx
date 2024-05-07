@@ -1,5 +1,5 @@
 import { getCompanies, createCompany, updateCompany } from "../../api/companies/companies";
-import CompaniesList from "@/ui/companies/companies-list";
+import { CompaniesList }   from "./CompaniesList";
 
 
 export default async function Page() {
@@ -24,7 +24,7 @@ export default async function Page() {
 
   return (
     <>
-      <CompaniesList companies={companies} />
+      {/* <CompaniesList companies={companies} /> */}
     </>
   );
 }
