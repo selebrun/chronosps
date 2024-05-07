@@ -1,8 +1,9 @@
-import { getCompanies, createCompany, updateCompany } from "../../api/companies/companies";
-import { CompaniesList }   from "./CompaniesList";
+import { getCompanies } from "../../api/companies/companies";
+import { CompaniesList } from "./CompaniesList";
 
 
-export default async function Page() {
+
+export default async function  Page() {
   const companies = await getCompanies()
 
   /* 
@@ -24,7 +25,7 @@ export default async function Page() {
 
   return (
     <>
-      <CompaniesList companies={companies} />
+      <CompaniesList currentCompanies={companies} />
     </>
   );
 }
