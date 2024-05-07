@@ -24,7 +24,7 @@ export default async function Page() {
 
   return (
     <>
-      {/* <CompaniesList companies={companies} /> */}
+      <CompaniesList companies={companies} />
     </>
   );
 }
