@@ -341,7 +341,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
                       </div>
                         <NewCompanyForm
                           handleChange={handleChangeUsers}
-                          label="RUT"
+                          label="Número de identificación"
                           name='code'
                           value={formUsers["code"]?.trim()}
                         />
