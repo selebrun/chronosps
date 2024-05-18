@@ -19,6 +19,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
   const [formUsers, setFormUsers] = useState<any>({});
   const router = useRouter();
   
+  console.log(currentuUsers, "currentuUserscurrentuUsers")
   useEffect(()=>{
     const userAdmin = localStorage?.getItem('admin')?.replace(/^['"](.*)['"]$/, '$1');
      if (userAdmin !== process.env.NEXT_PUBLIC_USER_ADMIN) {
