@@ -109,6 +109,8 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
         setCompaniesCurrent(update);
         setOnEdit(false)
         setShowForm(!showForm)
+        router.refresh();
+        console.log("aqui")
       }
     } catch (error) {
       console.error("Error fetching companies:", error);
