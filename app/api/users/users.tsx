@@ -31,7 +31,7 @@ export async function getUsers() {
     return companies;
   } catch (err) {
     console.error(err)
-    throw new Error("There was an error trying to get companies");
+    throw new Error("There was an error trying to get users");
   }
 }
 
@@ -57,7 +57,7 @@ export async function createUsers(users: any) {
     client.query(query, [code, email, id_company, name, password, rol]);
     return users
   } catch (error) {
-    console.error("Error al crear la empresa:", error);
+    console.error("Error al usuario:", error);
   }
 }
 
@@ -71,7 +71,7 @@ export async function createUsers(users: any) {
  */
 export async function updateUsers(users: any) {
   const client = new Client(config);
-  
+
   try {
     await client.connect();
     console.log("Conectado correctamente al servidor PostgreSQL en Azure");
@@ -82,14 +82,22 @@ export async function updateUsers(users: any) {
         WHERE email = $6
       `;
       const { code, email, id_company, name, password, rol } = users;
-      await client.query(query, [code.trim(), email.trim(), id_company.trim(), name.trim(), password.trim(), rol.trim()]);
+      await client.query(query, [
+        id_company.trim(),
+        code.trim(),
+        password.trim(),
+        name.trim(),
+        rol.trim(),
+        email.trim()
+      ]);
   
-    console.log(`Empresa con ID ${users.id_company} actualizada correctamente`);
+  
+    console.log(`El usuario  ${name} actualizado correctamente`);
     await client.end();
   
     return users
   
   } catch (error) {
-    console.error("Error al actualizar la empresa:", error);
+    console.error("Error al actualizar el usuario:", error);
   }
 }

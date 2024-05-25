@@ -6,7 +6,7 @@ export default async function  Page() {
   const companies = await getCompanies()
   const users = await getUsers()
 
-
+console.log(users, "usersusers")
   return (
     <>
       <CompaniesList currentCompanies={companies} currentuUsers={users}/>
