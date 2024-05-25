@@ -19,7 +19,6 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
   const [formUsers, setFormUsers] = useState<any>({});
   const router = useRouter();
   
-  console.log(currentuUsers, "currentuUserscurrentuUsers")
   useEffect(()=>{
     const userAdmin = localStorage?.getItem('admin')?.replace(/^['"](.*)['"]$/, '$1');
      if (userAdmin !== process.env.NEXT_PUBLIC_USER_ADMIN) {
@@ -109,8 +108,6 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
         setCompaniesCurrent(update);
         setOnEdit(false)
         setShowForm(!showForm)
-        router.refresh();
-        console.log()
       }
     } catch (error) {
       console.error("Error fetching companies:", error);
@@ -159,7 +156,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
 
       if (response.status === 200) {
         const update = users.map((item: any) =>{
-          if (item.id_company === data.id_company) {
+          if (item.code === data.code) {
             return data; 
           } else {
             return item; // Mantener el elemento sin cambios
@@ -210,7 +207,6 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
         setUsers((prevState:any)=> [...prevState, data]);
         setShowFormUsers(!showFormUsers)
         setFormUsers({})
-        router.refresh()
       }
 
     } catch (error) {
