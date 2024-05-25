@@ -26,6 +26,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
       localStorage.removeItem('admin')
       return router.push("/admin/login")
     } else {
+      console.log("entreee")
       router.refresh()
     }
   }, [])
