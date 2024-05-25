@@ -25,6 +25,8 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
      if (userAdmin !== process.env.NEXT_PUBLIC_USER_ADMIN) {
       localStorage.removeItem('admin')
       return router.push("/admin/login")
+    } else {
+      router.refresh()
     }
   }, [])
 
@@ -184,6 +186,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
         setUsers((prevState:any)=> [...prevState, data]);
         setShowFormUsers(!showFormUsers)
         setFormUsers({})
+        router.refresh()
       }
 
     } catch (error) {
