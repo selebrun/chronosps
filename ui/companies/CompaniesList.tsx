@@ -15,7 +15,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
   const [onEdit, setOnEdit] = useState(false);
   const [onEditUsers, setOnEditUsers] = useState(false);
   const [showUsers, setShowUsers] = useState(false);
-  const [users, setUsers] = useState<any>(currentuUsers);
+  const [users, setUsers] = useState<any>([]);
   const [formUsers, setFormUsers] = useState<any>({});
   const router = useRouter();
   
@@ -26,8 +26,8 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
       localStorage.removeItem('admin')
       return router.push("/admin/login")
     } else {
-      console.log("entreee")
-      router.refresh()
+      getUsers()
+      // router.refresh()
     }
   }, [])
 
@@ -110,7 +110,7 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
         setOnEdit(false)
         setShowForm(!showForm)
         router.refresh();
-        console.log("aqui")
+        console.log()
       }
     } catch (error) {
       console.error("Error fetching companies:", error);
@@ -121,6 +121,27 @@ export function CompaniesList({ currentCompanies, currentuUsers }:{ currentCompa
     setShowUsers(true);
   };
 
+  const getUsers = async () => {
+    try {
+      const response = await fetch("/api/users", {
+        method: 'GET',
+        headers: {
+          "Content-Type": "application/json"
+        },
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch companies");
+      }
+      const data = await response.json();
+
+       if (response.status === 200) {
+         setUsers(data)
+         console.log("Aqii", data)
+       }
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    }
+  };
 
   const editUsers = async () => {
     try {
