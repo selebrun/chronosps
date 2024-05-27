@@ -6,6 +6,8 @@ import { Suspense } from "react";
 import { LogoMenu } from '@/ui/logo-menu/LogoMenu';
 import React from 'react';
 
+// Layout config
+export const revalidate = 0;
 
 export const metadata: Metadata = {
   title: 'Chronos Piso App Dashboard',
