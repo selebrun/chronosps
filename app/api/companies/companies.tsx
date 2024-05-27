@@ -37,6 +37,34 @@ export async function getCompanies() {
 }
 
 /**
+ * getCompanyByID
+ * 
+ * Retorna una compania en base a su ID
+ * 
+ * Esta funcion es exclusivamente para usarla
+ * del lado del servidor
+ */
+
+export async function getCompanyByID(companyId: string) {
+  const client = new Client(config);
+
+  try {
+    await client.connect();
+    const res = await client.query('SELECT * FROM "company" WHERE id_company = $1', [companyId]);
+    const company = res.rows[0];
+
+    if (!company) {
+      throw new Error(`Company with id ${companyId} not found`);
+    }
+
+    return company;
+  } catch (err) {
+    console.error(err)
+    throw new Error(`There was an error trying to get company with id ${companyId}`);
+  }
+}
+
+/**
  * createCompany
  * 
  * Crea una compania y retorna los datos de la compania creada

@@ -1,17 +1,15 @@
 "use client";
 import { faUser } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 
 
 
-export function LogoMenu({ userRole }: { userRole: string }) {
+export function LogoMenu({ userRole, isDashboardRoute }: { userRole: string, isDashboardRoute: boolean }) {
   const [showMenu, setShowMenu] = useState<boolean>(false);
-  const pathName = usePathname();
-  const isDashboardRoute = pathName === '/dashboard' ||  pathName === '/admin/test';
   const router = useRouter();
   const onShowMenu = (): any => {
     setShowMenu(!showMenu)

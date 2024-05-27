@@ -26,9 +26,9 @@ export async function getUsers() {
   try {
    const a = await client.connect();
     const res = await client.query('SELECT * FROM "users"');
-    const companies = res.rows;
+    const users = res.rows;
 
-    return companies;
+    return users;
   } catch (err) {
     console.error(err)
     throw new Error("There was an error trying to get users");
@@ -81,6 +81,8 @@ export async function updateUsers(users: any) {
         SET id_company = $1, code = $2, password = $3, name = $4, rol = $5
         WHERE email = $6
       `;
+
+
       const { code, email, id_company, name, password, rol } = users;
       await client.query(query, [
         id_company.trim(),
@@ -99,5 +101,25 @@ export async function updateUsers(users: any) {
   
   } catch (error) {
     console.error("Error al actualizar el usuario:", error);
+  }
+}
+
+
+export async function getUsersByID(id: string) {
+  const client = new Client(config);
+
+  try {
+    await client.connect();
+    const res = await client.query('SELECT * FROM "users" WHERE code = $1', [id]);
+    const users = res.rows[0];
+
+    if (!users) {
+      throw new Error(`Users with id ${id} not found`);
+    }
+
+    return users;
+  } catch (err) {
+    console.error(err)
+    throw new Error(`There was an error trying to get users with id ${id}`);
   }
 }
