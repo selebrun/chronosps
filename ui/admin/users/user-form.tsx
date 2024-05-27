@@ -1,0 +1,207 @@
+"use client";
+import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { v4 as uuidv4 } from 'uuid';
+import { type ChronosUsers } from "@/types/chronosUsers";
+import { type ChronosCompany } from "@/types/chronosCompany";
+
+
+import { Spinner } from '@/ui/spinner';
+
+export function ChronosUsersForm({
+  user,
+  companies
+}: {
+  user?: ChronosUsers
+  companies?: any
+}) {
+
+  const router = useRouter();
+
+  const [formError, setFormError] = useState<string | null>(null)
+  const [loading, setLoading] = useState<boolean>(false)
+
+  const [formData, setFormData] = useState<any>({
+    id_company: user?.id_company?.trim() || '',
+    code: user?.code?.trim() || '',
+    password: user?.password?.trim() || '',
+    name: user?.name?.trim() || '',
+    rol: user?.rol?.trim() || '',
+    email: user?.email?.trim() || '',
+  });
+
+  const handleChange = (e: any) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const createUser = async () => {
+    const response = await fetch("/api/users", {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(formData)
+    });
+
+    if (!response.ok) {
+      setFormError("Ha ocurrido un error al intentar crear una compania");
+      setLoading(false);
+    }
+
+    navigateOnSuccess()
+  };
+
+  const updateUser = async () => {
+    try {
+      const response = await fetch("/api/users", {
+        method: 'PUT',
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
+      if (!response.ok) {
+        throw new Error("Failed to fetch companies");
+      }
+      const data = await response.json();
+
+      if (response.status === 200) {
+        setFormError("Ha ocurrido un error al intentar editar la compania");
+        setLoading(false);
+      }
+    
+      navigateOnSuccess()
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    if (!user) {
+      createUser()
+    } else {
+      updateUser()
+    }
+  };
+
+  const navigateOnSuccess = () => {
+    router.push("/admin/users");
+    router.refresh();
+  }
+
+
+  return (
+    <form onSubmit={handleSubmit} className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] w-full">
+
+      {formError &&
+        <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-5" role="alert">
+          <p className="font-bold">Error</p>
+          <p>{formError}</p>
+        </div>
+      }
+
+      <div className="mb-4">
+        <label htmlFor="code" className="text-xs block text-gray-700 font-bold mb-2">
+         Número de identificación
+        </label>
+        <input
+          type="text"
+          id="code"
+          name="code"
+          value={formData?.code?.trim()}
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          required
+        />
+      </div>
+
+      <div className="mb-4">
+        <label htmlFor="name" className="text-xs block text-gray-700 font-bold mb-2">
+          Nombre
+        </label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          value={formData?.name?.trim()}
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          required
+        />
+      </div>
+
+      <div className="mb-4">
+        <label htmlFor="email" className="text-xs block text-gray-700 font-bold mb-2">
+          Email
+        </label>
+        <input
+          type="text"
+          id="email"
+          name="email"
+          value={formData?.email?.trim()}
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          required
+        />
+      </div>
+
+      <div className="mb-4">
+        <label htmlFor="password" className="text-xs block text-gray-700 font-bold mb-2">
+          Password
+        </label>
+        <input
+          type="text"
+          id="password"
+          name="password"
+          value={formData?.password?.trim()}
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          required
+        />
+      </div>
+      <div className="mb-4">
+        <label htmlFor="user_default" className="text-xs block text-gray-700 font-bold mb-2">
+          Compañia
+        </label>
+        <select 
+          name="id_company"
+          value={formData?.id_company?.trim()}
+          onChange={handleChange}
+          className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
+            <option>{"Seleccionar compañia"}</option>
+            {companies?.map((item:any, index: number)=> (
+                <option value={item.id_company.trim()} key={index}>{item.name}</option>
+              ))}
+          </select>
+      </div>
+
+      <div className="mb-4">
+        <label htmlFor="rol" className="text-xs block text-gray-700 font-bold mb-2">
+          Rol
+        </label>
+        <select
+          name='rol'
+          onChange={handleChange}
+          value={formData?.rol?.trim()}
+          className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
+              <option>{"Seleccionar rol"}</option>
+            <option value={'Lider'}>Lider</option>
+            <option value={'Operario'}>Operario</option>
+            <option value={'Jefe'}>Jefe</option>
+        </select>
+      </div>
+      <button
+        type="submit"
+        className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
+        disabled={!formData.name || !formData.rol || !formData.email || !formData.id_company || !formData.password || !formData.code}
+      >
+        {!user ? "Crear Usuarios" : "Guardar Cambios"}
+        {loading && <Spinner /> }
+      </button>
+    </form>
+  )
+}
