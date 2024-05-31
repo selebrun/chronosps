@@ -36,7 +36,6 @@ export default async function Layout({
 
   const user = process.env.CHRONOS_ADMIN_USER;
   const session = await getServerSession(config)
-
   if (!session &&  user !== session.email ) redirect(CHRONOS_ADMIN_LOGIN_URL)
 
   return (
