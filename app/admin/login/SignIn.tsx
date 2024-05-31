@@ -8,13 +8,13 @@ import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { validateEmail } from "@/helper/validateEmail";
 
 
-function SignIn() {
+function SignInForm() {
   const [error, setError] = useState("");
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState({
-    dniUser: "",
+    email: "",
     password: "",
   });
 
@@ -32,16 +32,20 @@ function SignIn() {
 
   const handleSubmit = async (event: { preventDefault: () => void; }) => {
     event.preventDefault();
-    const isValidEmail = validateEmail(formData.dniUser);
-    const user = process.env.NEXT_PUBLIC_USER_ADMIN;
-    const password = process.env.NEXT_PUBLIC_PASSWORD;
-   
-    if (isValidEmail && user ===  formData.dniUser && password === formData.password ) {
-      localStorage.setItem('admin', JSON.stringify(formData.dniUser));
-      return router.push("/admin/test")
-    } else {
-      setError('Correo invalido')
+
+    const res = await signIn("credentials", {
+      username: formData.email,
+      password: formData.password,
+      isChronosAdmin: true,
+      redirect: false,
+    });
+
+    if (res?.error)  {
+      setLoading(false)
+      setError("Usuario o contrasena inválidos");
     }
+   
+    if (res?.ok) return router.push("/admin/companies")
   };
 
   return (
@@ -64,18 +68,19 @@ function SignIn() {
         >
           <div className="mb-4">
             <label
-              htmlFor="dniUser"
+              htmlFor="email"
               className="block text-gray-700 text-sm font-bold mb-1"
             >
               Correo electronico
             </label>
             <input
-              type="text"
-              name="dniUser"
-              value={formData.dniUser}
+              type="email"
+              name="email"
+              value={formData.email}
               onChange={(e) => handleChange(e)}
               placeholder="Ingrese su número"
               className="bg-white shadow appearance-none border rounded w-full py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline"
+              required
             />
           </div>
           <div className="mb-6">
@@ -94,6 +99,7 @@ function SignIn() {
                 value={formData.password}
                 onChange={(e) => handleChange(e)}
                 placeholder="******************"
+                required
               />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center h-9">
                 <button type="button" onClick={togglePasswordVisibility}>
@@ -106,7 +112,7 @@ function SignIn() {
               </div>
             </div>
           </div>
-          <button disabled={(formData.dniUser === '') || (formData.password === '')} className="bg-[#6BB2D7] flex justify-center  font-bold shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline">
+          <button disabled={(formData.email === '') || (formData.password === '')} className="bg-[#6BB2D7] flex justify-center  font-bold shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline">
             <div>Ingresar</div>
             <div role="status"  className='relative left-4' >
               {loading && <svg width="20" height="20" fill="currentColor" className="mr-2 animate-spin" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
@@ -121,4 +127,4 @@ function SignIn() {
   );
 }
 
-export default SignIn;
+export default SignInForm;

@@ -1,6 +1,11 @@
 import type { Metadata } from 'next'
 import { ChronosAdminSideMenu } from "@/ui/admin/side-menu";
 import { Suspense } from "react";
+import { redirect } from 'next/navigation';
+
+import { getServerSession } from 'next-auth'
+import { config } from '@/auth'
+import { CHRONOS_ADMIN_LOGIN_URL } from '@/config/constants'
 
 // Ui Components
 import { LogoMenu } from '@/ui/logo-menu/LogoMenu';
@@ -28,6 +33,11 @@ export default async function Layout({
 }: {
   children: React.ReactNode;
 }) {
+
+  const user = process.env.CHRONOS_ADMIN_USER;
+  const session = await getServerSession(config)
+
+  if (!session &&  user !== session.email ) redirect(CHRONOS_ADMIN_LOGIN_URL)
 
   return (
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">

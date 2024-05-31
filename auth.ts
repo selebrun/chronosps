@@ -18,7 +18,29 @@ export const config = {
           password: { label: "Password", type: "password" },
         },
         async authorize(credentials: any) {
-          const { username, password, company_id } = credentials;
+          const { username, password, company_id, isChronosAdmin } = credentials;
+
+          /*
+          * La constante isChronosAdmin, es de uso exclusivo
+          * para la ruta /admin donde se muestra el panel de administeracion interno
+          * de Chronos Piso.
+          * 
+          * Sise desea logear un usuario interno o admin Chronos se debe
+          * enviar isChronosAdmin = true en el mentodo signIn("credentials")
+          */
+
+          if (isChronosAdmin) {
+            if (process.env.CHRONOS_ADMIN_USER !== username ||
+              process.env.CHRONOS_ADMIN_PASSWORD !== password) return null
+
+            const adminUser = {
+              name: "Chronos Admin",
+              email: username,
+              company_id: null,
+              role: "chronosAdmin",
+            }
+            return adminUser
+          }
       
           const odooUsers: any = await getUsersFromOdoo(company_id);
        
