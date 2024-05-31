@@ -1,8 +1,7 @@
-"use client";
-import SignIn from "./SignIn";
+import SignInForm from "./SignIn";
 
 export default function Page() {
   return (
-      <SignIn></SignIn>
+    <SignInForm />
   );
 }
