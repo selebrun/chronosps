@@ -5,8 +5,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 //Services
-import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
+//import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
+import { getUsers } from "./app/api/users/users";
 import { getOdooData } from "@/app/api/odoo/odooService";
+
 
 export const config = {
     providers: [
@@ -42,29 +44,27 @@ export const config = {
             return adminUser
           }
       
-          const odooUsers: any = await getUsersFromOdoo(company_id);
-       
+          //const odooUsers: any = await getUsersFromOdoo(company_id);
 
-          if (!odooUsers.length) return null;
+          const chronosUsers: any = await getUsers();
+          if (!chronosUsers.length) return null;
        
-          const user = odooUsers.find((user: any) => removeSpecialCharacters(user.vat) === username && user.x_studio_password === password );      
+          const user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );      
           if (!user) return null;
           let odoo_user_id = 0
-          getOdooData('res.users',[['partner_id','=',user.id],['active','=',true]],['id'],false, false, company_id, (odoo_user: any) => {
+          getOdooData('res.users',[['partner_id','=',user.code],['active','=',true]],['id'],false, false, user.id_company, (odoo_user: any) => {
             if( odoo_user && odoo_user.data && odoo_user.data[0] && odoo_user.data[0].id) odoo_user_id = odoo_user.data[0].id
           })
 
           const user_data = {
-            name: user?.name,
-            email: user?.email,
-            company_id: company_id,
-            mobile: user?.mobile,
+            name: user?.name?.trim(),
+            email: user?.email?.trim(),
+            company_id: user?.id_company?.trim(),
             odoo_id: user?.id,
             odoo_user_id: odoo_user_id,
-            document: user?.vat,
-            role: user?.x_studio_rol_en_produccin,
-            materiales: user?.x_studio_new_material,
-            active: true
+            document: user?.code?.trim(),
+            role: user?.rol?.trim(),
+            materiales: user?.x_studio_new_material?.trim(),
           }
 
           return user_data as any;

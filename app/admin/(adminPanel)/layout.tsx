@@ -42,7 +42,7 @@ export default async function Layout({
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <LogoMenu
         userRole={"Administrador"}
-        isDashboardRoute
+        isDashboardRoute={true}
       />
 
       <div className="mx-auto max-w-7xl space-y-8 px-2 pt-20 lg:px-8 lg:py-8 bg-white rounded-lg p-px shadow-lg shadow-black/20 p-3.5 lg:p-6">

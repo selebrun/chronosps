@@ -11,20 +11,11 @@ function SignIn() {
   const [error, setError] = useState("");
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>();
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState({
     dniUser: "",
     password: "",
   });
-
-  useEffect(()=>{
-    // Get Company Id from URL QueryParams
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    const companyId = urlParams.get('company_id');
-    setCompanyId(companyId);
-  }, [])
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
@@ -41,20 +32,15 @@ function SignIn() {
   const handleSubmit = async (event: { preventDefault: () => void; }) => {
     event.preventDefault();
     setLoading(true)
-    if (!companyId) {
-      setLoading(false)
-      setError('No es posible determinar la compañia, debe especificar el companyId en la url');
-      return;
-    }
+
     const dni = removeSpecialCharacters(formData.dniUser)
 
     const res = await signIn("credentials", {
       username: dni,
       password: formData.password,
-      company_id: companyId,
       redirect: false,
     });
- 
+
     if (res?.error === 'CredentialsSignin') {
       setLoading(false)
       setError('Usuario o contraseña incorrectas')
