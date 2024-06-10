@@ -29,7 +29,7 @@ export default async function Layout({
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <LogoMenu
         userRole={session.user.name}
-        isDashboardRoute={false}
+        isDashboardRoute={true}
       />
       <HeaderLink userRole={session.user.role}></HeaderLink>
         <div className="mx-auto max-w-7xl space-y-8 px-2 pt-20 lg:px-8 lg:py-8">

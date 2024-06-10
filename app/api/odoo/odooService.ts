@@ -1,23 +1,40 @@
 const Odoo = require('odoo-xmlrpc');
 import { config } from '@/config/params';
+import { getCompanies } from "@/app/api/companies/companies";
 
 
-function odooRequest(
+async function odooRequest(
     pModel: any,
     action: any,
     params: any,
     company_id: any,
     callback: any
 ) {
-	const company_data = config.companies.find((company) => {return company.id == company_id})
+
+	const companies =  await getCompanies()
+	const mapCompanies = companies.map(company => {
+		return(
+			{
+				"id": company.id_company.trim(),
+				"company": company.name.trim(),
+				"odoo_connection": {
+						"domain": company.domain.trim(),
+						"url":  company.url.trim(),
+						"port": 443,
+						"db": company.database.trim(),
+						"username":  company.user_default.trim(),
+						"password": company.password.trim()
+			}
+	})})
+
+	const company_data = mapCompanies.find((company) => {return company.id == company_id.trim()})
 	const odoo_connection = (company_data ? company_data.odoo_connection : false)
-	
-    if(!odoo_connection) return callback({status: false, message: 'No se encontro la compañia con ID:'+company_id})
+  if(!odoo_connection) return callback({status: false, message: 'No se encontro la compañia con ID:'+company_id})
 	const odoo = new Odoo(odoo_connection);
 
     odoo.connect(function (pError: any) {
         if (pError) { 
-            console.log(pError); 
+            console.log(pError, "pErrorpError"); 
             callback({status:false}); 
         } else {
             odoo.execute_kw(pModel, action, params, function (pError: any, result: any) {
