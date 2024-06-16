@@ -6,7 +6,7 @@ import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 //Services
 //import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
-import { getUsers, getEmployee } from "./app/api/users/users";
+import { getUsers } from "./app/api/users/users";
 import { getOdooData } from "@/app/api/odoo/odooService";
 
 
