@@ -170,11 +170,11 @@ export function ModalDetailWork({
                   <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                       <div className=''>
                           <div className='font-bold text-center'>Inicio proramado</div>
-                          <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_planned_start ? showDetailOrderWork.date_planned_start : 'No definida'}</div>
+                          <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_start? showDetailOrderWork.date_start : 'No definida'}</div>
                       </div>
                     <div className=''>
                         <div className='font-bold text-center'>Final Programado</div>
-                        <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_planned_finished ? showDetailOrderWork.date_planned_finished : 'No definida'}</div>
+                        <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_finished ? showDetailOrderWork.date_finished : 'No definida'}</div>
                     </div>
                     <div className=''>
                         <div className='font-bold text-center'>Duración teorica</div>
