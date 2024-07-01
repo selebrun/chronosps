@@ -7,7 +7,8 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
     getOdooData(
       'mrp.workorder',
       [['id','=', workorder.id]],
-      ['id','name','state','x_studio_nro_ot','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working'],
+      [],
+      // ['id','name','state','x_studio_nro_ot','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working'],
       false,
       false,
       user.company_id,
