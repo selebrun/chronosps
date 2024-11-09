@@ -3,6 +3,7 @@
 import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
 
 export async function updateOrder (user: any, workorder: any, action: string, block_reason: any = false, qtyDone: number | undefined = 0): Promise<any>{
+ console.log("entreeeee")
   return new Promise(async (resolve, reject) => {
     getOdooData(
       'mrp.workorder',
