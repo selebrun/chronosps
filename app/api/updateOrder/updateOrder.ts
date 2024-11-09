@@ -3,18 +3,18 @@
 import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
 
 export async function updateOrder (user: any, workorder: any, action: string, block_reason: any = false, qtyDone: number | undefined = 0): Promise<any>{
- console.log("entreeeee")
   return new Promise(async (resolve, reject) => {
     getOdooData(
       'mrp.workorder',
       [['id','=', workorder.id]],
-      ['id','name','state','production_id','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working', 'employee_assigned_ids'],
+      ['id','production_id','employee_assigned_ids'],
+      // ['id','name','state','production_id','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working', 'employee_assigned_ids'],
       false,
       false,
       user.company_id,
       async (workorders: any) => {
         const work_order = workorders.data[0]
-        console.log(work_order, "work_order")
+
         switch(user.role) {
           case 'Operario':
             if(work_order.employee_assigned_ids[0] != user.odoo_id) return  resolve({ status: false, message: 'Usted no tiene autorizacion para realizar acciones sobre esta orden.' });

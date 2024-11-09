@@ -90,7 +90,9 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
+    console.log("entreeee")
     const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
+    console.log(update, "update")
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       let orderWorkSelected = orderSelected;
