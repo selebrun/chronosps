@@ -13,7 +13,7 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
       user.company_id,
       async (workorders: any) => {
         const work_order = workorders.data[0]
-  
+        console.log(work_order, "work_order")
         switch(user.role) {
           case 'Operario':
             if(work_order.employee_assigned_ids[0] != user.odoo_id) return  resolve({ status: false, message: 'Usted no tiene autorizacion para realizar acciones sobre esta orden.' });
