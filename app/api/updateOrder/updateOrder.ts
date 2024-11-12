@@ -3,12 +3,14 @@
 import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
 
 export async function updateOrder (user: any, workorder: any, action: string, block_reason: any = false, qtyDone: number | undefined = 0): Promise<any>{
+  
+  console.log(workorder, "workorder")
+  console.log(user, "user")
   return new Promise(async (resolve, reject) => {
     getOdooData(
       'mrp.workorder',
       [['id','=', workorder.id]],
-      ['id','production_id','employee_assigned_ids'],
-      // ['id','name','state','production_id','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working', 'employee_assigned_ids'],
+      ['id','name','state','production_id','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working', 'employee_assigned_ids'],
       false,
       false,
       user.company_id,
@@ -45,16 +47,16 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
         }
 
         const blockReason = block_reason === false ?   false : parseInt(block_reason)
-          createOdooData('x_acciones_remotas', 
-          {x_studio_ejecutado_por: user.odoo_id, 
-            x_studio_workorder_id: workorder.id, 
-            x_studio_production: workorder.production_id[0], 
-            x_studio_accion_a_ejecutar: action, 
-            x_studio_motivo_del_bloqueo: blockReason}, user.company_id, (data: any) => {
+          // createOdooData('x_acciones_remotas', 
+          // {x_studio_ejecutado_por: user.odoo_id, 
+          //   x_studio_workorder_id: workorder.id, 
+          //   x_studio_production: workorder.production_id[0], 
+          //   x_studio_accion_a_ejecutar: action, 
+          //   x_studio_motivo_del_bloqueo: blockReason}, user.company_id, (data: any) => {
 
-              if(!data || !data?.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo."})
-             return resolve({status: true, message: "Accion realizada con exito."})
-          })
+          //     if(!data || !data?.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo."})
+          //    return resolve({status: true, message: "Accion realizada con exito."})
+          // })
 
       })
   })
