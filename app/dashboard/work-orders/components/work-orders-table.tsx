@@ -93,6 +93,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     console.log("entreeee")
     const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
     console.log(update, "update")
+    console.log(orderSelected, "orderSelected")
     if (update.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       let orderWorkSelected = orderSelected;
