@@ -95,6 +95,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
+    console.log("holaaaa")
     const update = await updateOrder(user, orderWorkDetail[0], action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
 
     if (update?.status) {
