@@ -32,6 +32,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [loadigSaveMaterials, setLoadigSaveMaterials] = useState(false);
   const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
   const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
+  const [error, setError] = useState<string>('');
   
   useEffect(()=>{
     if(!user.materiales) {
@@ -114,6 +115,10 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
     } else {
+      setError(update.faultString)
+      setTimeout(() => {
+        setError('')
+      }, 4000);
       setLoadigAction(false)
     }
   }
@@ -206,6 +211,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          disabledBtnSaveMaterial={disabledBtnSaveMaterial}
          setDisabledBtnSaveMaterial={setDisabledBtnSaveMaterial}
          user={user}
+         error={error}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
