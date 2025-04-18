@@ -32,7 +32,8 @@ export function ModalDetailWork({
   onSaveMaterialsOrder,
   disabledBtnSaveMaterial,
   setDisabledBtnSaveMaterial,
-  user
+  user,
+  error
 }: {
   modalIsOpenJobDetail: boolean
   showDetailOrderWork?: any 
@@ -60,6 +61,7 @@ export function ModalDetailWork({
   disabledBtnSaveMaterial: boolean
   setDisabledBtnSaveMaterial: any
   user: any
+  error: string
 }) {
   const [valueSelect, setValueSelect] = useState('');
   const [qtyDone, setQtyDone] = useState<number>(0);
@@ -161,6 +163,7 @@ export function ModalDetailWork({
               </svg>
                 <span className="ml-2">Procesando ...</span>
             </div>}
+          {error !== '' && <div className='mb-5 font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>{error}</div>}
           <div className='flex justify-between'>
               <div className='w-[80vh]'>
                   <div className='mb-3 w-90'>
