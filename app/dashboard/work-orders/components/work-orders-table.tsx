@@ -208,7 +208,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
               {workoOrder?.data.map((order: any) => (
                 <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:bg-white dark:border-white bg-lightCyan text-black">
                     <th className="px-3 py-2">
-                      {order.id}
+                      {order?.sequence}
                     </th>
                     <td className="px-3 py-2">
                       <StatusBadge status={order.state} />
