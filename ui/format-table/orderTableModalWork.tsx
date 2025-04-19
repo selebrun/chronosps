@@ -36,7 +36,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
             <th scope="row" className="px-5 font-medium text-black">
               <div className="flex items-center space-x-4 whitespace-normal">
                 <div className="dark:text-white">
-                  <div className="text-sm text-black">{order?.id}</div>
+                  <div className="text-sm text-black">{order?.sequence}</div>
                 </div>
               </div>
             </th>
