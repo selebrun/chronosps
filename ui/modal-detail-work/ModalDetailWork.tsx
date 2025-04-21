@@ -64,7 +64,7 @@ export function ModalDetailWork({
   error: string
 }) {
   const [valueSelect, setValueSelect] = useState('');
-  const [qtyDone, setQtyDone] = useState<number>(0);
+  const [qtyDone, setQtyDone] = useState<number>(orderProductionSelected?.product_qty || 0 );
   const [disabledBtnBlock, setDisabledBtnBlock] = useState(true);
   const [valueSelectMaterial, setvValueSelectMaterial] = useState('');
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
@@ -259,7 +259,12 @@ export function ModalDetailWork({
           </div>
           <div className="mb-5 z-50">
             <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ingresa la cantidad</label>
-            <input  min="1" type="number" onChange={(e) => setQtyDone(parseInt(e.target.value))} className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required />
+            <input  
+            min="1" 
+            type="number" 
+            value={qtyDone}
+            onChange={(e) => setQtyDone(parseInt(e.target.value))} 
+            className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required />
           </div>
           <div className="mb-3 mt-5 text-center">
             <button 
