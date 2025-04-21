@@ -35,7 +35,7 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
               break
             case 'unblock_work_order':
               //Si se desea eliminar la restriccion de que operarios no puedan desbloquear, se debe comentar la siguiente linea.
-              if(user.role == 'Operario') return resolve({status: false, message: "Solo los responsables de produccion y administradores pueden desbloquear las ordenes de trabajo."})
+              if(user.role == 'Operario') return resolve({status: false, message: "Solo los responsables de produccion y administradores pueden desbloquear las ordenes de trabajo.", faultString: "Solo los responsables de produccion y administradores pueden desbloquear las ordenes de trabajo."})
               break
             case 'block_work_order':
               break
