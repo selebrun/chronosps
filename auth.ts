@@ -47,7 +47,7 @@ export const config = {
           //const odooUsers: any = await getUsersFromOdoo(company_id);
 
           const chronosUsers: any = await getUsers();
-          console.log(chronosUsers)
+ 
           if (!chronosUsers.length) return null;
        
           const user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );      
