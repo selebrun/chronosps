@@ -97,7 +97,7 @@ export const config = {
         return session;
       },
     },
-}
+} satisfies NextAuthOptions
 
 // getServerSession to use in server Context
 export function auth(...args: [GetServerSidePropsContext["req"], GetServerSidePropsContext["res"]] | [NextApiRequest, NextApiResponse] | []) {
