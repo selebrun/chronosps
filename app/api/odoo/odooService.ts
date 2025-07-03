@@ -12,6 +12,7 @@ async function odooRequest(
 ) {
 
 	const companies =  await getCompanies()
+
 	const mapCompanies = companies.map(company => {
 		return(
 			{
@@ -27,7 +28,8 @@ async function odooRequest(
 			}
 	})})
 
-	const company_data = mapCompanies.find((company) => {return company.id == company_id.trim()})
+
+	const company_data = mapCompanies.find((company) => {return company.odoo_connection.username === 'admin'})
 	const odoo_connection = (company_data ? company_data.odoo_connection : false)
   if(!odoo_connection) return callback({status: false, message: 'No se encontro la compañia con ID:'+company_id})
 	const odoo = new Odoo(odoo_connection);
