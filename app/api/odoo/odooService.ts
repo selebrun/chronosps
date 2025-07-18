@@ -99,7 +99,7 @@ export async function setOdooData(pModel: any, pIDs: any, pData: any, company_id
 	},  false)
 }
 
-export async function createOdooData(pModel: any, pData: any, company_id: any, callback: any) {
+export async function createOdooData(pModel: any, pData: any, company_id: any, callback: any, 	userAdmin: boolean) {
 	const action = 'create'
 	var inParams, params;
 	inParams = [];
@@ -109,7 +109,7 @@ export async function createOdooData(pModel: any, pData: any, company_id: any, c
 
     await odooRequest(pModel, action, params, company_id, (res: any) => {
 		callback(res)
-	})
+	},userAdmin)
 }
 
 export async function countOdooData(pModel: any, pFilter: any, pFields: any, company_id: any, callback: any) {
@@ -124,5 +124,5 @@ export async function countOdooData(pModel: any, pFilter: any, pFields: any, com
 	
 	await odooRequest(pModel, action, params, company_id, (res: any) => {
 		callback(res)
-	})
+	}, false)
 }

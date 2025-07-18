@@ -10,7 +10,7 @@ export async function acceptQualityControl (user: any, quality_control: any ): P
       async (data: any) => {
         if(!data || !data.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo."})
         return resolve({status: true, message: "Accion realizada con exito."})
-      })
+      },false)
   })
 }
 
@@ -23,6 +23,6 @@ export async function rejectQualityControl (user: any, quality_control: any ): P
       async (data: any) => {
         if(!data || !data.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo."})
         return resolve({status: true, message: "Accion realizada con exito."})
-      })
+      }, false)
   })
 }

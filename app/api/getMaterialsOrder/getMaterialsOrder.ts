@@ -35,7 +35,7 @@ export async function saveMaterialsOrder (user: any, workorder_id: any, producti
       user.company_id,
       async (bom_products: any) => {
         return resolve({status: true, message: 'Agregado',})
-      })
+      }, false)
   })
 }
 
