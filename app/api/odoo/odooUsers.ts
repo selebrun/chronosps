@@ -24,7 +24,10 @@ export async function getUsersFromOdoo(company_id: string) {
 
         const users = data.data;
         resolve(users);
-      }
-    );
+      },
+      false
+    )
+    
+    ;
   });
 }

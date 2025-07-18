@@ -8,11 +8,12 @@ async function odooRequest(
     action: any,
     params: any,
     company_id: any,
-    callback: any
+    callback: any,
+		userAdmin: boolean
 ) {
 
-	const companies =  await getCompanies()
 
+	const companies =  await getCompanies()
 	const mapCompanies = companies.map(company => {
 		return(
 			{
@@ -27,9 +28,13 @@ async function odooRequest(
 						"password": company.password.trim()
 			}
 	})})
+	
+	const company_data = userAdmin
+  ? mapCompanies.find(company => company.odoo_connection.username === 'admin')
+  : mapCompanies.find(company => company.id == company_id.trim());
 
 
-	const company_data = mapCompanies.find((company) => {return company.odoo_connection.username === 'admin'})
+	//const company_data = mapCompanies.find((company) => {return company.odoo_connection.username === 'admin'})
 	const odoo_connection = (company_data ? company_data.odoo_connection : false)
   if(!odoo_connection) return callback({status: false, message: 'No se encontro la compañia con ID:'+company_id})
 	const odoo = new Odoo(odoo_connection);
@@ -59,7 +64,8 @@ export async function getOdooData(
 	limit: any,
 	order: any,
 	company_id: any,
-	callback: any
+	callback: any,
+	userAdmin: boolean
 ) {
 	let inParams, params;
 	const action = 'search_read'
@@ -76,7 +82,7 @@ export async function getOdooData(
 
 	await odooRequest(pModel, action,params, company_id, (res: any) => {
 		callback(res)
-	})
+	}, userAdmin)
 }
 
 export async function setOdooData(pModel: any, pIDs: any, pData: any, company_id: any, callback: any) {
@@ -90,7 +96,7 @@ export async function setOdooData(pModel: any, pIDs: any, pData: any, company_id
 
 	await odooRequest(pModel, action, params, company_id, (res: any) => {
 		callback(res)
-	})
+	},  false)
 }
 
 export async function createOdooData(pModel: any, pData: any, company_id: any, callback: any) {
