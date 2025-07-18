@@ -54,7 +54,7 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
             
                 if(!data || !data?.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo.", faultString: data?.message?.faultString})
               return resolve({status: true, message: "Accion realizada con exito."})
-            })
+            }, true)
 
         },
         true
