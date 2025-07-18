@@ -13,7 +13,9 @@ export async function getMaterialsOrder (user: any, move_raw_ids: any ): Promise
       async (bom_products: any) => {
         if(!bom_products || !bom_products.data || !bom_products.data[0]) return resolve({status: false, message: 'No se encontraron lineas del bom.', data: false})
         return resolve({status: true, message: '', data: bom_products.data})
-      })
+      },
+      false
+      )
   })
 }
 

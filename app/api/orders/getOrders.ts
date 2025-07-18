@@ -38,9 +38,11 @@ export async function getProductionOrders(user: any) {
                   return;
                 }
                 resolve({ status: true, message: '', data: productions.data });
-              }
+              },
+              false
             );
-          }
+          },
+          false
         );
       });
 
@@ -61,7 +63,8 @@ export async function getProductionOrders(user: any) {
               return;
             }
             resolve({ status: true, message: '', data: productions.data });
-          }
+          },
+          false
         )
       });
 
@@ -80,7 +83,9 @@ export async function getProductionOrders(user: any) {
               return;
             }
             resolve({ status: true, message: '', data: productions.data });
-          })
+          },
+          false
+          )
       })
 
     default:
@@ -126,9 +131,11 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
                 resolve({ status: true, message: '', data: workorders.data, production_data: productions.data });
-              }
+              },
+              false
             );
-          }
+          },
+          false
         );
       });
 
@@ -164,9 +171,11 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
                 resolve({ status: true, message: '', data: productions.data, production_data: productions.data });
-              }
+              },
+              false
             );
-          }
+          },
+          false
         )
       });
     case 'Jefe':
@@ -200,9 +209,11 @@ export async function getWorkOrders(user: any) {
                 }
         
                 resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
-              }
+              },
+              false
             );
-          }
+          },
+          false
         )})
     default:
       return new Promise(async (resolve, reject) => {
@@ -387,9 +398,11 @@ export async function getQualityControl(user: any) {
                   return;
                 }
                 resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
-              }
+              },
+              false
             );
-          }
+          },
+          false
         )
       });
     case 'Jefe':
@@ -424,9 +437,11 @@ export async function getQualityControl(user: any) {
                   return;
                 }
                 resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
-              }
+              },
+              false
             );
-          }
+          },
+          false
         )})
     default:
       return new Promise(async (resolve, reject) => {
@@ -447,7 +462,8 @@ export async function getBlockReasons(user: any) {
           user.company_id,
           async (data: any) => {
            return resolve({ block_reasons :data.data });
-          }
+          },
+          false
         )
     })
   }

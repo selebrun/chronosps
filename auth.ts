@@ -48,6 +48,8 @@ export const config = {
 
           const chronosUsers: any = await getUsers();
 
+  
+
           if (!chronosUsers.length) return null;
        
           const user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );      
@@ -62,7 +64,9 @@ export const config = {
                       }
                   }
                   resolve();
-              });
+              },
+              false
+              );
           });
           
           const user_data = {

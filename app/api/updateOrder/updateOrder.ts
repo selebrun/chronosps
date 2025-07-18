@@ -56,7 +56,9 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
               return resolve({status: true, message: "Accion realizada con exito."})
             })
 
-        })
+        },
+        true
+        )
     })
   } catch (error) {
     console.error("Error en la función updateOrder:", error);
