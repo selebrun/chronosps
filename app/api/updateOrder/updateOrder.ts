@@ -51,14 +51,13 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
               x_studio_production: workorder.production_id[0], 
               x_studio_accion_a_ejecutar: action, 
               x_studio_motivo_del_bloqueo: blockReason}, user.company_id, (data: any) => {
-            
                 if(!data || !data?.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo.", faultString: data?.message?.faultString})
               return resolve({status: true, message: "Accion realizada con exito."})
-            }, true)
-
+            },
+            false
+            )
         },
-        true
-        )
+        false)
     })
   } catch (error) {
     console.error("Error en la función updateOrder:", error);

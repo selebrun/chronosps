@@ -28,10 +28,8 @@ async function odooRequest(
 						"password": company.password.trim()
 			}
 	})})
-	
-	const company_data = userAdmin
-  ? mapCompanies.find(company => company.odoo_connection.username === 'admin')
-  : mapCompanies.find(company => company.id == company_id.trim());
+
+	const company_data =  mapCompanies.find(company => company.id == company_id.trim());
 
 
 	//const company_data = mapCompanies.find((company) => {return company.odoo_connection.username === 'admin'})

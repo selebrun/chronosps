@@ -96,9 +96,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
-
+    console.log("Aquiii")
     const update = await updateOrder(user, orderWorkDetail[0], action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
-
+    console.log(update?.status)
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
