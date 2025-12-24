@@ -176,7 +176,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
            orderDetail={orderWorkDetail} 
            thOrder={'NO. de Orden'} 
            thStatus={'Estado'} 
-           thProduct={'Producto'}
+           thProduct={'Centro de Trabajo'}
            openJobDetail={openJobDetail}
            />}
           {orderWorkDetail.length === 0 && 
