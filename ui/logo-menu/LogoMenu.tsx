@@ -1,5 +1,5 @@
 "use client";
-import { faUser } from '@fortawesome/free-solid-svg-icons';
+import { faUser, faRotateRight } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -21,17 +21,25 @@ export function LogoMenu({ userRole, isDashboardRoute }: { userRole: string, isD
     router.push('/login'); 
   };
 
+  const refreshPage = () => {
+    window.location.reload();
+  };
+
   return (
     <>
       {isDashboardRoute && 
-        <div className="flex flex-col justify-center items-center lg:px-8 lg:py-8 mx-auto max-w-7xl">
+        <div className="flex flex-row justify-center items-center lg:px-8 lg:py-8 mx-auto max-w-7xl relative">
+          <button className="absolute left-8 py-2 px-3 rounded-md text-white hover:text-gray-50 hover:bg-sky-950" onClick={() => refreshPage()}>
+            <FontAwesomeIcon icon={faRotateRight} size="lg" />
+          </button>
+
           <div>
             <div className="bg-white rounded-lg p-3">
               <Image src="/logo.png" width={235} height={60} alt="Logo" />
             </div>
           </div>
           
-          <div className="self-end absolute ">
+          <div className="absolute right-8">
             <div onClick={() => onShowMenu()}>
               <Image src="/menu.png" width={60} height={10} alt="Menu"/>
             </div>
@@ -47,7 +55,7 @@ export function LogoMenu({ userRole, isDashboardRoute }: { userRole: string, isD
                   <FontAwesomeIcon icon={faUser} size="1x" className="ml-2 px-1"/>{userRole}
                   </li>
                   <li>
-                    <button className="py-1 px-2 ml-3 rounded-md hover:text-gray-50 y hover:bg-sky-950"onClick={() => logout()}>Cerrar Sessión</button>
+                    <button className="py-1 px-2 ml-3 rounded-md hover:text-gray-50 hover:bg-sky-950" onClick={() => logout()}>Cerrar Sessión</button>
                   </li>
                 </ul>
             </div>}
