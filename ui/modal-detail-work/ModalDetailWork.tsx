@@ -92,7 +92,9 @@ export function ModalDetailWork({
     }
   
     buttons.push(<div className="mb-3"><button onClick={() => openModalInstructions()} key="instructions" className='font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>Instrucciones</button></div>);
-    buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => {setModalIsMaterials(true), getMaterials()}}  key="materials" className='disabled:opacity-50 font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
+    if (user.role !== "Operario") {
+      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => {setModalIsMaterials(true), getMaterials()}}  key="materials" className='disabled:opacity-50 font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
+    }
   
     return <>{buttons}</>
   }
@@ -172,7 +174,7 @@ export function ModalDetailWork({
                   </div>
                   <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                       <div className=''>
-                          <div className='font-bold text-center'>Inicio proramado</div>
+                          <div className='font-bold text-center'>Inicio Programado</div>
                           <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.date_start? showDetailOrderWork.date_start : 'No definida'}</div>
                       </div>
                     <div className=''>

@@ -34,7 +34,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   }
 
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = odooOrders?.data.filter((orden:any) => orden.product_id[0] === order.product_id[0])
+    const dateilOrden = odooOrders?.data.filter((orden:any) => orden.production_id[0] === order.id)
     setOrderQualityDetail(dateilOrden)
   }
   
