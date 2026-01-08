@@ -190,8 +190,9 @@ export function ChronosUsersForm({
           className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
               <option>{"Seleccionar rol"}</option>
             <option value={'Lider'}>Lider</option>
-            <option value={'Operario'}>Operario</option>
             <option value={'Jefe'}>Jefe</option>
+            <option value={'Operario'}>Operario</option>
+	    <option value={'Calidad'}>Calidad</option>
         </select>
       </div>
       <button
