@@ -8,8 +8,8 @@ const config = {
   host: process.env.CHRONOS_DB_HOST || "",
   database: process.env.CHRONOS_DB_NAME || "",
   password: process.env.CHRONOS_DB_PASSWORD || "",
-  port: process.env.CHRONOS_DB_PORT || 5432,
-  ssl: true,
+  port: process.env.CHRONOS_DB_PORT || "",
+  ssl: false,
 } as any;
 
 /**
@@ -31,7 +31,7 @@ export async function getCompanies() {
 
     return companies;
   } catch (err) {
-    console.error(err)
+    console.error(config,err)
     throw new Error("There was an error trying to get companies");
   }
 }
