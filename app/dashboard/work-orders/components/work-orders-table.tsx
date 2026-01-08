@@ -62,7 +62,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       k = Math.floor(minutes/(60*24)); duration_expected += k + "Dias "; minutes -= k*60*24
     }
     if(minutes >= 60) {
-      k = Math.floor(minutes/60); duration_expected += k + "Horas "; minutes -= k*60*24
+      k = Math.floor(minutes/60); duration_expected += k + "Horas "; minutes -= k*60
     }
     if(minutes >= 1) duration_expected += Math.floor(minutes) + "Minutos"
 
@@ -73,7 +73,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     }
 
     if(minutes >= 60) {
-      k = Math.floor(minutes/60); duration += k + "Horas "; minutes -= k*60*24
+      k = Math.floor(minutes/60); duration += k + "Horas "; minutes -= k*60
     }
 
     if(minutes >= 1) duration += Math.floor(minutes) + "Minutos"
