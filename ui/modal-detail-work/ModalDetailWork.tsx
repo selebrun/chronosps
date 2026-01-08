@@ -259,22 +259,32 @@ export function ModalDetailWork({
               />
             </button>
           </div>
-          <div className="mb-5 z-50">
-            <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ingresa la cantidad</label>
-            <input  
-            min="1" 
-            type="number" 
-            value={qtyDone}
-            onChange={(e) => setQtyDone(parseInt(e.target.value))} 
-            className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required />
-          </div>
+          {user.role === "Operario" ? (
+            <div className="mb-5 z-50">
+              <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Cantidad</label>
+              <div className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
+                {orderProductionSelected?.product_qty}
+              </div>
+            </div>
+          ) : (
+            <div className="mb-5 z-50">
+              <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Ingresa la cantidad</label>
+              <input  
+              min="1" 
+              type="number" 
+              value={qtyDone}
+              onChange={(e) => setQtyDone(parseInt(e.target.value))} 
+              className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required />
+            </div>
+          )}
           <div className="mb-3 mt-5 text-center">
             <button 
-            disabled={qtyDone === 0}
+            disabled={user.role === "Operario" ? false : qtyDone === 0}
             onClick={() => {
               setModalIsOpenCompleteOrder(false)
+              const finalQty = user.role === "Operario" ? orderProductionSelected?.product_qty : qtyDone
               setQtyDone(0)
-              executeWorkOrderAction('finish_work_order', undefined, qtyDone)
+              executeWorkOrderAction('finish_work_order', undefined, finalQty)
             }}
             className='w-full font-bold bg-indigo-100 p-3 rounded-md disabled:opacity-50'>Aceptar</button>
           </div>
