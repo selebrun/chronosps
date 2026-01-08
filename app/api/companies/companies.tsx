@@ -8,8 +8,10 @@ const config = {
   host: process.env.CHRONOS_DB_HOST || "",
   database: process.env.CHRONOS_DB_NAME || "",
   password: process.env.CHRONOS_DB_PASSWORD || "",
-  port: process.env.CHRONOS_DB_PORT || "",
-  ssl: false,
+  port: process.env.CHRONOS_DB_PORT || 5432,
+  ssl: {
+    rejectUnauthorized: false
+  }
 } as any;
 
 /**
