@@ -48,25 +48,25 @@ function ModalOrderQualityDetails({
       <div className='w-[55vh]'>
         <div className='mb-3 w-90'>
           <div className='font-bold text-center'>{labels.orderProductionLabel}</div>
-          <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{selectedOrderQuantity?.production_id[1]}</div>
+          <div className='bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden'>{selectedOrderQuantity?.production_id[1]}</div>
         </div>
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <div className=''>
             <div className='font-bold text-center'>{labels.qualityControlLabel}</div>
-            <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{selectedOrderQuantity?.name}</div>
+            <div className='bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden'>{selectedOrderQuantity?.name}</div>
           </div>
           <div className=''>
             <div className='font-bold text-center'>{labels.workCenterLabel}</div>
-            <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{}</div>
+            <div className='bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden'>{selectedOrderQuantity?.workcenter_id?.[1] || 'N/A'}</div>
           </div>
           <div className=''>
             <div className='font-bold text-center'>{labels.workOrderLabel}</div>
-            <div className='bg-whiteInput h-10 shadow-md p-2 rounded-md text-center'>{selectedOrderQuantity?.workorder_id}</div>
+            <div className='bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden'>{selectedOrderQuantity?.workorder_id}</div>
           </div>
           <div className=''>
             <div className='font-bold text-center'>{labels.mesureLabel}</div>
             <div className='flex'>
-              <input type="number"min="0" className='bg-whiteInput h-10 w-full shadow-md rounded-md text-center focus:outline-none' placeholder="Medida"/>
+              <input type="number"min="0" className='bg-whiteInput min-h-12 w-full shadow-md rounded-md text-center focus:outline-none' placeholder="Medida"/>
             </div>
           </div>
         </div>
