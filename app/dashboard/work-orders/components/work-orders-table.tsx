@@ -90,6 +90,27 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
 
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
+    // Validation for start action
+    if (action === 'start_work_order') {
+      // Check if operator is assigned
+      if (!orderSelected?.employee_assigned_ids || orderSelected?.employee_assigned_ids.length === 0) {
+        setError('No hay operario asignado a esta orden de trabajo. Asigne un operario antes de iniciar.')
+        setTimeout(() => {
+          setError('')
+        }, 5000);
+        return
+      }
+      
+      // Validate production order has materials
+      if (!orderProduction.move_raw_ids || orderProduction.move_raw_ids.length === 0) {
+        setError('No hay materiales definidos para esta orden de producción. Defina los materiales en la BOM antes de iniciar.')
+        setTimeout(() => {
+          setError('')
+        }, 5000);
+        return
+      }
+    }
+
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
     const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
@@ -107,7 +128,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
     } else {
-      setError(update.faultString)
+      setError(update.faultString || update.message)
       setTimeout(() => {
         setError('')
       }, 4000);

@@ -28,14 +28,24 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
           }
           switch(action) {
             case 'start_work_order':
+              // Validate that operator is assigned
+              if(work_order.employee_assigned_ids.length === 0) {
+                return resolve({status: false, message: "No hay operario asignado a esta orden de trabajo. Asigne un operario antes de iniciar."})
+              }
+              break
             case 'stop_work_order':
               break
             case 'finish_work_order':
               if(!qtyDone || qtyDone < 1) return resolve({status: false, message: "Debe definir la cantidad producida."})
               break
             case 'unblock_work_order':
-              //Si se desea eliminar la restriccion de que operarios no puedan desbloquear, se debe comentar la siguiente linea.
-              if(user.role == 'Operario') return resolve({status: false, message: "Solo los responsables de produccion y administradores pueden desbloquear las ordenes de trabajo.", faultString: "Solo los responsables de produccion y administradores pueden desbloquear las ordenes de trabajo."})
+              // Allow operators to unblock if they are assigned to this work order
+              if(user.role === 'Operario') {
+                const isAssignedOperator = work_order.employee_assigned_ids.some((empId: any) => empId === user.odoo_id)
+                if(!isAssignedOperator) {
+                  return resolve({status: false, message: "Solo los operarios asignados a esta orden pueden desbloquearla.", faultString: "Solo los operarios asignados a esta orden pueden desbloquearla."})
+                }
+              }
               break
             case 'block_work_order':
               break
@@ -51,7 +61,10 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
               x_studio_production: workorder.production_id[0], 
               x_studio_accion_a_ejecutar: action, 
               x_studio_motivo_del_bloqueo: blockReason}, user.company_id, (data: any) => {
-                if(!data || !data?.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo.", faultString: data?.message?.faultString})
+                if(!data || !data?.status) {
+                  const errorMsg = data?.message?.faultString || data?.message || "Error ejecutando acción en Odoo"
+                  return resolve({status: false, message: errorMsg, faultString: errorMsg})
+                }
               return resolve({status: true, message: "Accion realizada con exito."})
             },
             false
