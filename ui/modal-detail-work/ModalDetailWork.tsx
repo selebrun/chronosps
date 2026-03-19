@@ -73,26 +73,37 @@ export function ModalDetailWork({
   const renderButtons = (showDetailOrderWork: any) => {
     const isBlocked = showDetailOrderWork.working_state === "blocked";
     const isUserWorking = showDetailOrderWork.is_user_working;
+    const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
     const buttons = [];
     const disabledBtns = showDetailOrderWork.state.includes('done')
 
-    if (!isBlocked && !isUserWorking) {
+    // Show Start button only if activity hasn't begun
+    if (!isBlocked && !isUserWorking && showDetailOrderWork.duration === 0) {
       buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order')} key="start" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
     }
 
+    // Show Resume button if paused
+    if (!isBlocked && isPaused && !isUserWorking) {
+      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order')} key="resume" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reanudar</button></div>)
+    }
+
+    // Block/Unblock buttons
     if (!isBlocked) {
       buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => setModalIsOpenBlocks(true)} key="block" className='disabled:opacity-50 font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
     } else {
       buttons.push(<div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>)
     }
   
+    // Pause and Done buttons shown only when actively working
     if (!isBlocked && isUserWorking) {
       buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Pausar</button></div>)
       buttons.push(<div className="mb-3"><button key="done" onClick={() => setModalIsOpenCompleteOrder(true)} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Hecho</button></div>)
     }
   
     buttons.push(<div className="mb-3"><button onClick={() => openModalInstructions()} key="instructions" className='font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>Instrucciones</button></div>);
-    if (user.role !== "Operario") {
+    
+    // Materials button: available to users with materiales permission (not just non-Operario)
+    if (user?.materiales) {
       buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => {setModalIsMaterials(true), getMaterials()}}  key="materials" className='disabled:opacity-50 font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full'>Materiales</button></div>)
     }
   
@@ -205,8 +216,21 @@ export function ModalDetailWork({
           </div>
             <div className='flex mt-5 '>
               <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.state} /></div>
-              <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'>{progress}%</div>
+              <div className='w-[50vh] mr-5'>
+                <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {progress}%</div>
+                <div className='w-full bg-gray-300 rounded-full h-4'>
+                  <div 
+                    className='bg-[#2FD28E] h-4 rounded-full transition-all duration-300' 
+                    style={{width: `${progress}%`}}
+                  ></div>
+                </div>
+              </div>
           </div>
+          {showDetailOrderWork.working_state === "paused" && (
+            <div className='mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded'>
+              <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón "Reanudar".
+            </div>
+          )}
       </Modal>
       <Modal setOpen={modalIsOpenBlocks} title='Motivo del bloqueo' className='max-w-xs'>
           <div className="flex justify-end relative bottom-10">

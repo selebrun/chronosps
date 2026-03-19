@@ -94,6 +94,27 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
 
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
+    // Validation for start action
+    if (action === 'start_work_order') {
+      // Check if operator is assigned
+      if (!orderWorkDetail[0]?.employee_assigned_ids || orderWorkDetail[0]?.employee_assigned_ids.length === 0) {
+        setError('No hay operario asignado a esta orden de trabajo. Asigne un operario antes de iniciar.')
+        setTimeout(() => {
+          setError('')
+        }, 5000);
+        return
+      }
+      
+      // Validate materials exist (basic check - Odoo will do detailed validation)
+      if (!orderProductionSelected.move_raw_ids || orderProductionSelected.move_raw_ids.length === 0) {
+        setError('No hay materiales definidos para esta orden de producción. Defina los materiales en la BOM antes de iniciar.')
+        setTimeout(() => {
+          setError('')
+        }, 5000);
+        return
+      }
+    }
+
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
     console.log("Aquiii")
@@ -115,7 +136,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
     } else {
-      setError(update.faultString)
+      setError(update.faultString || update.message)
       setTimeout(() => {
         setError('')
       }, 4000);
