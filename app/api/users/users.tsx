@@ -164,7 +164,7 @@ export async function updateUsers(user: any) {
           name = $4,
           password = $5,
           rol = $6
-      WHERE id = $7
+      WHERE odoo_id = $7
       RETURNING *
     `;
 
@@ -177,7 +177,7 @@ export async function updateUsers(user: any) {
       name,
       password,
       rol,
-      id,
+      odoo_id,
     ]);
 
     await client.end();
