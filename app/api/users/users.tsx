@@ -71,8 +71,8 @@ async function syncUserWithOdoo(user: any) {
     await client.query(
       `UPDATE users
        SET odoo_id = $1, odoo_user_id = $1
-       WHERE id = $2`,
-      [empleado.id, user.id]
+       WHERE odoo_id = $1`,
+      [empleado.id, user.odoo_id]
     );
     console.log(`✅ Usuario ${user.code} vinculado a Odoo ID ${empleado.id}`);
     user.odoo_id = empleado.id;
@@ -192,7 +192,12 @@ export async function updateUsers(user: any) {
 
     // 🔄 sincronizar con Odoo
     return await syncUserWithOdoo(updatedUser);
-  } catch (error) {
-    console.error("Error al actualizar usuario:", error);
+  } catch (error: any) {
+  console.error("Error al actualizar usuario:", error);
+  // No devuelvas el objeto 'error' crudo, devuelve un objeto simple:
+  return { 
+    error: true, 
+    message: error.message || "Error desconocido" 
+  };
   }
 }
