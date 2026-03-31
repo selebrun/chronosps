@@ -183,7 +183,7 @@ export async function updateUsers(user: any) {
     await client.end();
 
     if (result.rowCount === 0) {
-      console.log(`⚠️ No se encontró usuario con id ${id}`);
+      console.log(`⚠️ No se encontró usuario con id ${odoo_id}`);
       return null;
     }
 
