@@ -168,7 +168,7 @@ export async function updateUsers(user: any) {
       RETURNING *
     `;
 
-    const { code, email, id_company, name, password, rol, id } = user;
+    const { code, email, id_company, name, password, rol, odoo_id } = user;
 
     const result = await client.query(query, [
       code,
