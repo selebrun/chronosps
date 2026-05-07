@@ -5,7 +5,9 @@ export async function acceptQualityControl (user: any, quality_control: any ): P
   return new Promise(async (resolve, reject) => {
     createOdooData(
       'x_acciones_remotas',
-      {x_studio_ejecutado_por: user.odoo_id, x_studio_quality_control: 928, x_studio_accion_a_ejecutar: 'accept_quality_control'},
+      {x_studio_ejecutado_por: user.odoo_id, 
+        x_studio_quality_control: 928, 
+        x_studio_accion_a_ejecutar: 'accept_quality_control'},
       user.company_id,
       async (data: any) => {
         if(!data || !data.status) return resolve({status: false, message: "Ocurrio un error al intentar ejecutar accion en Odoo."})

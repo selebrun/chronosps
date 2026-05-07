@@ -22,7 +22,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
     orders =  odooOrders?.production_data.filter((pro: any) =>  pro.product_id[0] === work.product_id[0])
     ))
     setOrdersQualityControl(orders)
-  }, [])
+  }, [odooOrders?.data, odooOrders?.production_data])
 
 
   const  openJobDetail= () => {
