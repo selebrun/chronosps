@@ -39,7 +39,7 @@ export function ModalOrderQuality({
         selectedOrderQuantity={selectedOrderQuantity}
         acceptOrder={acceptOrder}
         />}
-      <Modal setOpen={modalIsOpen} title='Órdenes de trabajo' className='max-w-3xl'>
+      <Modal setOpen={modalIsOpen} title='Controles de calidad' className='max-w-3xl'>
         <div className="flex justify-end relative bottom-10">
           <button
             type="button"
