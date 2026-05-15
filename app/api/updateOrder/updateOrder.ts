@@ -14,7 +14,6 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
         user.company_id,
         async (workorders: any) => {
           const work_order = workorders.data[0]
-
           switch(user.role) {
             case 'Operario':
               // if(work_order.employee_assigned_ids[0] != user.odoo_id) return  resolve({ status: false, message: 'Usted no tiene autorizacion para realizar acciones sobre esta orden.' });
@@ -65,6 +64,8 @@ export async function updateOrder (user: any, workorder: any, action: string, bl
                   const errorMsg = data?.message?.faultString || data?.message || "Error ejecutando acción en Odoo"
                   return resolve({status: false, message: errorMsg, faultString: errorMsg})
                 }
+              console.log("datos enviado:",workorder.id,workorder.production_id[0],action,blockReason,user.company_id);
+              console.log("Respuesta de Odoo al crear accion remota:", data);
               return resolve({status: true, message: "Accion realizada con exito."})
             },
             false

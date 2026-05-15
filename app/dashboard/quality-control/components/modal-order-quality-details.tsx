@@ -35,14 +35,14 @@ function ModalOrderQualityDetails({
 
   const labels = {
     originalTitle: "Detalles de calidad",
-    qualityControlLabel: "Control de calidad",
+    qualityControlLabel: "Punto de control",
     orderProductionLabel: "Orden de producción",
-    aproveLabel: "Aprobar",
-    declineLabel: "Declinar",
+    aproveLabel: "Aprueba",
+    declineLabel: "Falla",
     workCenterLabel: "Centro de trabajo",
     workOrderLabel: "Orden de trabajo",
     mesureLabel: "Medida",
-    notesLabel: "Notas",
+    notesLabel: "Observaciones",
     instructionsLabel: "Instrucciones",
   };
 

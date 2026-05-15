@@ -13,13 +13,13 @@ export const navItems: { name: string; items: navItem[] }[] = [
       {
         name: 'Órdenes de producción',
         slug: 'production-orders',
-        description: 'Crea órdenes de produccion para piso',
+        description: 'Lista órdenes de produccion para piso',
         role: ['Operario', 'Lider', 'Jefe']
       },
       {
         name: 'Órdenes de trabajo',
         slug: 'work-orders',
-        description: 'Crea y lista órdenes de trabajo',
+        description: 'Lista órdenes de trabajo/operaciones para piso',
         role: ['Operario', 'Lider', 'Jefe']
       },
       // {
@@ -30,15 +30,15 @@ export const navItems: { name: string; items: navItem[] }[] = [
       {
         name: 'Controles de calidad',
         slug: 'quality-control',
-        description: 'Procesos de control de calidad',
+        description: 'Procesos de control de calidad para piso',
         role: ['Lider', 'Jefe','Calidad']
       },
-      {
-        name: 'Planificación',
-        slug: '',
-        description: 'Planificación',
-        role: ['Lider', 'Jefe']
-      },
+      //{
+      //  name: 'Planificación',
+      //  slug: '',
+      //  description: 'Planificación',
+      //  role: ['Lider', 'Jefe']
+      //},
     ],
   },
 ];

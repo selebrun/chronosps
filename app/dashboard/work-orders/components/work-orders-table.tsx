@@ -34,7 +34,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     if(!user.materiales) {
       setDisabledBtnSaveMaterial(true)
     }
-  }, [])
+  }, [user?.materiales])
 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
