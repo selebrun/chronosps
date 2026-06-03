@@ -7,6 +7,10 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
 import ModalOrderQualityDetails from './modal-order-quality-details'
 
+function getWorkOrderName(order: any) {
+  return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || 'N/A';
+}
+
 
 export function ModalOrderQuality({ 
   selectedQualityDetails,
@@ -63,6 +67,9 @@ export function ModalOrderQuality({
                 <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
                   <tr>
                     <th scope="col" className="px-6 py-3 ">
+                      {'Orden de trabajo'}
+                    </th>
+                    <th scope="col" className="px-6 py-3 ">
                       {'Punto de control'}
                     </th>
                     <th scope="col" className="px-6 py-3">
@@ -78,6 +85,9 @@ export function ModalOrderQuality({
                 <tbody>
                   {orderQualityDetail.map((order: any) => (
                     <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
+                      <td className="px-3 py-2 text-black">
+                        {getWorkOrderName(order)}
+                      </td>
                       <th scope="row" className="px-5 font-medium text-black">
                         <div className="flex items-center space-x-4 whitespace-normal">
                           <div className="dark:text-white">

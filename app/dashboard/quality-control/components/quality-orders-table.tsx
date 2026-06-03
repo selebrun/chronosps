@@ -8,6 +8,21 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalOrderQuality } from './modal-order-quality'
 import { acceptQualityControl, rejectQualityControl } from '@/app/api/accionQualityControl/accionQualityControl'
 
+function sortByNameAsc(a: any, b: any) {
+  return (a?.name || '').localeCompare(b?.name || '', 'es', { numeric: true, sensitivity: 'base' });
+}
+
+function getWorkOrderName(order: any) {
+  return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || '';
+}
+
+function sortQualityControlsAsc(a: any, b: any) {
+  const workOrderComparison = getWorkOrderName(a).localeCompare(getWorkOrderName(b), 'es', { numeric: true, sensitivity: 'base' });
+  if (workOrderComparison !== 0) return workOrderComparison;
+
+  return sortByNameAsc(a, b);
+}
+
 
 export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user: any }) {
   const [orderQualityDetail, setOrderQualityDetail] = useState([]);
@@ -23,7 +38,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
 
     const orders = (odooOrders?.production_data ?? []).filter(
       (production: any) => productionIdsInQuality.has(production?.id)
-    )
+    ).sort(sortByNameAsc)
 
     setOrdersQualityControl(orders)
   }, [odooOrders?.data, odooOrders?.production_data])
@@ -38,7 +53,9 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   }
 
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = odooOrders?.data.filter((orden:any) => orden.production_id[0] === order.id)
+    const dateilOrden = odooOrders?.data
+      .filter((orden:any) => orden.production_id[0] === order.id)
+      .sort(sortQualityControlsAsc)
     setOrderQualityDetail(dateilOrden)
   }
   
