@@ -48,7 +48,13 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
 
   const acceptOrder = async () => {
     return acceptQualityControl(user, selectedOrderQuantity)
-      .then((res) => res)
+      .then((res) => {
+        if (res?.status) {
+          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'pass' }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'pass' } : item))
+        }
+        return res
+      })
       .catch((err) => {
         console.log(err)
         return { status: false }
@@ -57,7 +63,13 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
 
   const rejectOrder = async () => {
     return rejectQualityControl(user, selectedOrderQuantity)
-      .then((res) => res)
+      .then((res) => {
+        if (res?.status) {
+          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'fail' }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'fail' } : item))
+        }
+        return res
+      })
       .catch((err) => {
         console.log(err)
         return { status: false }
