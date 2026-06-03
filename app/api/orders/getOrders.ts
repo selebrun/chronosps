@@ -636,6 +636,33 @@ function getProductionSaleMap(productions: any[], sales: any[]) {
   return productionSaleMap;
 }
 
+function getProductionParent(production: any, productionByName: Map<string, any>) {
+  const parentKey = getProductionSaleKey(production);
+  return parentKey ? productionByName.get(parentKey) : null;
+}
+
+function productionBelongsToProduct(production: any, productId: number, productionByName: Map<string, any>) {
+  let currentProduction = production;
+  const visited = new Set<number>();
+
+  while (currentProduction && !visited.has(currentProduction.id)) {
+    visited.add(currentProduction.id);
+
+    if (asOdooId(currentProduction.product_id) === productId) return true;
+    currentProduction = getProductionParent(currentProduction, productionByName);
+  }
+
+  return false;
+}
+
+function getProductProductions(line: any, lines: any[], productions: any[]) {
+  const productId = asOdooId(line.product_id);
+  if (lines.length === 1) return productions;
+
+  const productionByName = new Map(productions.map((production: any) => [production.name, production]));
+  return productions.filter((production: any) => productionBelongsToProduct(production, productId, productionByName));
+}
+
 function buildSaleProductRows(sale: any, saleLines: any[], productions: any[], workorders: any[]) {
   const lines = saleLines.filter((line: any) => asOdooId(line.order_id) === sale.id && asOdooId(line.product_id));
 
@@ -674,7 +701,7 @@ function buildSaleProductRows(sale: any, saleLines: any[], productions: any[], w
 
   return lines.map((line: any) => {
     const productId = asOdooId(line.product_id);
-    const productProductions = productions.filter((production: any) => asOdooId(production.product_id) === productId);
+    const productProductions = getProductProductions(line, lines, productions);
     const productWorkorders = workorders.filter((workorder: any) =>
       productProductions.some((production: any) => production.id === asOdooId(workorder.production_id))
     );
@@ -736,7 +763,7 @@ export async function getCustomerSalesNotes(user: any) {
   return new Promise((resolve) => {
     getOdooData(
       'sale.order',
-      [['partner_id', 'in', partnerIds], ['state', 'not in', ['cancel']]],
+      [['partner_id', 'in', partnerIds], ['state', 'in', ['sale', 'done']]],
       ['id', 'name', 'partner_id', 'date_order', 'state', 'client_order_ref', 'amount_total'],
       false,
       'date_order desc',
@@ -755,11 +782,28 @@ export async function getCustomerSalesNotes(user: any) {
           ['id', 'order_id', 'name', 'product_id', 'product_uom_qty', 'qty_delivered'],
           user.company_id
         );
-        const directProductions = await getOdooRecords(
+        const productionsBySaleId = await getOdooRecords(
           'mrp.production',
-          ['|', '|', ['sale_id', 'in', saleIds], ['origin', 'in', saleNames], ['x_studio_po', 'in', saleNames]],
+          [['sale_id', 'in', saleIds]],
           ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
           user.company_id
+        );
+        const productionsByOrigin = await getOdooRecords(
+          'mrp.production',
+          [['origin', 'in', saleNames]],
+          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
+          user.company_id
+        );
+        const productionsByStudioPo = await getOdooRecords(
+          'mrp.production',
+          [['x_studio_po', 'in', saleNames]],
+          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
+          user.company_id
+        );
+        const directProductions = Array.from(
+          new Map(
+            [...productionsBySaleId, ...productionsByOrigin, ...productionsByStudioPo].map((production: any) => [production.id, production])
+          ).values()
         );
 
         const productionData = await getProductionChildren(directProductions, user);

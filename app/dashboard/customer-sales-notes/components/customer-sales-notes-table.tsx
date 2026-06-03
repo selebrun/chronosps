@@ -19,7 +19,7 @@ function progressColor(value: number) {
 
 function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="min-w-[140px]">
+    <div className="min-w-[110px]">
       <div className="flex items-center justify-between text-xs text-gray-700">
         <span>Avance</span>
         <span className="font-semibold">{formatPercent(value)}</span>
@@ -38,18 +38,18 @@ function formatQuantity(value: number) {
 
 export function CustomerSalesNotesTable({ salesNotes }: { salesNotes: any[] }) {
   return (
-    <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
-      <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
+    <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[68vh] rounded">
+      <table className="w-full text-xs text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
         <thead className="text-xs text-black uppercase dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
           <tr>
-            <th scope="col" className="px-6 py-3">Nota de venta</th>
-            <th scope="col" className="px-6 py-3">Estado</th>
-            <th scope="col" className="px-6 py-3">Fecha</th>
-            <th scope="col" className="px-6 py-3">Producto</th>
-            <th scope="col" className="px-6 py-3">Cantidad NV</th>
-            <th scope="col" className="px-6 py-3">Ordenes de produccion</th>
-            <th scope="col" className="px-6 py-3">Ordenes de trabajo</th>
-            <th scope="col" className="px-6 py-3">Avance producto</th>
+            <th scope="col" className="px-3 py-2">Nota de venta</th>
+            <th scope="col" className="px-3 py-2">Estado</th>
+            <th scope="col" className="px-3 py-2">Fecha</th>
+            <th scope="col" className="px-3 py-2">Producto</th>
+            <th scope="col" className="px-3 py-2">Cantidad NV</th>
+            <th scope="col" className="px-3 py-2">OP</th>
+            <th scope="col" className="px-3 py-2">OT</th>
+            <th scope="col" className="px-3 py-2">Avance</th>
           </tr>
         </thead>
         <tbody>
@@ -63,7 +63,7 @@ export function CustomerSalesNotesTable({ salesNotes }: { salesNotes: any[] }) {
               >
                 {index === 0 && (
                   <>
-                    <th scope="row" rowSpan={products.length} className="px-5 py-3 align-top font-medium text-black">
+                    <th scope="row" rowSpan={products.length} className="px-3 py-2 align-top font-medium text-black">
                       <div className="space-y-1">
                         <div className="text-sm text-black">{sale.name}</div>
                         {sale.client_order_ref && (
@@ -71,24 +71,24 @@ export function CustomerSalesNotesTable({ salesNotes }: { salesNotes: any[] }) {
                         )}
                       </div>
                     </th>
-                    <td rowSpan={products.length} className="px-3 py-3 align-top">
+                    <td rowSpan={products.length} className="px-3 py-2 align-top">
                       <StatusBadge status={sale.state} />
                     </td>
-                    <td rowSpan={products.length} className="px-3 py-3 align-top text-black">
+                    <td rowSpan={products.length} className="px-3 py-2 align-top text-black">
                       {formatDate(sale.date_order)}
                     </td>
                   </>
                 )}
-                <td className="px-3 py-3 text-black">
-                  <div className="max-w-[280px] whitespace-normal font-medium">{product?.product || 'Sin producto asociado'}</div>
+                <td className="px-3 py-2 text-black">
+                  <div className="max-w-[240px] whitespace-normal font-medium">{product?.product || 'Sin producto asociado'}</div>
                   {product?.description && product.description !== product.product && (
-                    <div className="max-w-[280px] whitespace-normal text-xs text-gray-600">{product.description}</div>
+                    <div className="max-w-[240px] whitespace-normal text-xs text-gray-600">{product.description}</div>
                   )}
                 </td>
-                <td className="px-3 py-3 text-black">{product ? formatQuantity(product.quantity) : '-'}</td>
-                <td className="px-3 py-3 text-black">{product?.production_count || 0}</td>
-                <td className="px-3 py-3 text-black">{product?.workorder_count || 0}</td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-2 text-black">{product ? formatQuantity(product.quantity) : '-'}</td>
+                <td className="px-3 py-2 text-black">{product?.production_count || 0}</td>
+                <td className="px-3 py-2 text-black">{product?.workorder_count || 0}</td>
+                <td className="px-3 py-2">
                   <ProgressBar value={product ? product.progress : 0} />
                 </td>
               </tr>

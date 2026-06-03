@@ -26,13 +26,13 @@ export default async function Layout({
   if (!session) redirect(LOGIN_URL)
 
   return (
-    <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
+    <div className="min-h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <LogoMenu
         userRole={session.user.name}
         isDashboardRoute={true}
       />
       <HeaderLink userRole={session.user.role}></HeaderLink>
-        <div className="mx-auto max-w-7xl space-y-8 px-2 pt-20 lg:px-8 lg:py-8">
+        <div className="mx-auto max-w-[96rem] space-y-8 px-2 pt-20 lg:px-8 lg:py-8">
           <div className="bg-white rounded-lg p-px shadow-lg shadow-black/20">
             <div className="rounded-lg p-3.5 lg:p-6">{children}</div>
           </div>
