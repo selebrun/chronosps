@@ -889,19 +889,22 @@ async function getCustomerPartnerIds(user: any): Promise<number[]> {
 }
 
 export async function getCustomerSalesNotes(user: any) {
-  if (user.role !== 'Cliente') {
-    return { status: false, message: 'Esta consulta esta disponible solo para usuarios Cliente.', data: [] };
+  if (!['Cliente', 'Jefe'].includes(user.role)) {
+    return { status: false, message: 'Esta consulta esta disponible solo para usuarios Cliente o Jefe.', data: [] };
   }
 
-  const partnerIds = await getCustomerPartnerIds(user);
-  if (!partnerIds.length) {
+  const partnerIds = user.role === 'Cliente' ? await getCustomerPartnerIds(user) : [];
+  if (user.role === 'Cliente' && !partnerIds.length) {
     return { status: false, message: 'No se encontro un cliente relacionado al documento o email del usuario.', data: [] };
   }
+  const salesDomain = user.role === 'Cliente'
+    ? [['partner_id', 'in', partnerIds], ['state', 'in', ['sale', 'done']]]
+    : [['state', 'in', ['sale', 'done']]];
 
   return new Promise((resolve) => {
     getOdooData(
       'sale.order',
-      [['partner_id', 'in', partnerIds], ['state', 'in', ['sale', 'done']]],
+      salesDomain,
       ['id', 'name', 'partner_id', 'date_order', 'state', 'client_order_ref', 'amount_total'],
       false,
       'date_order desc',

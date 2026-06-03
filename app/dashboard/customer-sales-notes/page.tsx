@@ -8,7 +8,7 @@ export default async function Page() {
   const session = await getServerSession(config);
   const user = session.user;
 
-  if (user.role !== 'Cliente') redirect('/dashboard');
+  if (!['Cliente', 'Jefe'].includes(user.role)) redirect('/dashboard');
 
   const salesNotes: any = await getCustomerSalesNotes(user)
     .then((res) => res)
