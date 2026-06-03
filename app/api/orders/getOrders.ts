@@ -562,6 +562,7 @@ const CUSTOMER_PRODUCTION_FIELDS = [
   'product_qty',
   'qty_producing',
   'origin',
+  'workorder_ids',
   'date_planned_start',
   'date_planned_finished',
 ];
@@ -793,7 +794,7 @@ function buildSaleProductRows(sale: any, saleLines: any[], productions: any[], w
         ...product,
         progress: averageProgress(productWorkorders),
         production_count: productProductions.length,
-        workorder_count: productWorkorders.length,
+        workorder_count: productWorkorders.length || productProductions.reduce((sum: number, production: any) => sum + (production.workorder_ids?.length || 0), 0),
         productions: productProductions,
       };
     });
@@ -815,7 +816,7 @@ function buildSaleProductRows(sale: any, saleLines: any[], productions: any[], w
       delivered_quantity: line.qty_delivered,
       progress: averageProgress(productWorkorders),
       production_count: productProductions.length,
-      workorder_count: productWorkorders.length,
+      workorder_count: productWorkorders.length || productProductions.reduce((sum: number, production: any) => sum + (production.workorder_ids?.length || 0), 0),
       productions: productProductions,
     };
   });
@@ -892,7 +893,19 @@ export async function getCustomerSalesNotes(user: any) {
 
         const productionData = await getProductionChildren(directProductions, user);
         const productionSaleMap = getProductionSaleMap(productionData, sales.data);
-            const productionIds = productionData.map((production: any) => production.id);
+        const productionIds = productionData.map((production: any) => production.id);
+        const productionWorkorderIds = productionData.flatMap((production: any) => production.workorder_ids || []);
+
+        console.log('Consulta Cliente NV/OP', {
+          sale_count: sales.data.length,
+          sale_ids: saleIds,
+          sale_line_count: saleLines.length,
+          production_by_sale_id_count: productionsBySaleId.length,
+          production_by_sale_line_id_count: productionsBySaleLineId.length,
+          production_by_origin_count: productionsByOrigin.length,
+          production_total_count: productionData.length,
+          production_ids: productionIds,
+        });
 
             if (!productionIds.length) {
               resolve({
@@ -918,7 +931,7 @@ export async function getCustomerSalesNotes(user: any) {
 
             getOdooData(
               'mrp.workorder',
-              [['production_id', 'in', productionIds]],
+              ['|', ['production_id', 'in', productionIds], ['id', 'in', productionWorkorderIds]],
               ['id', 'name', 'state', 'production_id', 'workcenter_id', 'duration', 'duration_expected', 'date_planned_start', 'date_planned_finished'],
               false,
               false,
@@ -942,6 +955,19 @@ export async function getCustomerSalesNotes(user: any) {
 
                   const saleWorkorders = productionsWithProgress.flatMap((production: any) => production.workorders);
                   const saleProducts = buildSaleProductRows(sale, saleLines, productionsWithProgress, saleWorkorders);
+
+                  console.log('Consulta Cliente NV detalle', {
+                    sale: sale.name,
+                    sale_id: sale.id,
+                    productions: saleProductions.map((production: any) => production.name),
+                    workorder_count: saleWorkorders.length,
+                    product_rows: saleProducts.map((product: any) => ({
+                      product: product.product,
+                      production_count: product.production_count,
+                      workorder_count: product.workorder_count,
+                      progress: product.progress,
+                    })),
+                  });
 
                   return {
                     id: sale.id,
