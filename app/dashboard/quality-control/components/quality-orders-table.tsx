@@ -16,6 +16,10 @@ function getWorkOrderName(order: any) {
   return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || '';
 }
 
+function getMany2OneId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 function getWorkOrderSequence(order: any) {
   const sequence = Number(order?.workorder_sequence);
   return Number.isFinite(sequence) ? sequence : Number.MAX_SAFE_INTEGER;
@@ -62,9 +66,11 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
 
   const onSaveOrderId = (order: any) => {
     const dateilOrden = odooOrders?.data
-      .filter((orden:any) => orden.production_id[0] === order.id)
+      .filter((orden:any) => getMany2OneId(orden.production_id) === order.id)
       .sort(sortQualityControlsAsc)
     setOrderQualityDetail(dateilOrden)
+    setSelectedOrderQuantity({})
+    setModalDetailsIsOpen(false)
   }
   
   const selectedQualityDetails = (order : any) =>{
