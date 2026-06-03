@@ -551,8 +551,20 @@ function averageProgress(workorders: any[]) {
 }
 
 function getProductionSaleKey(production: any) {
-  return normalizeText(production?.x_studio_po) || normalizeText(production?.origin);
+  return normalizeText(production?.origin);
 }
+
+const CUSTOMER_PRODUCTION_FIELDS = [
+  'id',
+  'name',
+  'state',
+  'product_id',
+  'product_qty',
+  'qty_producing',
+  'origin',
+  'date_planned_start',
+  'date_planned_finished',
+];
 
 function getOdooRecords(
   model: string,
@@ -570,6 +582,9 @@ function getOdooRecords(
       order,
       companyId,
       async (response: any) => {
+        if (response && response.status === false) {
+          console.log(`Error consultando ${model}:`, response.message || response);
+        }
         resolve(response?.data || []);
       },
       false
@@ -577,8 +592,82 @@ function getOdooRecords(
   });
 }
 
+async function getOdooRecordsWithRelation(
+  model: string,
+  domain: any[],
+  fields: string[],
+  companyId: string,
+  relation: Record<string, any>
+) {
+  const records = await getOdooRecords(model, domain, fields, companyId);
+  return records.map((record: any) => ({ ...record, ...relation }));
+}
+
+async function getProductionsBySaleId(saleIds: number[], companyId: string) {
+  const productionGroups = await Promise.all(
+    saleIds.map((saleId) =>
+      getOdooRecordsWithRelation(
+        'mrp.production',
+        [['sale_id', '=', saleId]],
+        CUSTOMER_PRODUCTION_FIELDS,
+        companyId,
+        { customer_sale_id: saleId }
+      )
+    )
+  );
+
+  return productionGroups.flat();
+}
+
+async function getProductionsBySaleLineId(saleLines: any[], companyId: string) {
+  const productionGroups = await Promise.all(
+    saleLines.map((line: any) =>
+      getOdooRecordsWithRelation(
+        'mrp.production',
+        [['sale_line_id', '=', line.id]],
+        CUSTOMER_PRODUCTION_FIELDS,
+        companyId,
+        {
+          customer_sale_id: asOdooId(line.order_id),
+          customer_sale_line_id: line.id,
+        }
+      )
+    )
+  );
+
+  return productionGroups.flat();
+}
+
+async function getProductionsByOriginSales(sales: any[], companyId: string) {
+  const searches = sales.flatMap((sale: any) => {
+    const tokens = new Set<string>([sale.name]);
+    const lastNamePart = sale.name?.split('/').pop();
+
+    if (lastNamePart) {
+      tokens.add(lastNamePart);
+      tokens.add(lastNamePart.replace(/^0+/, '') || lastNamePart);
+    }
+
+    return Array.from(tokens)
+      .filter(Boolean)
+      .map((token) =>
+        getOdooRecordsWithRelation(
+          'mrp.production',
+          [['origin', 'ilike', token]],
+          CUSTOMER_PRODUCTION_FIELDS,
+          companyId,
+          { customer_sale_id: sale.id }
+        )
+      );
+  });
+
+  const productionGroups = await Promise.all(searches);
+
+  return productionGroups.flat();
+}
+
 function getProductionDirectSaleId(production: any, sales: any[]) {
-  const saleId = asOdooId(production?.sale_id);
+  const saleId = asOdooId(production?.customer_sale_id) || asOdooId(production?.sale_id);
   if (saleId) return saleId;
 
   const saleKey = getProductionSaleKey(production);
@@ -588,18 +677,29 @@ function getProductionDirectSaleId(production: any, sales: any[]) {
 
 async function getProductionChildren(productions: any[], user: any) {
   const productionsById = new Map(productions.map((production: any) => [production.id, production]));
+  let productionsByName = new Map(productions.map((production: any) => [production.name, production]));
   let pendingNames = productions.map((production: any) => production.name).filter(Boolean);
 
   for (let depth = 0; depth < 5 && pendingNames.length; depth += 1) {
     const children = await getOdooRecords(
       'mrp.production',
-      ['|', ['origin', 'in', pendingNames], ['x_studio_po', 'in', pendingNames]],
-      ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
+      [['origin', 'in', pendingNames]],
+      CUSTOMER_PRODUCTION_FIELDS,
       user.company_id
     );
 
-    const newChildren = children.filter((production: any) => !productionsById.has(production.id));
+    const newChildren = children
+      .filter((production: any) => !productionsById.has(production.id))
+      .map((production: any) => {
+        const parent = productionsByName.get(normalizeText(production.origin));
+        return {
+          ...production,
+          customer_sale_id: parent?.customer_sale_id,
+        };
+      });
+
     newChildren.forEach((production: any) => productionsById.set(production.id, production));
+    productionsByName = new Map(Array.from(productionsById.values()).map((production: any) => [production.name, production]));
     pendingNames = newChildren.map((production: any) => production.name).filter(Boolean);
   }
 
@@ -775,34 +875,18 @@ export async function getCustomerSalesNotes(user: any) {
         }
 
         const saleIds = sales.data.map((sale: any) => sale.id);
-        const saleNames = sales.data.map((sale: any) => sale.name);
         const saleLines = await getOdooRecords(
           'sale.order.line',
           [['order_id', 'in', saleIds], ['display_type', '=', false]],
           ['id', 'order_id', 'name', 'product_id', 'product_uom_qty', 'qty_delivered'],
           user.company_id
         );
-        const productionsBySaleId = await getOdooRecords(
-          'mrp.production',
-          [['sale_id', 'in', saleIds]],
-          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
-          user.company_id
-        );
-        const productionsByOrigin = await getOdooRecords(
-          'mrp.production',
-          [['origin', 'in', saleNames]],
-          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
-          user.company_id
-        );
-        const productionsByStudioPo = await getOdooRecords(
-          'mrp.production',
-          [['x_studio_po', 'in', saleNames]],
-          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
-          user.company_id
-        );
+        const productionsBySaleId = await getProductionsBySaleId(saleIds, user.company_id);
+        const productionsBySaleLineId = await getProductionsBySaleLineId(saleLines, user.company_id);
+        const productionsByOrigin = await getProductionsByOriginSales(sales.data, user.company_id);
         const directProductions = Array.from(
           new Map(
-            [...productionsBySaleId, ...productionsByOrigin, ...productionsByStudioPo].map((production: any) => [production.id, production])
+            [...productionsBySaleId, ...productionsBySaleLineId, ...productionsByOrigin].map((production: any) => [production.id, production])
           ).values()
         );
 
