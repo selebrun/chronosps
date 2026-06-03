@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import close from "@/public/close.png";
 import { Modal } from "@/ui/modal/modal";
@@ -17,11 +17,12 @@ function ModalOrderQualityDetails({
   modalWorkOrderDetail: boolean;
   openJobDetail: () => void;
   selectedOrderQuantity: any;
-  acceptOrder: () => Promise<any>;
-  rejectOrder: () => Promise<any>;
+  acceptOrder: (observations?: string) => Promise<any>;
+  rejectOrder: (observations?: string) => Promise<any>;
   user?: any;
 }) {
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
+  const [observations, setObservations] = useState<string>(selectedOrderQuantity?.additional_note || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
   const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
@@ -36,11 +37,16 @@ function ModalOrderQualityDetails({
     ? `${selectedOrderQuantity?.name || ""} - ${selectedOrderQuantity.point_id[1]}`
     : selectedOrderQuantity?.name || "N/A";
 
+  useEffect(() => {
+    setMeasureValue(selectedOrderQuantity?.measure || 0);
+    setObservations(selectedOrderQuantity?.additional_note || "");
+  }, [selectedOrderQuantity?.id, selectedOrderQuantity?.measure, selectedOrderQuantity?.additional_note]);
+
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
     if (isQualityClosed) return;
 
     setIsSubmitting(true);
-    const response = action === "accept" ? await acceptOrder() : await rejectOrder();
+    const response = action === "accept" ? await acceptOrder(observations) : await rejectOrder(observations);
 
     if (response?.status) {
       openJobDetail();
@@ -119,6 +125,8 @@ function ModalOrderQualityDetails({
               <textarea
                 className="h-[10vh] w-full p-2 border focus:border-primary rounded-md"
                 placeholder="Escribe tus notas aqui..."
+                value={observations}
+                onChange={(event) => setObservations(event.target.value)}
                 disabled={isQualityClosed}
               />
             </div>
