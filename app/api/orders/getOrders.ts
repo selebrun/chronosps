@@ -563,8 +563,6 @@ const CUSTOMER_PRODUCTION_FIELDS = [
   'qty_producing',
   'origin',
   'workorder_ids',
-  'date_planned_start',
-  'date_planned_finished',
 ];
 
 function getOdooRecords(
@@ -932,7 +930,7 @@ export async function getCustomerSalesNotes(user: any) {
             getOdooData(
               'mrp.workorder',
               ['|', ['production_id', 'in', productionIds], ['id', 'in', productionWorkorderIds]],
-              ['id', 'name', 'state', 'production_id', 'workcenter_id', 'duration', 'duration_expected', 'date_planned_start', 'date_planned_finished'],
+              ['id', 'name', 'state', 'production_id', 'workcenter_id', 'duration', 'duration_expected'],
               false,
               false,
               user.company_id,
