@@ -1,5 +1,4 @@
 "use client"
-import { useState } from 'react'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 import close from '@/public/close.png'
@@ -48,9 +47,6 @@ export function ModalOrderQuality({
   rejectOrder: () => Promise<any>,
   user: any
 }) {
-  const [instructionsQuality, setInstructionsQuality] = useState<any>(null)
-
-
   return (
     <>
      {modalDetailsIsOpen && 
@@ -93,9 +89,6 @@ export function ModalOrderQuality({
                       {'Producto'}
                     </th>
                     <th scope="col" className="px-6 py-3">
-                      {'Instrucciones'}
-                    </th>
-                    <th scope="col" className="px-6 py-3">
                     </th>
                   </tr>
                 </thead>
@@ -120,15 +113,6 @@ export function ModalOrderQuality({
                       </td>
                       <td className="px-3 py-2">
                         <button
-                          disabled={!order.note}
-                          onClick={() => setInstructionsQuality(order)}
-                          className="disabled:opacity-50 rounded bg-[#1D4C92] px-3 py-1 text-xs font-bold text-white"
-                        >
-                          Ver
-                        </button>
-                      </td>
-                      <td className="px-3 py-2">
-                        <button
                           onClick={() => {
                             openJobDetail()
                             selectedQualityDetails(order)
@@ -150,30 +134,6 @@ export function ModalOrderQuality({
           {orderQualityDetail.length === 0 && 
              <h5 className="mb-2 text-2xl tracking-tight text-gray-700 dark:text-white flex justify-center">No hay órdenes de trabajo</h5>
           }
-      </Modal>
-      <Modal setOpen={!!instructionsQuality} title='Instrucciones' className='max-w-2xl'>
-        <div className="flex justify-end relative bottom-10">
-          <button
-            type="button"
-            onClick={() => setInstructionsQuality(null)}
-          >
-            <Image
-              src={close}
-              alt="Close"
-            />
-          </button>
-        </div>
-        <div className="text-gray-900">
-          <div className="mb-3 font-bold">{instructionsQuality?.name}</div>
-          {instructionsQuality?.note ? (
-            <div
-              className="max-h-[55vh] overflow-y-auto rounded bg-whiteInput p-4 text-sm leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: instructionsQuality.note }}
-            />
-          ) : (
-            <div className="rounded bg-whiteInput p-4 text-sm">No hay instrucciones registradas.</div>
-          )}
-        </div>
       </Modal>
     </>
     

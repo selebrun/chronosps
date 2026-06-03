@@ -23,6 +23,7 @@ function ModalOrderQualityDetails({
 }) {
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
   const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
   const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
     ? selectedOrderQuantity.workorder_id[1]
@@ -139,8 +140,37 @@ function ModalOrderQualityDetails({
           >
             Falla
           </button>
+          <button
+            disabled={!selectedOrderQuantity?.note}
+            onClick={() => setModalInstructionsOpen(true)}
+            className="font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full mt-2 disabled:opacity-50"
+          >
+            Instrucciones
+          </button>
         </div>
       </div>
+
+      <Modal setOpen={modalInstructionsOpen} title="Instrucciones" className="max-w-2xl">
+        <div className="flex justify-end relative bottom-10">
+          <button
+            type="button"
+            onClick={() => setModalInstructionsOpen(false)}
+          >
+            <Image src={close} alt="Close" />
+          </button>
+        </div>
+        <div className="text-gray-900">
+          <div className="mb-3 font-bold">{qualityPointLabel}</div>
+          {selectedOrderQuantity?.note ? (
+            <div
+              className="max-h-[55vh] overflow-y-auto rounded bg-whiteInput p-4 text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: selectedOrderQuantity.note }}
+            />
+          ) : (
+            <div className="rounded bg-whiteInput p-4 text-sm">No hay instrucciones registradas.</div>
+          )}
+        </div>
+      </Modal>
     </Modal>
   );
 }
