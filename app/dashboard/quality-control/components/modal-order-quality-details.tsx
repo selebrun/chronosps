@@ -31,6 +31,9 @@ function ModalOrderQualityDetails({
   const workOrderLabel = selectedOrderQuantity?.workorder_sequence !== null && selectedOrderQuantity?.workorder_sequence !== undefined
     ? operationName ? `${selectedOrderQuantity.workorder_sequence} - ${operationName}` : selectedOrderQuantity.workorder_sequence
     : operationName || "N/A";
+  const qualityPointLabel = Array.isArray(selectedOrderQuantity?.point_id)
+    ? `${selectedOrderQuantity?.name || ""} - ${selectedOrderQuantity.point_id[1]}`
+    : selectedOrderQuantity?.name || "N/A";
 
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
     if (isQualityClosed) return;
@@ -70,7 +73,7 @@ function ModalOrderQualityDetails({
             <div>
               <div className="font-bold text-center">Punto de control</div>
               <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
-                {selectedOrderQuantity?.name || "N/A"}
+                {qualityPointLabel}
               </div>
             </div>
 
