@@ -228,7 +228,7 @@ export function ModalDetailWork({
           </div>
           {showDetailOrderWork.working_state === "paused" && (
             <div className='mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded'>
-              <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón "Reanudar".
+              <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón &quot;Reanudar&quot;.
             </div>
           )}
       </Modal>
