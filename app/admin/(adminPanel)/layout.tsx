@@ -36,7 +36,7 @@ export default async function Layout({
 
   const user = process.env.CHRONOS_ADMIN_USER;
   const session = await getServerSession(config)
-  if (!session &&  user !== session.email ) redirect(CHRONOS_ADMIN_LOGIN_URL)
+  if (!session || user !== session.user?.email) redirect(CHRONOS_ADMIN_LOGIN_URL)
 
   return (
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
