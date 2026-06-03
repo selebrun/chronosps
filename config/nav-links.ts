@@ -37,7 +37,7 @@ export const navItems: { name: string; items: navItem[] }[] = [
         name: 'Notas de venta',
         slug: 'customer-sales-notes',
         description: 'Consulta de notas de venta y avance de produccion',
-        role: ['Cliente']
+        role: ['Cliente', 'Jefe']
       },
       //{
       //  name: 'Planificación',
