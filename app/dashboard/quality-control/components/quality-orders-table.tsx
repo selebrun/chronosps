@@ -77,12 +77,12 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
     setSelectedOrderQuantity(order)
   }
 
-  const acceptOrder = async (observations?: string) => {
-    return acceptQualityControl(user, selectedOrderQuantity, observations)
+  const acceptOrder = async (observations?: string, measure?: number) => {
+    return acceptQualityControl(user, selectedOrderQuantity, observations, measure)
       .then((res) => {
         if (res?.status) {
-          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'pass', additional_note: observations || '' }))
-          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'pass', additional_note: observations || '' } : item))
+          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'pass', additional_note: observations || '', measure }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'pass', additional_note: observations || '', measure } : item))
         }
         return res
       })
@@ -92,12 +92,12 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
       })
   }
 
-  const rejectOrder = async (observations?: string) => {
-    return rejectQualityControl(user, selectedOrderQuantity, observations)
+  const rejectOrder = async (observations?: string, measure?: number) => {
+    return rejectQualityControl(user, selectedOrderQuantity, observations, measure)
       .then((res) => {
         if (res?.status) {
-          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'fail', additional_note: observations || '' }))
-          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'fail', additional_note: observations || '' } : item))
+          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'fail', additional_note: observations || '', measure }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'fail', additional_note: observations || '', measure } : item))
         }
         return res
       })
