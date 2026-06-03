@@ -6,7 +6,7 @@ import close from '@/public/close.png'
 // UI Components
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalOrderQuality } from './modal-order-quality'
-import { acceptQualityControl } from '@/app/api/accionQualityControl/accionQualityControl'
+import { acceptQualityControl, rejectQualityControl } from '@/app/api/accionQualityControl/accionQualityControl'
 
 
 export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user: any }) {
@@ -16,11 +16,15 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   const [selectedOrderQuantity, setSelectedOrderQuantity] = useState({});
   const [ordersQualityControl, setOrdersQualityControl] = useState<any[]>([]);
 
-  useEffect(()=>{
-    let orders:any[] = []
-    odooOrders?.data.filter((work: any) => (
-    orders =  odooOrders?.production_data.filter((pro: any) =>  pro.product_id[0] === work.product_id[0])
-    ))
+  useEffect(() => {
+    const productionIdsInQuality = new Set(
+      (odooOrders?.data ?? []).map((work: any) => work?.production_id?.[0])
+    )
+
+    const orders = (odooOrders?.production_data ?? []).filter(
+      (production: any) => productionIdsInQuality.has(production?.id)
+    )
+
     setOrdersQualityControl(orders)
   }, [odooOrders?.data, odooOrders?.production_data])
 
@@ -43,7 +47,21 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   }
 
   const acceptOrder = async () => {
-    const accept: any = await acceptQualityControl(user, selectedOrderQuantity).then( res => res).catch((err) => console.log(err))
+    return acceptQualityControl(user, selectedOrderQuantity)
+      .then((res) => res)
+      .catch((err) => {
+        console.log(err)
+        return { status: false }
+      })
+  }
+
+  const rejectOrder = async () => {
+    return rejectQualityControl(user, selectedOrderQuantity)
+      .then((res) => res)
+      .catch((err) => {
+        console.log(err)
+        return { status: false }
+      })
   }
 
   return (
@@ -57,6 +75,8 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
         selectedQualityDetails={selectedQualityDetails}
         selectedOrderQuantity={selectedOrderQuantity}
         acceptOrder={acceptOrder}
+        rejectOrder={rejectOrder}
+        user={user}
       /> 
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">

@@ -1,6 +1,7 @@
 import { getProductionOrders, getWorkOrders, getBlockReasons } from '@/app/api/orders/getOrders'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
+import { redirect } from 'next/navigation';
 
 
 // UI Components
@@ -9,6 +10,7 @@ import { ProductionOrdersTable } from '@/app/dashboard/production-orders/compone
 export default async function Page() {
   const session = await getServerSession(config);
   const user = session.user;
+  if (user.role === 'Calidad') redirect('/dashboard/quality-control');
   const odooOrders: any = await getProductionOrders(user).then( res => res).catch((err) => console.log(err));
   const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
   const blockReasons: any = await getBlockReasons(user).then( res => res).catch((err) => console.log(err))

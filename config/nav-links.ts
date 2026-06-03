@@ -33,6 +33,12 @@ export const navItems: { name: string; items: navItem[] }[] = [
         description: 'Procesos de control de calidad para piso',
         role: ['Lider', 'Jefe','Calidad']
       },
+      {
+        name: 'Notas de venta',
+        slug: 'customer-sales-notes',
+        description: 'Consulta de notas de venta y avance de produccion',
+        role: ['Cliente']
+      },
       //{
       //  name: 'Planificación',
       //  slug: '',

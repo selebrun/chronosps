@@ -11,9 +11,13 @@ export function StatusBadge({ status }: { status: string }) {
     pass: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
     normal: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
     ready: { name: "Completado", color: "bg-green-400 text-white" },
+    draft: { name: "Borrador", color: "bg-gray-200 text-gray-800" },
+    sent: { name: "Enviada", color: "bg-blue-100 text-blue-800" },
+    sale: { name: "Confirmada", color: "bg-green-100 text-green-800" },
+    cancel: { name: "Cancelada", color: "bg-red-100 text-red-800" },
   };
 
-  const statusInfo = STATUS_DICT[status] || { name: {status}, color: "bg-gray-400 text-black" };
+  const statusInfo = STATUS_DICT[status] || { name: status || "Sin estado", color: "bg-gray-400 text-black" };
 
   return (
     <span className={`text-xs font-medium mr-2 px-2.5 py-0.5 rounded whitespace-nowrap ${statusInfo.color}`}>
