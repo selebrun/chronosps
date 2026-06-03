@@ -24,6 +24,11 @@ function ModalOrderQualityDetails({
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
+  const workOrderLabel = selectedOrderQuantity?.workorder_sequence !== null && selectedOrderQuantity?.workorder_sequence !== undefined
+    ? selectedOrderQuantity.workorder_sequence
+    : Array.isArray(selectedOrderQuantity?.workorder_id)
+      ? selectedOrderQuantity.workorder_id[1]
+      : selectedOrderQuantity?.workorder_id || "N/A";
 
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
     if (isQualityClosed) return;
@@ -84,9 +89,7 @@ function ModalOrderQualityDetails({
             <div>
               <div className="font-bold text-center">Orden de trabajo</div>
               <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
-                {Array.isArray(selectedOrderQuantity?.workorder_id)
-                  ? selectedOrderQuantity.workorder_id[1]
-                  : selectedOrderQuantity?.workorder_id || "N/A"}
+                {workOrderLabel}
               </div>
             </div>
 

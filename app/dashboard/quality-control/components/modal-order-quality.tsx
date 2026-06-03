@@ -8,6 +8,10 @@ import { Modal } from '@/ui/modal/modal'
 import ModalOrderQualityDetails from './modal-order-quality-details'
 
 function getWorkOrderName(order: any) {
+  if (order?.workorder_sequence !== null && order?.workorder_sequence !== undefined) {
+    return order.workorder_sequence;
+  }
+
   return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || 'N/A';
 }
 
