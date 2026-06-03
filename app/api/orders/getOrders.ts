@@ -417,7 +417,8 @@ export async function getQualityControl(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
+                const qualityChecks = await addWorkOrderSequenceToQualityChecks(productions.data, user.company_id);
+                resolve({ status: true, message: '', data:  qualityChecks, production_data: workorders.data });
               },
               false
             );
@@ -456,7 +457,8 @@ export async function getQualityControl(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
+                const qualityChecks = await addWorkOrderSequenceToQualityChecks(productions.data, user.company_id);
+                resolve({ status: true, message: '', data:  qualityChecks, production_data: workorders.data });
               },
               false
             );
@@ -492,7 +494,8 @@ export async function getQualityControl(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
+                const qualityChecks = await addWorkOrderSequenceToQualityChecks(productions.data, user.company_id);
+                resolve({ status: true, message: '', data:  qualityChecks, production_data: workorders.data });
               },
               false
             );
@@ -526,6 +529,42 @@ export async function getBlockReasons(user: any) {
 
 function asOdooId(value: any) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], companyId: string) {
+  const workorderIds = Array.from(new Set(
+    qualityChecks
+      .map((qualityCheck: any) => Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[0] : qualityCheck?.workorder_id)
+      .filter(Boolean)
+  ));
+
+  if (!workorderIds.length) return qualityChecks;
+
+  return new Promise<any[]>((resolve) => {
+    getOdooData(
+      'mrp.workorder',
+      [['id', 'in', workorderIds]],
+      ['id', 'sequence', 'name'],
+      false,
+      false,
+      companyId,
+      async (workorders: any) => {
+        const workorderById = new Map<number, any>((workorders?.data || []).map((workorder: any) => [workorder.id, workorder]));
+
+        resolve(qualityChecks.map((qualityCheck: any) => {
+          const workorderId = Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[0] : qualityCheck?.workorder_id;
+          const workorder = workorderById.get(workorderId);
+
+          return {
+            ...qualityCheck,
+            workorder_sequence: workorder?.sequence ?? null,
+            workorder_name: workorder?.name || (Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[1] : qualityCheck?.workorder_id),
+          };
+        }));
+      },
+      false
+    );
+  });
 }
 
 function asOdooName(value: any) {

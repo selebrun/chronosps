@@ -16,7 +16,15 @@ function getWorkOrderName(order: any) {
   return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || '';
 }
 
+function getWorkOrderSequence(order: any) {
+  const sequence = Number(order?.workorder_sequence);
+  return Number.isFinite(sequence) ? sequence : Number.MAX_SAFE_INTEGER;
+}
+
 function sortQualityControlsAsc(a: any, b: any) {
+  const sequenceComparison = getWorkOrderSequence(a) - getWorkOrderSequence(b);
+  if (sequenceComparison !== 0) return sequenceComparison;
+
   const workOrderComparison = getWorkOrderName(a).localeCompare(getWorkOrderName(b), 'es', { numeric: true, sensitivity: 'base' });
   if (workOrderComparison !== 0) return workOrderComparison;
 
