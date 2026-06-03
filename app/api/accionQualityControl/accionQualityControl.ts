@@ -1,7 +1,7 @@
 'use server'
 import { setOdooData } from '@/app/api/odoo/odooService';
 
-export async function acceptQualityControl (user: any, quality_control: any, observations?: string ): Promise<any>{
+export async function acceptQualityControl (user: any, quality_control: any, observations?: string, measure?: number ): Promise<any>{
   return new Promise(async (resolve) => {
     if (!quality_control?.id) {
       return resolve({ status: false, message: "No se encontro el control de calidad seleccionado." });
@@ -9,6 +9,7 @@ export async function acceptQualityControl (user: any, quality_control: any, obs
 
     const updateValues: any = { quality_state: 'pass' };
     if (observations !== undefined) updateValues.additional_note = observations;
+    if (measure !== undefined) updateValues.measure = measure;
 
     setOdooData(
       'quality.check',
@@ -22,7 +23,7 @@ export async function acceptQualityControl (user: any, quality_control: any, obs
   })
 }
 
-export async function rejectQualityControl (user: any, quality_control: any, observations?: string ): Promise<any>{
+export async function rejectQualityControl (user: any, quality_control: any, observations?: string, measure?: number ): Promise<any>{
   return new Promise(async (resolve) => {
     if (!quality_control?.id) {
       return resolve({ status: false, message: "No se encontro el control de calidad seleccionado." });
@@ -30,6 +31,7 @@ export async function rejectQualityControl (user: any, quality_control: any, obs
 
     const updateValues: any = { quality_state: 'fail' };
     if (observations !== undefined) updateValues.additional_note = observations;
+    if (measure !== undefined) updateValues.measure = measure;
 
     setOdooData(
       'quality.check',

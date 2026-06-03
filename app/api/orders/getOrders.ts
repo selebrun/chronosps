@@ -408,7 +408,7 @@ export async function getQualityControl(user: any) {
             getOdooData(
               'quality.check',
               [['production_id','in',production_orders]],
-              ['id','name','production_id','quality_state','product_id','point_id','note','additional_note','test_type_id','workorder_id','workorder_id'],
+              ['id','name','production_id','quality_state','product_id','point_id','note','additional_note','measure','test_type_id','workorder_id','workorder_id'],
               false,
               false,
               user.company_id,

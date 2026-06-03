@@ -43,13 +43,13 @@ export function ModalOrderQuality({
   modalDetailsIsOpen: boolean,
   openJobDetail: any,
   selectedOrderQuantity:any,
-  acceptOrder: () => Promise<any>,
-  rejectOrder: () => Promise<any>,
+  acceptOrder: (observations?: string, measure?: number) => Promise<any>,
+  rejectOrder: (observations?: string, measure?: number) => Promise<any>,
   user: any
 }) {
   return (
     <>
-     {modalDetailsIsOpen && 
+      {modalDetailsIsOpen && 
       <ModalOrderQualityDetails 
         modalWorkOrderDetail={modalDetailsIsOpen}
         openJobDetail={openJobDetail}
@@ -59,7 +59,7 @@ export function ModalOrderQuality({
         rejectOrder={rejectOrder}
         user={user}
         />}
-      <Modal setOpen={modalIsOpen} title='Controles de calidad' className='max-w-3xl'>
+      <Modal setOpen={modalIsOpen && !modalDetailsIsOpen} title='Controles de calidad' className='max-w-3xl'>
         <div className="flex justify-end relative bottom-10">
           <button
             type="button"

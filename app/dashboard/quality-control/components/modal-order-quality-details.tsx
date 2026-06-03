@@ -17,8 +17,8 @@ function ModalOrderQualityDetails({
   modalWorkOrderDetail: boolean;
   openJobDetail: () => void;
   selectedOrderQuantity: any;
-  acceptOrder: (observations?: string) => Promise<any>;
-  rejectOrder: (observations?: string) => Promise<any>;
+  acceptOrder: (observations?: string, measure?: number) => Promise<any>;
+  rejectOrder: (observations?: string, measure?: number) => Promise<any>;
   user?: any;
 }) {
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
@@ -46,7 +46,7 @@ function ModalOrderQualityDetails({
     if (isQualityClosed) return;
 
     setIsSubmitting(true);
-    const response = action === "accept" ? await acceptOrder(observations) : await rejectOrder(observations);
+    const response = action === "accept" ? await acceptOrder(observations, measureValue) : await rejectOrder(observations, measureValue);
 
     if (response?.status) {
       openJobDetail();
