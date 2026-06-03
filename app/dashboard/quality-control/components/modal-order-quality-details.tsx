@@ -24,11 +24,13 @@ function ModalOrderQualityDetails({
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
+  const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
+    ? selectedOrderQuantity.workorder_id[1]
+    : selectedOrderQuantity?.workorder_id || "");
+  const operationName = rawWorkOrderName.includes(" - ") ? rawWorkOrderName.split(" - ").slice(1).join(" - ") : rawWorkOrderName;
   const workOrderLabel = selectedOrderQuantity?.workorder_sequence !== null && selectedOrderQuantity?.workorder_sequence !== undefined
-    ? selectedOrderQuantity.workorder_sequence
-    : Array.isArray(selectedOrderQuantity?.workorder_id)
-      ? selectedOrderQuantity.workorder_id[1]
-      : selectedOrderQuantity?.workorder_id || "N/A";
+    ? operationName ? `${selectedOrderQuantity.workorder_sequence} - ${operationName}` : selectedOrderQuantity.workorder_sequence
+    : operationName || "N/A";
 
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
     if (isQualityClosed) return;

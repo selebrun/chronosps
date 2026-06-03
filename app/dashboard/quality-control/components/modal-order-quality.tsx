@@ -8,11 +8,14 @@ import { Modal } from '@/ui/modal/modal'
 import ModalOrderQualityDetails from './modal-order-quality-details'
 
 function getWorkOrderName(order: any) {
+  const workorderName = order?.workorder_name || (Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || '');
+  const operationName = workorderName.includes(' - ') ? workorderName.split(' - ').slice(1).join(' - ') : workorderName;
+
   if (order?.workorder_sequence !== null && order?.workorder_sequence !== undefined) {
-    return order.workorder_sequence;
+    return operationName ? `${order.workorder_sequence} - ${operationName}` : order.workorder_sequence;
   }
 
-  return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || 'N/A';
+  return operationName || 'N/A';
 }
 
 
