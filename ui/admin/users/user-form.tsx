@@ -1,10 +1,7 @@
 "use client";
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { v4 as uuidv4 } from 'uuid';
 import { type ChronosUsers } from "@/types/chronosUsers";
-import { type ChronosCompany } from "@/types/chronosCompany";
-
 
 import { Spinner } from '@/ui/spinner';
 
@@ -28,11 +25,21 @@ export function ChronosUsersForm({
     name: user?.name?.trim() || '',
     rol: user?.rol?.trim() || '',
     email: user?.email?.trim() || '',
+    original_code: user?.code?.trim() || '',
   });
 
   const handleChange = (e: any) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  const getErrorMessage = async (response: Response, fallback: string) => {
+    try {
+      const data = await response.json();
+      return data?.message || fallback;
+    } catch {
+      return fallback;
+    }
   };
 
   const createUser = async () => {
@@ -45,46 +52,49 @@ export function ChronosUsersForm({
     });
 
     if (!response.ok) {
-      setFormError("Ha ocurrido un error al intentar crear una compania");
-      setLoading(false);
+      const message = await getErrorMessage(response, "Ha ocurrido un error al intentar crear el usuario");
+      setFormError(message);
+      return;
     }
 
     navigateOnSuccess()
   };
 
   const updateUser = async () => {
-    try {
-      const response = await fetch("/api/users", {
-        method: 'PUT',
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(formData)
-      });
-      if (!response.ok) {
-        throw new Error("Failed to fetch companies");
-      }
-      const data = await response.json();
+    const response = await fetch("/api/users", {
+      method: 'PUT',
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(formData)
+    });
 
-      if (response.status === 200) {
-        setFormError("Ha ocurrido un error al intentar editar la compania");
-        setLoading(false);
-      }
-    
-      navigateOnSuccess()
-    } catch (error) {
-      console.error("Error fetching companies:", error);
+    if (!response.ok) {
+      const message = await getErrorMessage(response, "Ha ocurrido un error al intentar editar el usuario");
+      setFormError(message);
+      return;
     }
+
+    navigateOnSuccess()
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
-    if (!user) {
-      createUser()
-    } else {
-      updateUser()
+    setFormError(null);
+
+    try {
+      if (!user) {
+        await createUser()
+      } else {
+        await updateUser()
+      }
+    } catch (error) {
+      console.error("Error saving user:", error);
+      setFormError("Ha ocurrido un error inesperado al guardar el usuario");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -193,6 +203,7 @@ export function ChronosUsersForm({
             <option value={'Jefe'}>Jefe</option>
             <option value={'Operario'}>Operario</option>
 	    <option value={'Calidad'}>Calidad</option>
+            <option value={'Cliente'}>Cliente</option>
         </select>
       </div>
       <button

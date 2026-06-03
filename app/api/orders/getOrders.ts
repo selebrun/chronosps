@@ -88,6 +88,26 @@ export async function getProductionOrders(user: any) {
           )
       })
 
+    case 'Calidad':
+      return new Promise(async (resolve, reject) => {
+        getOdooData(
+          'mrp.production',
+          [['state','in',['confirmed','progress']]],
+          [],
+          false,
+          false,
+          user.company_id,
+          async (productions: any) => {
+            if (!productions || !productions.data) {
+              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+              return;
+            }
+            resolve({ status: true, message: '', data: productions.data });
+          },
+          false
+          )
+      })
+
     default:
       return new Promise(async (resolve, reject) => {
         reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
@@ -443,6 +463,42 @@ export async function getQualityControl(user: any) {
           },
           false
         )})
+    case 'Calidad':
+      return new Promise(async (resolve, reject) => {
+        filter = [['state','in',['confirmed','progress']]]
+        filter.push(['id','=',  idOrders])
+        getOdooData(
+          'mrp.production',
+          filter,
+          [],
+          false,
+          false,
+          user.company_id,
+          async (workorders: any) => {
+            if (!workorders || !workorders.data) {
+              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+              return;
+            }
+            const production_orders = workorders.data.map((p: any) => p.id);
+            getOdooData(
+              'quality.check',
+              [['production_id','in',production_orders]],
+              [],
+              false,
+              false,
+              user.company_id,
+              async (productions: any) => {
+                if (!productions || !productions.data) {
+                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+                  return;
+                }
+                resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
+              },
+              false
+            );
+          },
+          false
+        )})
     default:
       return new Promise(async (resolve, reject) => {
         reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
@@ -467,3 +523,177 @@ export async function getBlockReasons(user: any) {
         )
     })
   }
+
+function asOdooId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function asOdooName(value: any) {
+  return Array.isArray(value) ? value[1] : value || '';
+}
+
+function normalizeText(value: any) {
+  return (value || '').toString().trim();
+}
+
+function getWorkOrderProgress(workorder: any) {
+  if (['done', 'completed'].includes(workorder?.state)) return 100;
+  if (workorder?.state === 'progress' && workorder?.duration_expected > 0) {
+    return Math.min(Math.round((workorder.duration / workorder.duration_expected) * 100), 100);
+  }
+  return 0;
+}
+
+function averageProgress(workorders: any[]) {
+  if (!workorders.length) return 0;
+  const total = workorders.reduce((sum, workorder) => sum + getWorkOrderProgress(workorder), 0);
+  return Math.round(total / workorders.length);
+}
+
+function getProductionSaleKey(production: any) {
+  return normalizeText(production?.x_studio_po) || normalizeText(production?.origin);
+}
+
+async function getCustomerPartnerIds(user: any): Promise<number[]> {
+  return new Promise((resolve) => {
+    const domain = [
+      '|',
+      '|',
+      ['vat', '=', user.document],
+      ['ref', '=', user.document],
+      ['email', '=', user.email],
+    ];
+
+    getOdooData(
+      'res.partner',
+      domain,
+      ['id', 'name', 'vat', 'ref', 'email'],
+      false,
+      false,
+      user.company_id,
+      async (partners: any) => {
+        if (!partners?.data?.length) {
+          resolve([]);
+          return;
+        }
+        resolve(partners.data.map((partner: any) => partner.id));
+      },
+      false
+    );
+  });
+}
+
+export async function getCustomerSalesNotes(user: any) {
+  if (user.role !== 'Cliente') {
+    return { status: false, message: 'Esta consulta esta disponible solo para usuarios Cliente.', data: [] };
+  }
+
+  const partnerIds = await getCustomerPartnerIds(user);
+  if (!partnerIds.length) {
+    return { status: false, message: 'No se encontro un cliente relacionado al documento o email del usuario.', data: [] };
+  }
+
+  return new Promise((resolve) => {
+    getOdooData(
+      'sale.order',
+      [['partner_id', 'in', partnerIds], ['state', 'not in', ['cancel']]],
+      ['id', 'name', 'partner_id', 'date_order', 'state', 'client_order_ref', 'amount_total'],
+      false,
+      'date_order desc',
+      user.company_id,
+      async (sales: any) => {
+        if (!sales?.data?.length) {
+          resolve({ status: true, message: '', data: [] });
+          return;
+        }
+
+        const saleNames = sales.data.map((sale: any) => sale.name);
+
+        getOdooData(
+          'mrp.production',
+          ['|', ['origin', 'in', saleNames], ['x_studio_po', 'in', saleNames]],
+          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'date_planned_start', 'date_planned_finished'],
+          false,
+          false,
+          user.company_id,
+          async (productions: any) => {
+            const productionData = productions?.data || [];
+            const productionIds = productionData.map((production: any) => production.id);
+
+            if (!productionIds.length) {
+              resolve({
+                status: true,
+                message: '',
+                data: sales.data.map((sale: any) => ({
+                  id: sale.id,
+                  name: sale.name,
+                  partner: asOdooName(sale.partner_id),
+                  date_order: sale.date_order,
+                  state: sale.state,
+                  client_order_ref: sale.client_order_ref,
+                  amount_total: sale.amount_total,
+                  progress: 0,
+                  production_count: 0,
+                  workorder_count: 0,
+                  productions: [],
+                })),
+              });
+              return;
+            }
+
+            getOdooData(
+              'mrp.workorder',
+              [['production_id', 'in', productionIds]],
+              ['id', 'name', 'state', 'production_id', 'workcenter_id', 'duration', 'duration_expected', 'date_planned_start', 'date_planned_finished'],
+              false,
+              false,
+              user.company_id,
+              async (workorders: any) => {
+                const workorderData = workorders?.data || [];
+
+                const data = sales.data.map((sale: any) => {
+                  const saleProductions = productionData.filter((production: any) => getProductionSaleKey(production) === sale.name);
+                  const productionsWithProgress = saleProductions.map((production: any) => {
+                    const productionWorkorders = workorderData.filter((workorder: any) => asOdooId(workorder.production_id) === production.id);
+
+                    return {
+                      ...production,
+                      product: asOdooName(production.product_id),
+                      progress: averageProgress(productionWorkorders),
+                      workorder_count: productionWorkorders.length,
+                      workorders: productionWorkorders,
+                    };
+                  });
+
+                  const saleWorkorders = productionsWithProgress.flatMap((production: any) => production.workorders);
+
+                  return {
+                    id: sale.id,
+                    name: sale.name,
+                    partner: asOdooName(sale.partner_id),
+                    date_order: sale.date_order,
+                    state: sale.state,
+                    client_order_ref: sale.client_order_ref,
+                    amount_total: sale.amount_total,
+                    progress: averageProgress(saleWorkorders),
+                    production_count: productionsWithProgress.length,
+                    workorder_count: saleWorkorders.length,
+                    productions: productionsWithProgress,
+                  };
+                });
+
+                resolve({ status: true, message: '', data });
+              },
+              false
+            );
+          },
+          false
+        );
+      },
+      false
+    );
+  }).catch((error) => {
+    console.log(error);
+    return { status: false, message: 'No se pudo consultar las notas de venta del cliente.', data: [] };
+  });
+}

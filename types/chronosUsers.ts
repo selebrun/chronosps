@@ -5,4 +5,5 @@ export interface ChronosUsers {
   name: string;
   rol: string;
   email: string;
+  original_code?: string;
 }

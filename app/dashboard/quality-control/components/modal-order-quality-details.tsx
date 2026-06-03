@@ -12,6 +12,7 @@ function ModalOrderQualityDetails({
   openJobDetail,
   selectedOrderQuantity,
   acceptOrder,
+  rejectOrder,
   user
 
 }: {
@@ -19,7 +20,8 @@ function ModalOrderQualityDetails({
   modalWorkOrderDetail: boolean;
   openJobDetail: () => void;
   selectedOrderQuantity: any
-  acceptOrder: () => void;
+  acceptOrder: () => Promise<any>
+  rejectOrder: () => Promise<any>
   user?: any;
 }) {
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
@@ -32,6 +34,7 @@ function ModalOrderQualityDetails({
   const [valueSelectMaterial, setvValueSelectMaterial] = useState('');
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const labels = {
     originalTitle: "Detalles de calidad",
@@ -90,6 +93,17 @@ function ModalOrderQualityDetails({
     setvValueTotalMaterial(e)
   }
 
+  const onExecuteQualityAction = async (action: "accept" | "reject") => {
+    setIsSubmitting(true)
+    const response = action === "accept" ? await acceptOrder() : await rejectOrder()
+
+    if (response?.status) {
+      openJobDetail()
+    }
+
+    setIsSubmitting(false)
+  }
+
 
   return (
     <>
@@ -140,8 +154,8 @@ function ModalOrderQualityDetails({
             </div>
           </div>
           <div className='mb-3'>
-            <button className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>{labels.aproveLabel}</button>
-            <button className='font-bold bg-red-500 p-3 rounded-md w-full mt-2'>{labels.declineLabel}</button>
+            <button disabled={isSubmitting} onClick={() => onExecuteQualityAction('accept')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50'>{labels.aproveLabel}</button>
+            <button disabled={isSubmitting} onClick={() => onExecuteQualityAction('reject')} className='font-bold bg-red-500 p-3 rounded-md w-full mt-2 disabled:opacity-50'>{labels.declineLabel}</button>
             {user?.role === "Calidad" && (
               <button onClick={() => {setModalIsMaterials(true), getMaterials()}} className='font-bold bg-[#1D4C92] text-white p-3 rounded-md w-full mt-2'>Materiales</button>
             )}

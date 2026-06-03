@@ -16,7 +16,9 @@ export function ModalOrderQuality({
   modalDetailsIsOpen,
   openJobDetail,
   selectedOrderQuantity,
-  acceptOrder
+  acceptOrder,
+  rejectOrder,
+  user
 }: 
 { selectedQualityDetails: (order: any) => void,
   orderQualityDetail: any, 
@@ -25,7 +27,9 @@ export function ModalOrderQuality({
   modalDetailsIsOpen: boolean,
   openJobDetail: any,
   selectedOrderQuantity:any,
-  acceptOrder: () => void
+  acceptOrder: () => Promise<any>,
+  rejectOrder: () => Promise<any>,
+  user: any
 }) {
 
 
@@ -38,6 +42,8 @@ export function ModalOrderQuality({
         orderQualityDetail={orderQualityDetail}
         selectedOrderQuantity={selectedOrderQuantity}
         acceptOrder={acceptOrder}
+        rejectOrder={rejectOrder}
+        user={user}
         />}
       <Modal setOpen={modalIsOpen} title='Controles de calidad' className='max-w-3xl'>
         <div className="flex justify-end relative bottom-10">

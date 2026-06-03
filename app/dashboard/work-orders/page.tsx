@@ -1,11 +1,13 @@
 import { getWorkOrders, getBlockReasons } from '@/app/api/orders/getOrders'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
+import { redirect } from 'next/navigation';
 import { WorkOrdersTable } from './components/work-orders-table';
 
 export default async function Page() {
   const session = await getServerSession(config);
   const user = session.user;
+  if (user.role === 'Calidad') redirect('/dashboard/quality-control');
   const odooOrders: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err));
   const blockReasons: any = await getBlockReasons(user).then( res => res).catch((err) => console.log(err))
 
