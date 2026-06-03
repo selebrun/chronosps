@@ -554,6 +554,146 @@ function getProductionSaleKey(production: any) {
   return normalizeText(production?.x_studio_po) || normalizeText(production?.origin);
 }
 
+function getOdooRecords(
+  model: string,
+  domain: any[],
+  fields: string[],
+  companyId: string,
+  order: any = false,
+): Promise<any[]> {
+  return new Promise((resolve) => {
+    getOdooData(
+      model,
+      domain,
+      fields,
+      false,
+      order,
+      companyId,
+      async (response: any) => {
+        resolve(response?.data || []);
+      },
+      false
+    );
+  });
+}
+
+function getProductionDirectSaleId(production: any, sales: any[]) {
+  const saleId = asOdooId(production?.sale_id);
+  if (saleId) return saleId;
+
+  const saleKey = getProductionSaleKey(production);
+  const sale = sales.find((item: any) => item.name === saleKey);
+  return sale?.id || null;
+}
+
+async function getProductionChildren(productions: any[], user: any) {
+  const productionsById = new Map(productions.map((production: any) => [production.id, production]));
+  let pendingNames = productions.map((production: any) => production.name).filter(Boolean);
+
+  for (let depth = 0; depth < 5 && pendingNames.length; depth += 1) {
+    const children = await getOdooRecords(
+      'mrp.production',
+      ['|', ['origin', 'in', pendingNames], ['x_studio_po', 'in', pendingNames]],
+      ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
+      user.company_id
+    );
+
+    const newChildren = children.filter((production: any) => !productionsById.has(production.id));
+    newChildren.forEach((production: any) => productionsById.set(production.id, production));
+    pendingNames = newChildren.map((production: any) => production.name).filter(Boolean);
+  }
+
+  return Array.from(productionsById.values());
+}
+
+function getProductionSaleMap(productions: any[], sales: any[]) {
+  const productionSaleMap = new Map<number, number>();
+  const productionByName = new Map(productions.map((production: any) => [production.name, production]));
+
+  productions.forEach((production: any) => {
+    const saleId = getProductionDirectSaleId(production, sales);
+    if (saleId) productionSaleMap.set(production.id, saleId);
+  });
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+
+    productions.forEach((production: any) => {
+      if (productionSaleMap.has(production.id)) return;
+
+      const parentKey = getProductionSaleKey(production);
+      const parent = productionByName.get(parentKey);
+      const parentSaleId = parent ? productionSaleMap.get(parent.id) : null;
+
+      if (parentSaleId) {
+        productionSaleMap.set(production.id, parentSaleId);
+        changed = true;
+      }
+    });
+  }
+
+  return productionSaleMap;
+}
+
+function buildSaleProductRows(sale: any, saleLines: any[], productions: any[], workorders: any[]) {
+  const lines = saleLines.filter((line: any) => asOdooId(line.order_id) === sale.id && asOdooId(line.product_id));
+
+  if (!lines.length) {
+    const productionProducts = new Map<number, any>();
+
+    productions.forEach((production: any) => {
+      const productId = asOdooId(production.product_id);
+      if (!productId || productionProducts.has(productId)) return;
+
+      productionProducts.set(productId, {
+        id: `production-product-${productId}`,
+        product_id: productId,
+        product: asOdooName(production.product_id),
+        quantity: productions
+          .filter((item: any) => asOdooId(item.product_id) === productId)
+          .reduce((sum: number, item: any) => sum + (Number(item.product_qty) || 0), 0),
+      });
+    });
+
+    return Array.from(productionProducts.values()).map((product: any) => {
+      const productProductions = productions.filter((production: any) => asOdooId(production.product_id) === product.product_id);
+      const productWorkorders = workorders.filter((workorder: any) =>
+        productProductions.some((production: any) => production.id === asOdooId(workorder.production_id))
+      );
+
+      return {
+        ...product,
+        progress: averageProgress(productWorkorders),
+        production_count: productProductions.length,
+        workorder_count: productWorkorders.length,
+        productions: productProductions,
+      };
+    });
+  }
+
+  return lines.map((line: any) => {
+    const productId = asOdooId(line.product_id);
+    const productProductions = productions.filter((production: any) => asOdooId(production.product_id) === productId);
+    const productWorkorders = workorders.filter((workorder: any) =>
+      productProductions.some((production: any) => production.id === asOdooId(workorder.production_id))
+    );
+
+    return {
+      id: line.id,
+      product_id: productId,
+      product: asOdooName(line.product_id) || line.name,
+      description: line.name,
+      quantity: line.product_uom_qty,
+      delivered_quantity: line.qty_delivered,
+      progress: averageProgress(productWorkorders),
+      production_count: productProductions.length,
+      workorder_count: productWorkorders.length,
+      productions: productProductions,
+    };
+  });
+}
+
 async function getCustomerPartnerIds(user: any): Promise<number[]> {
   return new Promise((resolve) => {
     const domain = [
@@ -607,17 +747,23 @@ export async function getCustomerSalesNotes(user: any) {
           return;
         }
 
+        const saleIds = sales.data.map((sale: any) => sale.id);
         const saleNames = sales.data.map((sale: any) => sale.name);
-
-        getOdooData(
+        const saleLines = await getOdooRecords(
+          'sale.order.line',
+          [['order_id', 'in', saleIds], ['display_type', '=', false]],
+          ['id', 'order_id', 'name', 'product_id', 'product_uom_qty', 'qty_delivered'],
+          user.company_id
+        );
+        const directProductions = await getOdooRecords(
           'mrp.production',
-          ['|', ['origin', 'in', saleNames], ['x_studio_po', 'in', saleNames]],
-          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'date_planned_start', 'date_planned_finished'],
-          false,
-          false,
-          user.company_id,
-          async (productions: any) => {
-            const productionData = productions?.data || [];
+          ['|', '|', ['sale_id', 'in', saleIds], ['origin', 'in', saleNames], ['x_studio_po', 'in', saleNames]],
+          ['id', 'name', 'state', 'product_id', 'product_qty', 'qty_producing', 'origin', 'x_studio_po', 'sale_id', 'date_planned_start', 'date_planned_finished'],
+          user.company_id
+        );
+
+        const productionData = await getProductionChildren(directProductions, user);
+        const productionSaleMap = getProductionSaleMap(productionData, sales.data);
             const productionIds = productionData.map((production: any) => production.id);
 
             if (!productionIds.length) {
@@ -635,6 +781,7 @@ export async function getCustomerSalesNotes(user: any) {
                   progress: 0,
                   production_count: 0,
                   workorder_count: 0,
+                  products: buildSaleProductRows(sale, saleLines, [], []),
                   productions: [],
                 })),
               });
@@ -652,7 +799,7 @@ export async function getCustomerSalesNotes(user: any) {
                 const workorderData = workorders?.data || [];
 
                 const data = sales.data.map((sale: any) => {
-                  const saleProductions = productionData.filter((production: any) => getProductionSaleKey(production) === sale.name);
+                  const saleProductions = productionData.filter((production: any) => productionSaleMap.get(production.id) === sale.id);
                   const productionsWithProgress = saleProductions.map((production: any) => {
                     const productionWorkorders = workorderData.filter((workorder: any) => asOdooId(workorder.production_id) === production.id);
 
@@ -666,6 +813,7 @@ export async function getCustomerSalesNotes(user: any) {
                   });
 
                   const saleWorkorders = productionsWithProgress.flatMap((production: any) => production.workorders);
+                  const saleProducts = buildSaleProductRows(sale, saleLines, productionsWithProgress, saleWorkorders);
 
                   return {
                     id: sale.id,
@@ -678,6 +826,7 @@ export async function getCustomerSalesNotes(user: any) {
                     progress: averageProgress(saleWorkorders),
                     production_count: productionsWithProgress.length,
                     workorder_count: saleWorkorders.length,
+                    products: saleProducts,
                     productions: productionsWithProgress,
                   };
                 });
@@ -686,9 +835,6 @@ export async function getCustomerSalesNotes(user: any) {
               },
               false
             );
-          },
-          false
-        );
       },
       false
     );
