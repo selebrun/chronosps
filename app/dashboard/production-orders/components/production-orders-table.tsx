@@ -94,10 +94,12 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
 
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
+    const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
+
     // Validation for start action
     if (action === 'start_work_order') {
       // Check if operator is assigned
-      if (!orderWorkDetail[0]?.employee_assigned_ids || orderWorkDetail[0]?.employee_assigned_ids.length === 0) {
+      if (!currentWorkOrder?.employee_assigned_ids || currentWorkOrder?.employee_assigned_ids.length === 0) {
         setError('No hay operario asignado a esta orden de trabajo. Asigne un operario antes de iniciar.')
         setTimeout(() => {
           setError('')
@@ -117,20 +119,19 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
-    console.log("Aquiii")
-    const update = await updateOrder(user, orderWorkDetail[0], action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
-    console.log(update?.status)
+    const update = await updateOrder(user, currentWorkOrder, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
 
-      let orderWorkSelected1 = orderWorkSelected;
+      let orderWorkSelected1 = currentWorkOrder;
       if (action === 'finish_work_order') {
-        orderWorkSelected1 = {...orderWorkSelected, state: 'completed'}
+        orderWorkSelected1 = {...currentWorkOrder, state: 'completed'}
       } else {
-        orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === orderWorkSelected.id)
+        orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === currentWorkOrder.id)
       }
 
+      seOrderWorkSelected(orderWorkSelected1)
       setShowDetailOrderWork(orderWorkSelected1)
       setOrderWorkDetail(dateilOrden)
       setOrdersWork(odooOrdersWork)
