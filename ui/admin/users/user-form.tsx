@@ -25,12 +25,13 @@ export function ChronosUsersForm({
     name: user?.name?.trim() || '',
     rol: user?.rol?.trim() || '',
     email: user?.email?.trim() || '',
+    materiales: Boolean(user?.materiales),
     original_code: user?.code?.trim() || '',
   });
 
   const handleChange = (e: any) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const { name, value, type, checked } = e.target;
+    setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
   };
 
   const getErrorMessage = async (response: Response, fallback: string) => {
@@ -206,6 +207,16 @@ export function ChronosUsersForm({
             <option value={'Cliente'}>Cliente</option>
         </select>
       </div>
+      <label className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input
+          type="checkbox"
+          name="materiales"
+          checked={Boolean(formData.materiales)}
+          onChange={handleChange}
+          className="h-4 w-4"
+        />
+        Permite agregar materiales
+      </label>
       <button
         type="submit"
         className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'

@@ -5,5 +5,6 @@ export interface ChronosUsers {
   name: string;
   rol: string;
   email: string;
+  materiales?: boolean;
   original_code?: string;
 }

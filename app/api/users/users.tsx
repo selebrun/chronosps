@@ -132,12 +132,12 @@ export async function createUsers(user: any) {
     await client.connect();
 
     const query = `
-      INSERT INTO users (code, email, id_company, name, password, rol)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO users (code, email, id_company, name, password, rol, materiales)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
     `;
 
-    const { code, email, id_company, name, password, rol } = user;
+    const { code, email, id_company, name, password, rol, materiales } = user;
     const result = await client.query(query, [
       code,
       email,
@@ -145,6 +145,7 @@ export async function createUsers(user: any) {
       name,
       password,
       rol,
+      Boolean(materiales),
     ]);
 
     newUser = result.rows[0];
@@ -172,12 +173,13 @@ export async function updateUsers(user: any) {
           id_company = $3,
           name = $4,
           password = $5,
-          rol = $6
-      WHERE code = $7
+          rol = $6,
+          materiales = $7
+      WHERE code = $8
       RETURNING *
     `;
 
-    const { code, email, id_company, name, password, rol } = user;
+    const { code, email, id_company, name, password, rol, materiales } = user;
     const lookupCode = user.original_code || code;
 
     const result = await client.query(query, [
@@ -187,6 +189,7 @@ export async function updateUsers(user: any) {
       name,
       password,
       rol,
+      Boolean(materiales),
       lookupCode,
     ]);
 
