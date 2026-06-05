@@ -95,6 +95,10 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     return normalizedMessage.includes('calidad') || normalizedMessage.includes('quality');
   }
 
+  const getQualityPauseMessage = (message: string) => {
+    return `${message.replace('usando el taller', 'usando el módulo de calidad')} La orden de trabajo fue pausada para realizar los controles de calidad.`
+  }
+
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     // Validation for start action
     if (action === 'start_work_order') {
@@ -144,7 +148,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
           getDetailOrderWork(refreshedOrder)
         }
         if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
-        setQualityPauseMessage(`${message} La orden de trabajo fue pausada para realizar los controles de calidad.`)
+        setQualityPauseMessage(getQualityPauseMessage(message))
         setLoadigAction(false)
         return
       }
