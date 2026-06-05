@@ -28,6 +28,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
   const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
   const [error, setError] = useState<string>('');
+  const [qualityPauseMessage, setQualityPauseMessage] = useState<string>('');
 
 
   useEffect(()=>{
@@ -89,6 +90,11 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
 
+  const isQualityControlError = (message: string) => {
+    const normalizedMessage = (message || '').toLowerCase();
+    return normalizedMessage.includes('calidad') || normalizedMessage.includes('quality');
+  }
+
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     // Validation for start action
     if (action === 'start_work_order') {
@@ -115,7 +121,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     setModalIsOpenBlocks(false)
     const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
 
-    if (update.status) {
+    if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       let orderWorkSelected = orderSelected;
       if (action === 'finish_work_order') {
@@ -128,7 +134,22 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
     } else {
-      setError(update.faultString || update.message)
+      const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
+      if (action === 'finish_work_order' && isQualityControlError(message)) {
+        await updateOrder(user, orderSelected, 'stop_work_order').then(res => res).catch((err) => console.log(err))
+        const odooOrdersWork: any = await getWorkOrders(user).then(res => res).catch((err) => console.log(err))
+        const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id)
+        if (refreshedOrder) {
+          setOrderSelected(refreshedOrder)
+          getDetailOrderWork(refreshedOrder)
+        }
+        if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
+        setQualityPauseMessage(`${message} La orden de trabajo fue pausada para realizar los controles de calidad.`)
+        setLoadigAction(false)
+        return
+      }
+
+      setError(message)
       setTimeout(() => {
         setError('')
       }, 4000);
@@ -219,6 +240,8 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          setDisabledBtnSaveMaterial={setDisabledBtnSaveMaterial}
          user={user}
          error={error}
+         qualityPauseMessage={qualityPauseMessage}
+         onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">

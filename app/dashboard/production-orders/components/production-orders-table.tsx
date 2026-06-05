@@ -33,6 +33,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
   const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
   const [error, setError] = useState<string>('');
+  const [qualityPauseMessage, setQualityPauseMessage] = useState<string>('');
   
   useEffect(()=>{
     if(!user.materiales) {
@@ -92,6 +93,10 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     setModalIsOpenInstructions(!modalIsOpenInstructions)
   }
 
+  const isQualityControlError = (message: string) => {
+    const normalizedMessage = (message || '').toLowerCase();
+    return normalizedMessage.includes('calidad') || normalizedMessage.includes('quality');
+  }
 
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
     const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
@@ -137,7 +142,24 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
     } else {
-      setError(update.faultString || update.message)
+      const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
+      if (action === 'finish_work_order' && isQualityControlError(message)) {
+        await updateOrder(user, currentWorkOrder, 'stop_work_order').then(res => res).catch((err) => console.log(err))
+        const odooOrdersWork: any = await getWorkOrders(user).then(res => res).catch((err) => console.log(err))
+        const dateilOrden = odooOrdersWork?.data?.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
+        const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id)
+        if (refreshedOrder) {
+          seOrderWorkSelected(refreshedOrder)
+          setShowDetailOrderWork(refreshedOrder)
+        }
+        if (dateilOrden) setOrderWorkDetail(dateilOrden)
+        if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
+        setQualityPauseMessage(`${message} La orden de trabajo fue pausada para realizar los controles de calidad.`)
+        setLoadigAction(false)
+        return
+      }
+
+      setError(message)
       setTimeout(() => {
         setError('')
       }, 4000);
@@ -255,6 +277,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          setDisabledBtnSaveMaterial={setDisabledBtnSaveMaterial}
          user={user}
          error={error}
+         qualityPauseMessage={qualityPauseMessage}
+         onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
         />
       }
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
