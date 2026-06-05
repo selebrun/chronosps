@@ -1,6 +1,33 @@
 'use server'
 import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
 
+function createOdooDataWithTimeout(model: string, values: any, companyId: string, timeoutMs = 25000): Promise<any> {
+  return new Promise((resolve) => {
+    let resolved = false;
+    const timeout = setTimeout(() => {
+      if (resolved) return;
+      resolved = true;
+      resolve({
+        status: false,
+        message: 'Odoo no respondio al guardar el material. Revise si la accion remota se creo o si el modulo quedo procesando.',
+      });
+    }, timeoutMs);
+
+    createOdooData(
+      model,
+      values,
+      companyId,
+      (data: any) => {
+        if (resolved) return;
+        resolved = true;
+        clearTimeout(timeout);
+        resolve(data);
+      },
+      false
+    );
+  });
+}
+
 export async function getMaterialsOrder(user: any, move_raw_ids: any): Promise<any> {
   return new Promise(async (resolve) => {
     getOdooData(
@@ -46,7 +73,7 @@ export async function saveMaterialsOrder(
     }
 
     const values = {
-      x_studio_ejecutado_por: user.odoo_id,
+      x_studio_ejecutado_por: '1',
       x_studio_workorder_id: workorder_id,
       x_studio_production: production_id,
       x_studio_accion_a_ejecutar: 'new_material',
@@ -63,21 +90,19 @@ export async function saveMaterialsOrder(
       product_qty,
     });
 
-    createOdooData(
+    const materialsResult = await createOdooDataWithTimeout(
       'x_acciones_remotas',
       values,
-      user.company_id,
-      async (materialsResult: any) => {
-        if (!materialsResult || !materialsResult.status) {
-          return resolve({
-            status: false,
-            message: materialsResult?.message || 'Ocurrio un error al agregar el material en Odoo.',
-          });
-        }
-
-        return resolve({ status: true, message: 'Agregado' });
-      },
-      false
+      user.company_id
     );
+
+    console.log('Material adicional: respuesta accion remota', materialsResult);
+
+    if (!materialsResult || !materialsResult.status) {
+      const message = materialsResult?.message?.faultString || materialsResult?.message || 'Ocurrio un error al agregar el material en Odoo.';
+      return resolve({ status: false, message });
+    }
+
+    return resolve({ status: true, message: 'Agregado' });
   });
 }
