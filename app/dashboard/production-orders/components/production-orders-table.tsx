@@ -163,7 +163,18 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const onSaveMaterialsOrder = async () => {
     setLoadigSaveMaterials(true)
     try {
-      const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.additional_quantity)
+      const data = await saveMaterialsOrder(
+        user,
+        orderWorkSelected.id,
+        orderProductionSelected.id,
+        orderMaterialsSelected.product_id[0],
+        orderMaterialsSelected.product_uom[0],
+        orderMaterialsSelected.additional_quantity,
+        orderMaterialsSelected.location_id[0],
+        orderMaterialsSelected.location_dest_id[0],
+        orderMaterialsSelected.company_id[0],
+        orderMaterialsSelected.product_id[1]
+      )
 
       if (data?.status) {
         setDisabledBtnSaveMaterial(true)
