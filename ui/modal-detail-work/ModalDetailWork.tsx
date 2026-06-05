@@ -338,6 +338,7 @@ export function ModalDetailWork({
               <span className="ml-2">Cargando ...</span>
             </div>}
         {!user.materiales && <div className='pb-5'>Su usuario no tiene permitido añadir materiales adicionales al BOM. Contacte con un supervisor.</div>}
+        {error !== '' && <div className='mb-5 font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>{error}</div>}
         <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
           <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
             {materials.length > 0 && 

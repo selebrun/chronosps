@@ -162,19 +162,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
   const onSaveMaterialsOrder = async () => {
     setLoadigSaveMaterials(true)
-    const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.additional_quantity)
+    try {
+      const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.additional_quantity)
 
-    if (data?.status) {
-      setLoadigSaveMaterials(false)
-      setDisabledBtnSaveMaterial(true)
-      setModalIsMaterials(false)
-      setOrderMaterialsSelected({})
-    } else {
-      setLoadigSaveMaterials(false)
-      setError(data?.message || 'No se pudo agregar el material.')
+      if (data?.status) {
+        setDisabledBtnSaveMaterial(true)
+        setModalIsMaterials(false)
+        setOrderMaterialsSelected({})
+      } else {
+        setError(data?.message || 'No se pudo agregar el material.')
+        setTimeout(() => {
+          setError('')
+        }, 5000);
+      }
+    } catch (error: any) {
+      setError(error?.message || 'No se pudo agregar el material.')
       setTimeout(() => {
         setError('')
       }, 5000);
+    } finally {
+      setLoadigSaveMaterials(false)
     }
   }
 
