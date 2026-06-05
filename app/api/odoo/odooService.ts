@@ -110,6 +110,20 @@ export async function createOdooData(pModel: any, pData: any, company_id: any, c
 	},userAdmin)
 }
 
+export async function executeOdooMethod(pModel: any, method: any, args: any[], company_id: any, callback: any) {
+	const params = [];
+	params.push(args);
+
+	await odooRequest(pModel, method, params, company_id, (res: any) => {
+		const faultString = res?.message?.faultString || res?.message?.message || res?.message || '';
+		if (!res?.status && typeof faultString === 'string' && faultString.includes('cannot marshal None')) {
+			callback({ status: true, data: true });
+			return;
+		}
+		callback(res)
+	}, false)
+}
+
 export async function countOdooData(pModel: any, pFilter: any, pFields: any, company_id: any, callback: any) {
 	var inParams, params;
 	const action = 'search_count'

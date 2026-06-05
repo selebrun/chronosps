@@ -1,31 +1,14 @@
 'use server'
-import { getOdooData, createOdooData } from '@/app/api/odoo/odooService';
+import { createOdooData, executeOdooMethod, getOdooData } from '@/app/api/odoo/odooService';
 
-function createOdooDataWithTimeout(model: string, values: any, companyId: string, timeoutMs = 25000): Promise<any> {
+function callOdooMethod(model: string, method: string, args: any[], companyId: string): Promise<any> {
   return new Promise((resolve) => {
-    let resolved = false;
-    const timeout = setTimeout(() => {
-      if (resolved) return;
-      resolved = true;
-      resolve({
-        status: false,
-        message: 'Odoo no respondio al guardar el material. Revise si la accion remota se creo o si el modulo quedo procesando.',
-      });
-    }, timeoutMs);
-
-    createOdooData(
-      model,
-      values,
-      companyId,
-      (data: any) => {
-        if (resolved) return;
-        resolved = true;
-        clearTimeout(timeout);
-        resolve(data);
-      },
-      false
-    );
+    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data));
   });
+}
+
+function getOdooError(data: any, fallback: string) {
+  return data?.message?.faultString || data?.message || fallback;
 }
 
 export async function getMaterialsOrder(user: any, move_raw_ids: any): Promise<any> {
@@ -33,7 +16,7 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any): Promise<a
     getOdooData(
       'stock.move',
       [['id', 'in', move_raw_ids]],
-      ['id', 'product_id', 'location_id', 'product_uom_qty', 'product_uom', 'forecast_availability'],
+      ['id', 'name', 'product_id', 'location_id', 'location_dest_id', 'company_id', 'product_uom_qty', 'product_uom', 'forecast_availability'],
       false,
       false,
       user.company_id,
@@ -55,7 +38,11 @@ export async function saveMaterialsOrder(
   production_id: any,
   product_id: any,
   uom: any,
-  product_qty: any
+  product_qty: any,
+  location_id: any,
+  location_dest_id: any,
+  company_id: any,
+  product_name?: string
 ): Promise<any> {
   return new Promise(async (resolve) => {
     if (!user.materiales) {
@@ -65,7 +52,7 @@ export async function saveMaterialsOrder(
       });
     }
 
-    if (!workorder_id || !production_id || !product_id || !uom || !product_qty) {
+    if (!workorder_id || !production_id || !product_id || !uom || !product_qty || !location_id || !location_dest_id || !company_id) {
       return resolve({
         status: false,
         message: 'Faltan datos para agregar el material a la orden de produccion.',
@@ -73,36 +60,37 @@ export async function saveMaterialsOrder(
     }
 
     const values = {
-      x_studio_ejecutado_por: '1',
-      x_studio_workorder_id: workorder_id,
-      x_studio_production: production_id,
-      x_studio_accion_a_ejecutar: 'new_material',
-      x_studio_new_material: product_id,
-      x_studio_new_material_qty: product_qty,
-      x_studio_new_material_uom: uom,
+      name: product_name || 'Material adicional',
+      product_id,
+      product_uom_qty: Number(product_qty),
+      product_uom: uom,
+      location_id,
+      location_dest_id,
+      raw_material_production_id: production_id,
+      workorder_id,
+      company_id,
+      procure_method: 'make_to_stock',
     };
 
-    console.log('Material adicional: creando accion remota', {
-      workorder_id,
-      production_id,
-      product_id,
-      uom,
-      product_qty,
-    });
-
-    const materialsResult = await createOdooDataWithTimeout(
-      'x_acciones_remotas',
+    createOdooData(
+      'stock.move',
       values,
-      user.company_id
+      user.company_id,
+      async (moveResult: any) => {
+        if (!moveResult || !moveResult.status) {
+          const message = getOdooError(moveResult, 'Ocurrio un error al agregar el material en Odoo.');
+          return resolve({ status: false, message });
+        }
+
+        const assignResult = await callOdooMethod('mrp.production', 'action_assign', [[production_id]], user.company_id);
+        if (!assignResult?.status) {
+          const message = getOdooError(assignResult, 'El material fue creado, pero no se pudo actualizar la disponibilidad de la OP.');
+          return resolve({ status: false, message });
+        }
+
+        return resolve({ status: true, message: 'Agregado', data: moveResult.data });
+      },
+      false
     );
-
-    console.log('Material adicional: respuesta accion remota', materialsResult);
-
-    if (!materialsResult || !materialsResult.status) {
-      const message = materialsResult?.message?.faultString || materialsResult?.message || 'Ocurrio un error al agregar el material en Odoo.';
-      return resolve({ status: false, message });
-    }
-
-    return resolve({ status: true, message: 'Agregado' });
   });
 }
