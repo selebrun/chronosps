@@ -33,7 +33,9 @@ export function ModalDetailWork({
   disabledBtnSaveMaterial,
   setDisabledBtnSaveMaterial,
   user,
-  error
+  error,
+  qualityPauseMessage,
+  onCloseQualityPauseMessage
 }: {
   modalIsOpenJobDetail: boolean
   showDetailOrderWork?: any 
@@ -62,6 +64,8 @@ export function ModalDetailWork({
   setDisabledBtnSaveMaterial: any
   user: any
   error: string
+  qualityPauseMessage?: string
+  onCloseQualityPauseMessage?: () => void
 }) {
   const [valueSelect, setValueSelect] = useState('');
   const [qtyDone, setQtyDone] = useState<number>(orderProductionSelected?.product_qty || 0 );
@@ -135,6 +139,22 @@ export function ModalDetailWork({
 
   return (
     <>
+      <Modal setOpen={Boolean(qualityPauseMessage)} title='Control de calidad pendiente' className='max-w-md'>
+        <div className="text-gray-900">
+          <div className="mb-5 rounded-md bg-[#A9D1DC] p-4 font-medium">
+            {qualityPauseMessage}
+          </div>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={onCloseQualityPauseMessage}
+              className="font-bold bg-[#2FD28E] p-3 rounded-md w-full"
+            >
+              Aceptar
+            </button>
+          </div>
+        </div>
+      </Modal>
       <Modal setOpen={modalIsOpenInstructions} title='Instrucciones' className='max-w-3xl'>
         <div className="flex justify-end relative bottom-10">
           <button
