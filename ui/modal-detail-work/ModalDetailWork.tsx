@@ -104,6 +104,19 @@ export function ModalDetailWork({
       .join(':');
   }
 
+  const formatDurationFromMinutes = (durationMinutes: any, fallback = '') => {
+    const minutes = Number(durationMinutes);
+
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      return fallback || 'No definida';
+    }
+
+    return formatElapsedTime(Math.round(minutes * 60));
+  }
+
+  const theoreticalDuration = formatDurationFromMinutes(showDetailOrderWork?.duration_expected, showDetailOrderWork?.theoretical_duration);
+  const realDuration = formatElapsedTime(elapsedSeconds);
+
   const renderButtons = (showDetailOrderWork: any) => {
     const isBlocked = showDetailOrderWork.working_state === "blocked";
     const isUserWorking = showDetailOrderWork.is_user_working;
@@ -244,15 +257,11 @@ export function ModalDetailWork({
                     </div>
                     <div className=''>
                         <div className='font-bold text-center'>Duración teorica</div>
-                        <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.theoretical_duration}</div>
+                        <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-mono text-lg'>{theoreticalDuration}</div>
                     </div>
                     <div className=''>
                         <div className='font-bold text-center'>Duración real</div>
-                        <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center'>{showDetailOrderWork?.real_duration}</div>
-                    </div>
-                    <div className=''>
-                        <div className='font-bold text-center'>Reloj de avance</div>
-                        <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center font-mono text-lg'>{formatElapsedTime(elapsedSeconds)}</div>
+                        <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center font-mono text-lg'>{realDuration}</div>
                     </div>
                     <div className=''>
                         <div className='font-bold text-center'>Centro de trabajo</div>
