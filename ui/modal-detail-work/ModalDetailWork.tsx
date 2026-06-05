@@ -76,8 +76,9 @@ export function ModalDetailWork({
   const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && showDetailOrderWork?.working_state !== 'blocked' && !showDetailOrderWork?.state?.includes('done'));
   const baseElapsedSeconds = Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60));
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
-  const expectedSeconds = Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 1);
-  const visualProgress = Math.min(Math.floor((elapsedSeconds / expectedSeconds) * 100), 100) || progress || 0;
+  const expectedSeconds = Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
+  const realProgress = expectedSeconds > 0 ? Math.floor((elapsedSeconds / expectedSeconds) * 100) : progress || 0;
+  const progressBarWidth = Math.min(Math.max(realProgress, 0), 100);
 
   useEffect(() => {
     setElapsedSeconds(baseElapsedSeconds);
@@ -280,11 +281,11 @@ export function ModalDetailWork({
             <div className='flex mt-5 '>
               <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.state} /></div>
               <div className='w-[50vh] mr-5'>
-                <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {visualProgress}%</div>
+                <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {realProgress}%</div>
                 <div className='w-full bg-gray-300 rounded-full h-4'>
                   <div 
                     className='bg-[#2FD28E] h-4 rounded-full transition-all duration-300' 
-                    style={{width: `${visualProgress}%`}}
+                    style={{width: `${progressBarWidth}%`}}
                   ></div>
                 </div>
               </div>
