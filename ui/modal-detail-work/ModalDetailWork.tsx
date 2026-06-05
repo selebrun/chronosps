@@ -142,9 +142,13 @@ export function ModalDetailWork({
       buttons.push(<div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>)
     }
   
-    // Pause and Done buttons shown only when actively working
+    // Pause is only available while the timer is running.
     if (!isBlocked && isUserWorking) {
       buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Pausar</button></div>)
+    }
+
+    // Done is available while running or paused; Odoo validates quality and final state.
+    if (!isBlocked && (isUserWorking || isPaused)) {
       buttons.push(<div className="mb-3"><button key="done" onClick={() => setModalIsOpenCompleteOrder(true)} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Hecho</button></div>)
     }
   
