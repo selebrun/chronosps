@@ -25,7 +25,7 @@ export function ChronosUsersForm({
     name: user?.name?.trim() || '',
     rol: user?.rol?.trim() || '',
     email: user?.email?.trim() || '',
-    materiales: Boolean(user?.materiales),
+    x_studio_new_material: Boolean(user?.x_studio_new_material),
     original_code: user?.code?.trim() || '',
   });
 
@@ -210,8 +210,8 @@ export function ChronosUsersForm({
       <label className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-700">
         <input
           type="checkbox"
-          name="materiales"
-          checked={Boolean(formData.materiales)}
+          name="x_studio_new_material"
+          checked={Boolean(formData.x_studio_new_material)}
           onChange={handleChange}
           className="h-4 w-4"
         />

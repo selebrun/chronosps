@@ -77,7 +77,7 @@ export const config = {
             odoo_user_id: odoo_user_id,
             document: user?.code?.trim(),
             role: user?.rol?.trim(),
-            materiales: Boolean(user?.materiales),
+            materiales: Boolean(user?.x_studio_new_material),
           }
       
           return user_data as any;
