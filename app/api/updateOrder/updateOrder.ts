@@ -118,6 +118,15 @@ export async function updateOrder(
     }
 
     let response: any;
+    console.log('Accion OT directa', {
+      action,
+      workorder_id: work_order.id,
+      workorder_name: work_order.name,
+      workorder_state: work_order.state,
+      working_state: work_order.working_state,
+      production_id: work_order.production_id?.[0],
+    });
+
     switch (action) {
       case 'start_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id);

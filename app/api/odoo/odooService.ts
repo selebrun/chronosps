@@ -44,6 +44,11 @@ async function odooRequest(
         } else {
             odoo.execute_kw(pModel, action, params, function (pError: any, result: any) {
                 if (pError) {
+                    const faultString = pError?.faultString || pError?.message || '';
+                    if (typeof faultString === 'string' && faultString.includes('cannot marshal None')) {
+                        callback({status: true, data: true})
+                        return
+                    }
                     console.log(pError)
                     callback({status: false, message: pError})
                 } else {
