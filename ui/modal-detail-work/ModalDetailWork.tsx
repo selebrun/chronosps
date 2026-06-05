@@ -363,7 +363,7 @@ export function ModalDetailWork({
                       <td className="px-3 py-2">
                         {material?.product_id[1]}
                       </td>
-                      <td className="px-3 py-2">{ Math.floor(material?.quantity_done)}</td>
+                      <td className="px-3 py-2">{ Math.floor(material?.product_uom_qty || 0)}</td>
                       <td className="px-3 py-2">{material?.product_uom[1]}</td>
                       <td className="px-3 py-2">{material?.location_id[1]}</td>
                       

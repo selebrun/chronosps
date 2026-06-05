@@ -6,7 +6,7 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any): Promise<a
     getOdooData(
       'stock.move',
       [['id', 'in', move_raw_ids]],
-      ['id', 'product_id', 'location_id', 'product_uom_qty', 'product_uom', 'forecast_availability', 'quantity_done'],
+      ['id', 'product_id', 'location_id', 'product_uom_qty', 'product_uom', 'forecast_availability'],
       false,
       false,
       user.company_id,
