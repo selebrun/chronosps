@@ -155,15 +155,14 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const onAddMaterial = async (material: any, total: number) => { 
     const objeto = { material: material }; 
     const materialSelected = materials.find((material: any) => material.id === parseInt(objeto.material))
-    materialSelected.product_uom_qty = total
-    materialSelected.quantity_done = total
+    materialSelected.additional_quantity = Number(total)
     setOrderMaterialsSelected(materialSelected)
     setDisabledBtnSaveMaterial(false)
   }
 
   const onSaveMaterialsOrder = async () => {
     setLoadigSaveMaterials(true)
-    const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.quantity_done)
+    const data = await saveMaterialsOrder(user, orderWorkSelected.id, orderProductionSelected.id, orderMaterialsSelected.product_id[0], orderMaterialsSelected.product_uom[0], orderMaterialsSelected.additional_quantity)
 
     if (data?.status) {
       setLoadigSaveMaterials(false)
