@@ -137,7 +137,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       if (action === 'finish_work_order') {
         orderWorkSelected1 = {...currentWorkOrder, state: 'completed'}
       } else {
-        orderWorkSelected1 = odooOrdersWork.data.find((item: any) => item.id === currentWorkOrder.id)
+        orderWorkSelected1 = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id) || currentWorkOrder
       }
 
       seOrderWorkSelected(orderWorkSelected1)

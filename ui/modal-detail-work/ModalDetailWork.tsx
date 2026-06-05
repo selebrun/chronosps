@@ -1,5 +1,5 @@
 "use client"
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal } from "@/ui/modal/modal"
 import Image from 'next/image'
 import close from '@/public/close.png'
@@ -73,6 +73,36 @@ export function ModalDetailWork({
   const [valueSelectMaterial, setvValueSelectMaterial] = useState('');
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
+  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && showDetailOrderWork?.working_state !== 'blocked' && !showDetailOrderWork?.state?.includes('done'));
+  const baseElapsedSeconds = Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60));
+  const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
+  const expectedSeconds = Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 1);
+  const visualProgress = Math.min(Math.floor((elapsedSeconds / expectedSeconds) * 100), 100) || progress || 0;
+
+  useEffect(() => {
+    setElapsedSeconds(baseElapsedSeconds);
+  }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
+
+  useEffect(() => {
+    if (!isTimerRunning) return;
+
+    const timer = window.setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isTimerRunning, showDetailOrderWork?.id]);
+
+  const formatElapsedTime = (totalSeconds: number) => {
+    const seconds = Math.max(0, Math.floor(totalSeconds));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainingSeconds = seconds % 60;
+
+    return [hours, minutes, remainingSeconds]
+      .map((value) => value.toString().padStart(2, '0'))
+      .join(':');
+  }
 
   const renderButtons = (showDetailOrderWork: any) => {
     const isBlocked = showDetailOrderWork.working_state === "blocked";
@@ -221,6 +251,10 @@ export function ModalDetailWork({
                         <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center'>{showDetailOrderWork?.real_duration}</div>
                     </div>
                     <div className=''>
+                        <div className='font-bold text-center'>Reloj de avance</div>
+                        <div className='bg-whiteInput shadow-md p-2 rounded-md h-10 text-center font-mono text-lg'>{formatElapsedTime(elapsedSeconds)}</div>
+                    </div>
+                    <div className=''>
                         <div className='font-bold text-center'>Centro de trabajo</div>
                         <div className='bg-whiteInput shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.workcenter_id[1]}</div>
                     </div>
@@ -237,11 +271,11 @@ export function ModalDetailWork({
             <div className='flex mt-5 '>
               <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.state} /></div>
               <div className='w-[50vh] mr-5'>
-                <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {progress}%</div>
+                <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {visualProgress}%</div>
                 <div className='w-full bg-gray-300 rounded-full h-4'>
                   <div 
                     className='bg-[#2FD28E] h-4 rounded-full transition-all duration-300' 
-                    style={{width: `${progress}%`}}
+                    style={{width: `${visualProgress}%`}}
                   ></div>
                 </div>
               </div>

@@ -131,9 +131,10 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       if (action === 'finish_work_order') {
         orderWorkSelected = {...orderWorkSelected, state: 'completed'}
       } else {
-        orderWorkSelected = odooOrdersWork.data.find((item: any) => item.id === orderSelected.id)
+        orderWorkSelected = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id) || orderSelected
       }
 
+      setOrderSelected(orderWorkSelected)
       getDetailOrderWork(orderWorkSelected)
       setOrdersWork(odooOrdersWork)
       setLoadigAction(false)
