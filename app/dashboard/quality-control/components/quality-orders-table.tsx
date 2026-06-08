@@ -6,7 +6,7 @@ import close from '@/public/close.png'
 // UI Components
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalOrderQuality } from './modal-order-quality'
-import { acceptQualityControl, rejectQualityControl } from '@/app/api/accionQualityControl/accionQualityControl'
+import { acceptQualityControl, rejectQualityControl, saveQualityControlNotes } from '@/app/api/accionQualityControl/accionQualityControl'
 
 function sortByNameAsc(a: any, b: any) {
   return (a?.name || '').localeCompare(b?.name || '', 'es', { numeric: true, sensitivity: 'base' });
@@ -107,6 +107,21 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
       })
   }
 
+  const saveNotes = async (observations?: string, measure?: number) => {
+    return saveQualityControlNotes(user, selectedOrderQuantity, observations, measure)
+      .then((res) => {
+        if (res?.status) {
+          setSelectedOrderQuantity((current: any) => ({ ...current, additional_note: observations || '', measure }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, additional_note: observations || '', measure } : item))
+        }
+        return res
+      })
+      .catch((err) => {
+        console.log(err)
+        return { status: false, message: 'No se pudieron guardar las notas.' }
+      })
+  }
+
   return (
     <>
       <ModalOrderQuality 
@@ -119,6 +134,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
         selectedOrderQuantity={selectedOrderQuantity}
         acceptOrder={acceptOrder}
         rejectOrder={rejectOrder}
+        saveNotes={saveNotes}
         user={user}
       /> 
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">

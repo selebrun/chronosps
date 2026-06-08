@@ -74,3 +74,38 @@ export async function rejectQualityControl (user: any, quality_control: any, obs
     return resolve({status: true, message: "Control de calidad rechazado."})
   })
 }
+
+export async function saveQualityControlNotes(user: any, quality_control: any, observations?: string, measure?: number): Promise<any> {
+  return new Promise(async (resolve) => {
+    if (!quality_control?.id) {
+      return resolve({ status: false, message: "No se encontro el control de calidad seleccionado." });
+    }
+
+    const values: any = {};
+    if (observations !== undefined) values.additional_note = observations;
+    if (measure !== undefined) values.measure = measure;
+
+    if (Object.keys(values).length === 0) {
+      return resolve({ status: true, message: "No hay notas para guardar." });
+    }
+
+    console.log('Control de calidad: guardando notas', {
+      id: quality_control.id,
+      additional_note_length: observations?.length || 0,
+      measure
+    });
+
+    const result = await writeOdooData(
+      'quality.check',
+      [quality_control.id],
+      values,
+      user.company_id
+    );
+
+    if (!result || !result.status) {
+      return resolve({ status: false, message: result?.message || "Ocurrio un error al guardar las notas del control de calidad en Odoo." });
+    }
+
+    return resolve({ status: true, message: "Notas guardadas." });
+  })
+}
