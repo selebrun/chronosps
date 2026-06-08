@@ -47,8 +47,6 @@ function ModalOrderQualityDetails({
   }, [selectedOrderQuantity?.id, selectedOrderQuantity?.measure, selectedOrderQuantity?.additional_note]);
 
   const onSaveNotes = async () => {
-    if (isQualityClosed) return;
-
     setIsSubmitting(true);
     setSaveMessage("");
     const response = await saveNotes(observations, measureValue);
@@ -128,7 +126,7 @@ function ModalOrderQualityDetails({
                 onChange={(event) => setMeasureValue(parseInt(event.target.value) || 0)}
                 className="bg-whiteInput min-h-12 w-full shadow-md rounded-md text-center focus:outline-none text-gray-900"
                 placeholder="0"
-                disabled={isQualityClosed}
+                disabled={false}
               />
             </div>
           </div>
@@ -141,9 +139,15 @@ function ModalOrderQualityDetails({
                 placeholder="Escribe tus notas aqui..."
                 value={observations}
                 onChange={(event) => setObservations(event.target.value)}
-                disabled={isQualityClosed}
               />
             </div>
+            <button
+              disabled={isSubmitting}
+              onClick={onSaveNotes}
+              className="mt-3 font-bold bg-[#A9D1DC] p-3 rounded-md w-full disabled:opacity-50"
+            >
+              {isSubmitting ? "Guardando..." : "Guardar comentarios"}
+            </button>
           </div>
           {saveMessage && (
             <div className="mt-3 rounded-md bg-[#A9D1DC] p-2 text-center font-medium text-gray-900">
@@ -155,15 +159,8 @@ function ModalOrderQualityDetails({
         <div className="min-w-[150px]">
           <button
             disabled={isSubmitting || isQualityClosed}
-            onClick={onSaveNotes}
-            className="font-bold bg-[#A9D1DC] p-3 rounded-md w-full disabled:opacity-50"
-          >
-            Guardar notas
-          </button>
-          <button
-            disabled={isSubmitting || isQualityClosed}
             onClick={() => onExecuteQualityAction("accept")}
-            className="font-bold bg-[#2FD28E] p-3 rounded-md w-full mt-2 disabled:opacity-50"
+            className="font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50"
           >
             Aprueba
           </button>
