@@ -34,6 +34,7 @@ export function ModalOrderQuality({
   selectedOrderQuantity,
   acceptOrder,
   rejectOrder,
+  saveNotes,
   user
 }: 
 { selectedQualityDetails: (order: any) => void,
@@ -45,6 +46,7 @@ export function ModalOrderQuality({
   selectedOrderQuantity:any,
   acceptOrder: (observations?: string, measure?: number) => Promise<any>,
   rejectOrder: (observations?: string, measure?: number) => Promise<any>,
+  saveNotes: (observations?: string, measure?: number) => Promise<any>,
   user: any
 }) {
   return (
@@ -57,6 +59,7 @@ export function ModalOrderQuality({
         selectedOrderQuantity={selectedOrderQuantity}
         acceptOrder={acceptOrder}
         rejectOrder={rejectOrder}
+        saveNotes={saveNotes}
         user={user}
         />}
       <Modal setOpen={modalIsOpen && !modalDetailsIsOpen} title='Controles de calidad' className='max-w-3xl'>

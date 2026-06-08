@@ -12,6 +12,7 @@ function ModalOrderQualityDetails({
   selectedOrderQuantity,
   acceptOrder,
   rejectOrder,
+  saveNotes,
 }: {
   orderQualityDetail: any;
   modalWorkOrderDetail: boolean;
@@ -19,11 +20,13 @@ function ModalOrderQualityDetails({
   selectedOrderQuantity: any;
   acceptOrder: (observations?: string, measure?: number) => Promise<any>;
   rejectOrder: (observations?: string, measure?: number) => Promise<any>;
+  saveNotes: (observations?: string, measure?: number) => Promise<any>;
   user?: any;
 }) {
   const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
   const [observations, setObservations] = useState<string>(selectedOrderQuantity?.additional_note || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
   const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
   const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
@@ -40,7 +43,18 @@ function ModalOrderQualityDetails({
   useEffect(() => {
     setMeasureValue(selectedOrderQuantity?.measure || 0);
     setObservations(selectedOrderQuantity?.additional_note || "");
+    setSaveMessage("");
   }, [selectedOrderQuantity?.id, selectedOrderQuantity?.measure, selectedOrderQuantity?.additional_note]);
+
+  const onSaveNotes = async () => {
+    if (isQualityClosed) return;
+
+    setIsSubmitting(true);
+    setSaveMessage("");
+    const response = await saveNotes(observations, measureValue);
+    setSaveMessage(response?.message || (response?.status ? "Notas guardadas." : "No se pudieron guardar las notas."));
+    setIsSubmitting(false);
+  };
 
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
     if (isQualityClosed) return;
@@ -131,13 +145,25 @@ function ModalOrderQualityDetails({
               />
             </div>
           </div>
+          {saveMessage && (
+            <div className="mt-3 rounded-md bg-[#A9D1DC] p-2 text-center font-medium text-gray-900">
+              {saveMessage}
+            </div>
+          )}
         </div>
 
         <div className="min-w-[150px]">
           <button
             disabled={isSubmitting || isQualityClosed}
+            onClick={onSaveNotes}
+            className="font-bold bg-[#A9D1DC] p-3 rounded-md w-full disabled:opacity-50"
+          >
+            Guardar notas
+          </button>
+          <button
+            disabled={isSubmitting || isQualityClosed}
             onClick={() => onExecuteQualityAction("accept")}
-            className="font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50"
+            className="font-bold bg-[#2FD28E] p-3 rounded-md w-full mt-2 disabled:opacity-50"
           >
             Aprueba
           </button>
