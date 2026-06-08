@@ -16,6 +16,7 @@ export function StatusBadge({ status }: { status: string }) {
     sent: { name: "Enviada", color: "bg-blue-100 text-blue-800" },
     sale: { name: "Confirmada", color: "bg-green-100 text-green-800" },
     cancel: { name: "Cancelada", color: "bg-red-100 text-red-800" },
+    blocked: { name: "Bloqueada", color: "bg-red-600 text-white" },
   };
 
   const statusInfo = STATUS_DICT[status] || { name: status || "Sin estado", color: "bg-gray-400 text-black" };

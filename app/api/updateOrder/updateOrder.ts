@@ -1,6 +1,7 @@
 'use server'
 
 import { createOdooData, executeOdooMethod, getOdooData, setOdooData } from '@/app/api/odoo/odooService';
+import { isWorkOrderLocallyBlocked, markWorkOrderBlocked, markWorkOrderUnblocked } from '@/app/api/workOrderBlocks/workOrderBlocks';
 
 function getOdooRecord(model: string, domain: any[], fields: string[], companyId: string): Promise<any> {
   return new Promise((resolve) => {
@@ -66,6 +67,11 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     return { status: false, message: getOdooError(created, 'No se pudo bloquear la orden de trabajo en Odoo.') };
   }
 
+  const localBlock = await markWorkOrderBlocked(user, workOrder, loss);
+  if (!localBlock?.status) {
+    return { status: false, message: 'Se registro el bloqueo en Odoo, pero no se pudo bloquear la OT en Piso.' };
+  }
+
   return { status: true, message: 'Orden de trabajo bloqueada.' };
 }
 
@@ -106,15 +112,21 @@ export async function updateOrder(
       return { status: false, message: 'Debe definir la cantidad producida.' };
     }
 
-    if (action === 'unblock_work_order' && user.role === 'Operario') {
-      const isAssignedOperator = work_order.employee_assigned_ids.some((empId: any) => empId === user.odoo_id);
-      if (!isAssignedOperator) {
-        return {
-          status: false,
-          message: 'Solo los operarios asignados a esta orden pueden desbloquearla.',
-          faultString: 'Solo los operarios asignados a esta orden pueden desbloquearla.',
-        };
-      }
+    const isLocallyBlocked = await isWorkOrderLocallyBlocked(user, work_order.id);
+    if (isLocallyBlocked && action !== 'unblock_work_order') {
+      return {
+        status: false,
+        message: 'La orden de trabajo esta bloqueada en Piso. Solo un Lider o Jefe puede desbloquearla.',
+        faultString: 'La orden de trabajo esta bloqueada en Piso. Solo un Lider o Jefe puede desbloquearla.',
+      };
+    }
+
+    if (action === 'unblock_work_order' && !['Lider', 'Jefe'].includes(user.role)) {
+      return {
+        status: false,
+        message: 'Solo los usuarios Lider o Jefe pueden desbloquear una orden de trabajo.',
+        faultString: 'Solo los usuarios Lider o Jefe pueden desbloquear una orden de trabajo.',
+      };
     }
 
     let response: any;
@@ -139,8 +151,15 @@ export async function updateOrder(
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id);
         break;
       case 'unblock_work_order':
-        response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id);
-        break;
+        if (work_order.working_state === 'blocked') {
+          response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id);
+          if (!response?.status) {
+            const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
+            return { status: false, message: errorMsg, faultString: errorMsg };
+          }
+        }
+        await markWorkOrderUnblocked(user, work_order.id);
+        return { status: true, message: 'Orden de trabajo desbloqueada.' };
       case 'block_work_order':
         return createProductivityBlock(work_order, block_reason, user);
       default:

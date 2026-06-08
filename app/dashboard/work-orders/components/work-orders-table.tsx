@@ -281,7 +281,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
                       {order?.sequence}
                     </th>
                     <td className="px-3 py-2">
-                      <StatusBadge status={order.state} />
+                      <StatusBadge status={order.local_blocked ? 'blocked' : order.state} />
                     </td>
                     <td className="px-3 py-2">{order.name}</td>
                     <td className="px-3 py-2">{order.production_id[1]}</td>
