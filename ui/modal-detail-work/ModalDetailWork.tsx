@@ -122,8 +122,17 @@ export function ModalDetailWork({
     const isBlocked = showDetailOrderWork.working_state === "blocked";
     const isUserWorking = showDetailOrderWork.is_user_working;
     const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
+    const canUnblock = ['Lider', 'Jefe'].includes(user?.role);
     const buttons = [];
     const disabledBtns = showDetailOrderWork.state.includes('done')
+
+    if (isBlocked) {
+      if (canUnblock) {
+        return <div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>
+      }
+
+      return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Orden bloqueada</div>
+    }
 
     // Show Start button only if activity hasn't begun
     if (!isBlocked && !isUserWorking && showDetailOrderWork.duration === 0) {
@@ -135,12 +144,7 @@ export function ModalDetailWork({
       buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order')} key="resume" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reanudar</button></div>)
     }
 
-    // Block/Unblock buttons
-    if (!isBlocked) {
-      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => setModalIsOpenBlocks(true)} key="block" className='disabled:opacity-50 font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
-    } else {
-      buttons.push(<div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>)
-    }
+    buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => setModalIsOpenBlocks(true)} key="block" className='disabled:opacity-50 font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
   
     // Pause is only available while the timer is running.
     if (!isBlocked && isUserWorking) {
@@ -283,7 +287,7 @@ export function ModalDetailWork({
               </div>
           </div>
             <div className='flex mt-5 '>
-              <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.state} /></div>
+              <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.local_blocked ? 'blocked' : showDetailOrderWork.state} /></div>
               <div className='w-[50vh] mr-5'>
                 <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {realProgress}%</div>
                 <div className='w-full bg-gray-300 rounded-full h-4'>
@@ -294,6 +298,12 @@ export function ModalDetailWork({
                 </div>
               </div>
           </div>
+          {showDetailOrderWork.working_state === "blocked" && (
+            <div className='mt-3 bg-red-100 border border-red-500 text-red-800 px-4 py-3 rounded'>
+              <strong>Estado: Bloqueada</strong>
+              {showDetailOrderWork?.local_block_reason_name ? ` - Motivo: ${showDetailOrderWork.local_block_reason_name}` : ''}. Solo un Lider o Jefe puede desbloquear esta orden de trabajo.
+            </div>
+          )}
           {showDetailOrderWork.working_state === "paused" && (
             <div className='mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded'>
               <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón &quot;Reanudar&quot;.

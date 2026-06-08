@@ -1,5 +1,6 @@
 'use server'
 import { getOdooData } from '@/app/api/odoo/odooService';
+import { addLocalBlockState } from '@/app/api/workOrderBlocks/workOrderBlocks';
 
 // `server-only` guarantees any modules that import code in file
 // will never run on the client. Even though this particular api
@@ -150,7 +151,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data: workorders.data, production_data: productions.data });
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workorders.data);
+                resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
               false
             );
@@ -190,7 +192,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data: productions.data, production_data: productions.data });
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, productions.data);
+                resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
               false
             );
@@ -228,7 +231,8 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
         
-                resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, productions.data);
+                resolve({ status: true, message: '', data:  workOrdersWithLocalBlocks, production_data: workorders.data });
               },
               false
             );

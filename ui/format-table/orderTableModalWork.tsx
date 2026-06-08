@@ -41,7 +41,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
               </div>
             </th>
             <td className="px-3 py-2">
-              <StatusBadge status={order?.state} />
+              <StatusBadge status={order?.local_blocked ? 'blocked' : order?.state} />
             </td>
             <td className="px-3 py-2">
               {order?.workcenter_id[1]}
