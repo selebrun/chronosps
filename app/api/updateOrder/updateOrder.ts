@@ -127,8 +127,8 @@ export async function updateOrder(
     if (isLocallyBlocked && action !== 'unblock_work_order') {
       return {
         status: false,
-        message: 'La orden de trabajo esta bloqueada en Piso. Solo un Lider o Jefe puede desbloquearla.',
-        faultString: 'La orden de trabajo esta bloqueada en Piso. Solo un Lider o Jefe puede desbloquearla.',
+        message: 'La orden de trabajo esta bloqueada en Piso. Solo un Jefe puede desbloquearla.',
+        faultString: 'La orden de trabajo esta bloqueada en Piso. Solo un Jefe puede desbloquearla.',
       };
     }
 
@@ -143,11 +143,19 @@ export async function updateOrder(
       }
     }
 
-    if (action === 'unblock_work_order' && !['Lider', 'Jefe'].includes(user.role)) {
+    if (action === 'unblock_work_order' && user.role !== 'Jefe') {
       return {
         status: false,
-        message: 'Solo los usuarios Lider o Jefe pueden desbloquear una orden de trabajo.',
-        faultString: 'Solo los usuarios Lider o Jefe pueden desbloquear una orden de trabajo.',
+        message: 'Solo los usuarios Jefe pueden desbloquear una orden de trabajo.',
+        faultString: 'Solo los usuarios Jefe pueden desbloquear una orden de trabajo.',
+      };
+    }
+
+    if (['done', 'completed', 'cancel'].includes(work_order.state) && action !== 'unblock_work_order') {
+      return {
+        status: false,
+        message: 'La orden de trabajo ya esta terminada o cancelada. No se pueden ejecutar mas acciones desde Piso.',
+        faultString: 'La orden de trabajo ya esta terminada o cancelada. No se pueden ejecutar mas acciones desde Piso.',
       };
     }
 

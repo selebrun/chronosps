@@ -130,10 +130,14 @@ export function ModalDetailWork({
     const isBlocked = showDetailOrderWork.working_state === "blocked";
     const isUserWorking = showDetailOrderWork.is_user_working;
     const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
-    const canUnblock = ['Lider', 'Jefe'].includes(user?.role);
+    const canUnblock = user?.role === 'Jefe';
     const isFailedForOperator = Boolean(showDetailOrderWork.quality_failed && user?.role === 'Operario');
     const buttons = [];
     const disabledBtns = ['done', 'completed', 'cancel'].includes(showDetailOrderWork.state)
+
+    if (disabledBtns) {
+      return <div className="mb-3 rounded-md bg-gray-100 p-3 text-center font-bold text-gray-700">Orden terminada</div>
+    }
 
     if (isFailedForOperator) {
       return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
@@ -314,7 +318,7 @@ export function ModalDetailWork({
           {showDetailOrderWork.working_state === "blocked" && (
             <div className='mt-3 bg-red-100 border border-red-500 text-red-800 px-4 py-3 rounded'>
               <strong>Estado: Bloqueada</strong>
-              {showDetailOrderWork?.local_block_reason_name ? ` - Motivo: ${showDetailOrderWork.local_block_reason_name}` : ''}. Solo un Lider o Jefe puede desbloquear esta orden de trabajo.
+              {showDetailOrderWork?.local_block_reason_name ? ` - Motivo: ${showDetailOrderWork.local_block_reason_name}` : ''}. Solo un Jefe puede desbloquear esta orden de trabajo.
             </div>
           )}
           {showDetailOrderWork.quality_failed && (

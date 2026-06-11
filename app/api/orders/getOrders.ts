@@ -73,10 +73,10 @@ export async function getProductionOrders(user: any) {
       return new Promise(async (resolve, reject) => {
         getOdooData(
           'mrp.production',
-          [['state','in',['confirmed','progress']]],
+          [['state','in',['confirmed','progress']], ['user_id','!=', false]],
           [],
           false,
-          false,
+          'name asc, date_planned_start asc',
           user.company_id,
           async (productions: any) => {
             if (!productions || !productions.data) {
@@ -287,14 +287,14 @@ export async function getWorkOrders(user: any) {
       });
     case 'Jefe':
       return new Promise(async (resolve, reject) => {
-        filter = [['state','in',['confirmed','progress']]]
-        filter.push(['id','=',  idOrders])
+        filter = [['state','in',['confirmed','progress']], ['user_id','!=', false]]
+        filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
           filter,
           [],
           false,
-          false,
+          'name asc, date_planned_start asc',
           user.company_id,
           async (workorders: any) => {
             if (!workorders || !workorders.data) {
@@ -307,7 +307,7 @@ export async function getWorkOrders(user: any) {
               [['production_id','in',production_orders]],
               [],
               false,
-              false,
+              'sequence asc, name asc',
               user.company_id,
               async (productions: any) => {
                 if (!productions || !productions.data) {

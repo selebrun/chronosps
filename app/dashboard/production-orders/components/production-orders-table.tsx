@@ -84,7 +84,14 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = workoOrder?.data.filter((orden:any) => orden.production_id[0] === parseInt(order.id))
+    const dateilOrden = workoOrder?.data
+      .filter((orden:any) => orden.production_id[0] === parseInt(order.id))
+      .sort((a: any, b: any) => {
+        const sequenceA = Number(a.sequence ?? a.x_studio_nro_ot ?? 0);
+        const sequenceB = Number(b.sequence ?? b.x_studio_nro_ot ?? 0);
+        if (sequenceA !== sequenceB) return sequenceA - sequenceB;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'es', { numeric: true });
+      })
     setOrderWorkDetail(dateilOrden)
     setOrderProductionSelected(order)
   }
@@ -232,6 +239,13 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
+  const productionOrders = [...(odooOrders?.data || [])].sort((a: any, b: any) => {
+    const nameOrder = String(a.name || '').localeCompare(String(b.name || ''), 'es', { numeric: true });
+    if (nameOrder !== 0) return nameOrder;
+    const dateA = String(a.date_planned_start || '');
+    const dateB = String(b.date_planned_start || '');
+    return dateA.localeCompare(dateB);
+  });
 
 
   return (
@@ -325,7 +339,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
             </tr>
           </thead>
           <tbody>
-            {odooOrders?.data?.map((order: any) => (
+            {productionOrders.map((order: any) => (
               <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
                 <th scope="row" className="px-5 font-medium text-black">
                   <div className="flex items-center space-x-4 whitespace-normal">
