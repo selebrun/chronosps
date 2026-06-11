@@ -13,6 +13,7 @@ function ModalOrderQualityDetails({
   acceptOrder,
   rejectOrder,
   saveNotes,
+  user,
 }: {
   orderQualityDetail: any;
   modalWorkOrderDetail: boolean;
@@ -29,6 +30,8 @@ function ModalOrderQualityDetails({
   const [saveMessage, setSaveMessage] = useState("");
   const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
   const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
+  const canModifyClosedQuality = ["Calidad", "Lider", "Jefe"].includes(user?.role);
+  const disableQualityDecision = isSubmitting || (isQualityClosed && !canModifyClosedQuality);
   const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
     ? selectedOrderQuantity.workorder_id[1]
     : selectedOrderQuantity?.workorder_id || "");
@@ -55,7 +58,7 @@ function ModalOrderQualityDetails({
   };
 
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
-    if (isQualityClosed) return;
+    if (isQualityClosed && !canModifyClosedQuality) return;
 
     setIsSubmitting(true);
     const response = action === "accept" ? await acceptOrder(observations, measureValue) : await rejectOrder(observations, measureValue);
@@ -158,14 +161,14 @@ function ModalOrderQualityDetails({
 
         <div className="min-w-[150px]">
           <button
-            disabled={isSubmitting || isQualityClosed}
+            disabled={disableQualityDecision}
             onClick={() => onExecuteQualityAction("accept")}
             className="font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50"
           >
             Aprueba
           </button>
           <button
-            disabled={isSubmitting || isQualityClosed}
+            disabled={disableQualityDecision}
             onClick={() => onExecuteQualityAction("reject")}
             className="font-bold bg-red-500 p-3 rounded-md w-full mt-2 disabled:opacity-50"
           >

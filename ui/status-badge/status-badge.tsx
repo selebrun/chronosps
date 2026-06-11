@@ -13,6 +13,7 @@ export function StatusBadge({ status }: { status: string }) {
     normal: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
     ready: { name: "Completado", color: "bg-green-400 text-white" },
     fail: { name: "Fallado", color: "bg-red-500 text-white" },
+    quality_failed: { name: "Fallada", color: "bg-red-600 text-white" },
     draft: { name: "Borrador", color: "bg-gray-200 text-gray-800" },
     sent: { name: "Enviada", color: "bg-blue-100 text-blue-800" },
     sale: { name: "Confirmada", color: "bg-green-100 text-green-800" },
