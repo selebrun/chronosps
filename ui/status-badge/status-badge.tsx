@@ -2,6 +2,7 @@ export function StatusBadge({ status }: { status: string }) {
 
   const STATUS_DICT: Record<string, { name: string; color: string }> = {
     progress: { name: "En progreso", color: "bg-yellow-100 text-yellow-800" },
+    paused: { name: "Pausada", color: "bg-yellow-200 text-yellow-900" },
     completed: { name: "Completado", color: "bg-green-400 text-white" },
     waiting: { name: "En espera", color: "bg-gray-400 text-black" },
     pending: { name: "Pendiente", color: "bg-orange-400 text-white" },

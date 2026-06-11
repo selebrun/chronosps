@@ -4,6 +4,11 @@ import { StatusBadge } from '@/ui/status-badge/status-badge'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 
+function getWorkOrderDisplayStatus(order: any) {
+  if (order?.local_blocked) return 'blocked';
+  if (order?.working_state === 'paused') return 'paused';
+  return order?.state;
+}
 
 export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct, openJobDetail }: {
     orderDetail: any, 
@@ -41,7 +46,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
               </div>
             </th>
             <td className="px-3 py-2">
-              <StatusBadge status={order?.local_blocked ? 'blocked' : order?.state} />
+              <StatusBadge status={getWorkOrderDisplayStatus(order)} />
             </td>
             <td className="px-3 py-2">
               {order?.workcenter_id[1]}

@@ -116,6 +116,51 @@ export async function getProductionOrders(user: any) {
   }
 }
 
+function parseOdooDate(dateValue: string) {
+  if (!dateValue) return null;
+  return new Date(`${dateValue.replace(' ', 'T')}Z`);
+}
+
+async function addActiveWorkOrderTimers(user: any, workOrders: any[]) {
+  const activeWorkOrders = (workOrders || []).filter((workOrder: any) =>
+    workOrder?.id &&
+    workOrder?.is_user_working &&
+    workOrder?.working_state !== 'blocked' &&
+    !['done', 'completed', 'cancel'].includes(workOrder?.state)
+  );
+
+  if (!activeWorkOrders.length) return workOrders || [];
+
+  const productivityData: any[] = await getOdooRecords(
+    'mrp.workcenter.productivity',
+    [['workorder_id', 'in', activeWorkOrders.map((workOrder: any) => workOrder.id)], ['date_end', '=', false]],
+    ['id', 'workorder_id', 'date_start', 'date_end'],
+    user.company_id
+  );
+
+  const productivityByWorkOrder = new Map<number, any>();
+  (productivityData || []).forEach((productivity: any) => {
+    const workOrderId = Array.isArray(productivity?.workorder_id) ? productivity.workorder_id[0] : productivity?.workorder_id;
+    const current = productivityByWorkOrder.get(Number(workOrderId));
+    if (!current || String(productivity?.date_start || '') > String(current?.date_start || '')) {
+      productivityByWorkOrder.set(Number(workOrderId), productivity);
+    }
+  });
+
+  const now = Date.now();
+  return (workOrders || []).map((workOrder: any) => {
+    const productivity = productivityByWorkOrder.get(Number(workOrder.id));
+    const dateStart = parseOdooDate(productivity?.date_start);
+    if (!dateStart || Number.isNaN(dateStart.getTime())) return workOrder;
+
+    return {
+      ...workOrder,
+      piso_active_elapsed_seconds: Math.max(0, Math.floor((now - dateStart.getTime()) / 1000)),
+      piso_active_since: productivity.date_start,
+    };
+  });
+}
+
 export async function getWorkOrders(user: any) {
   const ordersPro: any = await getProductionOrders(user) || []
   let filter: any = []
@@ -151,7 +196,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workorders.data);
+                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workorders.data);
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
                 resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
               false
@@ -192,7 +238,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, productions.data);
+                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, productions.data);
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
                 resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
               false
@@ -231,7 +278,8 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
         
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, productions.data);
+                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, productions.data);
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
                 resolve({ status: true, message: '', data:  workOrdersWithLocalBlocks, production_data: workorders.data });
               },
               false

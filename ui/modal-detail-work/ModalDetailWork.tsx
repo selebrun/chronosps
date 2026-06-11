@@ -73,8 +73,9 @@ export function ModalDetailWork({
   const [valueSelectMaterial, setvValueSelectMaterial] = useState('');
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
-  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && showDetailOrderWork?.working_state !== 'blocked' && !showDetailOrderWork?.state?.includes('done'));
-  const baseElapsedSeconds = Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60));
+  const isWorkOrderDone = ['done', 'completed', 'cancel'].includes(showDetailOrderWork?.state);
+  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && showDetailOrderWork?.working_state !== 'blocked' && !isWorkOrderDone);
+  const baseElapsedSeconds = Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
   const expectedSeconds = Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
   const realProgress = expectedSeconds > 0 ? Math.floor((elapsedSeconds / expectedSeconds) * 100) : progress || 0;
@@ -82,7 +83,7 @@ export function ModalDetailWork({
 
   useEffect(() => {
     setElapsedSeconds(baseElapsedSeconds);
-  }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
+  }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
 
   useEffect(() => {
     if (!isTimerRunning) return;
@@ -117,6 +118,11 @@ export function ModalDetailWork({
 
   const theoreticalDuration = formatDurationFromMinutes(showDetailOrderWork?.duration_expected, showDetailOrderWork?.theoretical_duration);
   const realDuration = formatElapsedTime(elapsedSeconds);
+  const displayStatus = showDetailOrderWork.local_blocked
+    ? 'blocked'
+    : showDetailOrderWork.working_state === 'paused'
+      ? 'paused'
+      : showDetailOrderWork.state;
 
   const renderButtons = (showDetailOrderWork: any) => {
     const isBlocked = showDetailOrderWork.working_state === "blocked";
@@ -124,7 +130,7 @@ export function ModalDetailWork({
     const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
     const canUnblock = ['Lider', 'Jefe'].includes(user?.role);
     const buttons = [];
-    const disabledBtns = showDetailOrderWork.state.includes('done')
+    const disabledBtns = ['done', 'completed', 'cancel'].includes(showDetailOrderWork.state)
 
     if (isBlocked) {
       if (canUnblock) {
@@ -287,7 +293,7 @@ export function ModalDetailWork({
               </div>
           </div>
             <div className='flex mt-5 '>
-              <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={showDetailOrderWork.local_blocked ? 'blocked' : showDetailOrderWork.state} /></div>
+              <div className='w-[50vh] mr-5 bg-whiteInput shadow-md p-2 rounded-md text-center'><StatusBadge status={displayStatus} /></div>
               <div className='w-[50vh] mr-5'>
                 <div className='bg-whiteInput shadow-md p-2 rounded-md text-center font-bold mb-2'>Progreso: {realProgress}%</div>
                 <div className='w-full bg-gray-300 rounded-full h-4'>
