@@ -8,6 +8,12 @@ import { addLocalBlockState } from '@/app/api/workOrderBlocks/workOrderBlocks';
 // good practise to add `server-only` preemptively.
 // import 'server-only';
 
+function onlyProductionsWithWorkOrders(productions: any[] = []) {
+  return productions.filter((production: any) =>
+    Array.isArray(production?.workorder_ids) && production.workorder_ids.length > 0
+  );
+}
+
 export async function getProductionOrders(user: any) {
 	switch(user.role) {
     case 'Operario':
@@ -63,7 +69,7 @@ export async function getProductionOrders(user: any) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            resolve({ status: true, message: '', data: productions.data });
+            resolve({ status: true, message: '', data: onlyProductionsWithWorkOrders(productions.data) });
           },
           false
         )
@@ -83,7 +89,7 @@ export async function getProductionOrders(user: any) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            resolve({ status: true, message: '', data: productions.data });
+            resolve({ status: true, message: '', data: onlyProductionsWithWorkOrders(productions.data) });
           },
           false
           )
@@ -103,7 +109,7 @@ export async function getProductionOrders(user: any) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            resolve({ status: true, message: '', data: productions.data });
+            resolve({ status: true, message: '', data: onlyProductionsWithWorkOrders(productions.data) });
           },
           false
           )

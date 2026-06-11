@@ -11,25 +11,30 @@ async function odooRequest(
     callback: any,
 		userAdmin: boolean
 ) {
+  const companyId = typeof company_id === 'string' ? company_id.trim() : '';
+  if (!companyId) {
+    callback({ status: false, message: 'No se encontro la compania del usuario en la sesion.' });
+    return;
+  }
 
 
 	const companies =  await getCompanies()
 	const mapCompanies = companies.map(company => {
 		return(
 			{
-				"id": company.id_company.trim(),
-				"company": company.name.trim(),
+				"id": company.id_company?.trim(),
+				"company": company.name?.trim(),
 				"odoo_connection": {
-						"domain": company.domain.trim(),
-						"url":  company.url.trim(),
+						"domain": company.domain?.trim(),
+						"url":  company.url?.trim(),
 						"port": 443,
-						"db": company.database.trim(),
-						"username":  company.user_default.trim(),
-						"password": company.password.trim()
+						"db": company.database?.trim(),
+						"username":  company.user_default?.trim(),
+						"password": company.password?.trim()
 			}
 	})})
 
-	const company_data =  mapCompanies.find(company => company.id == company_id.trim());
+	const company_data =  mapCompanies.find(company => company.id == companyId);
 
 
 	//const company_data = mapCompanies.find((company) => {return company.odoo_connection.username === 'admin'})

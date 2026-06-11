@@ -8,14 +8,20 @@ import { signOut } from "next-auth/react";
 
 
 
-export function LogoMenu({ userRole, isDashboardRoute }: { userRole: string, isDashboardRoute: boolean }) {
+export function LogoMenu({ userRole, isDashboardRoute, isAdminRoute = false }: { userRole: string, isDashboardRoute: boolean, isAdminRoute?: boolean }) {
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const router = useRouter();
   const onShowMenu = (): any => {
     setShowMenu(!showMenu)
   }
 
-  const logout = () => {
+  const logout = async () => {
+    if (isAdminRoute) {
+      await fetch('/api/admin-auth/logout', { method: 'POST' });
+      router.push('/admin/login');
+      return;
+    }
+
     signOut({ redirect: false });
     localStorage.removeItem('admin');
     router.push('/login'); 

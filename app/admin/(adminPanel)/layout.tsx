@@ -2,10 +2,9 @@ import type { Metadata } from 'next'
 import { ChronosAdminSideMenu } from "@/ui/admin/side-menu";
 import { Suspense } from "react";
 import { redirect } from 'next/navigation';
-
-import { getServerSession } from 'next-auth'
-import { config } from '@/auth'
+import { cookies } from 'next/headers';
 import { CHRONOS_ADMIN_LOGIN_URL } from '@/config/constants'
+import { ADMIN_SESSION_COOKIE, isValidAdminSessionToken } from '@/app/api/admin-auth/adminSession';
 
 // Ui Components
 import { LogoMenu } from '@/ui/logo-menu/LogoMenu';
@@ -34,15 +33,15 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
 
-  const user = process.env.CHRONOS_ADMIN_USER;
-  const session = await getServerSession(config)
-  if (!session || user !== session.user?.email) redirect(CHRONOS_ADMIN_LOGIN_URL)
+  const adminSession = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  if (!isValidAdminSessionToken(adminSession)) redirect(CHRONOS_ADMIN_LOGIN_URL)
 
   return (
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <LogoMenu
         userRole={"Administrador"}
         isDashboardRoute={true}
+        isAdminRoute={true}
       />
 
       <div className="mx-auto max-w-7xl space-y-8 px-2 pt-20 lg:px-8 lg:py-8 bg-white rounded-lg p-px shadow-lg shadow-black/20 p-3.5 lg:p-6">
