@@ -51,44 +51,27 @@ async function getEmployeeFromOdoo(company: any, code: string) {
   return empleados.length > 0 ? empleados[0] : null;
 }
 
-async function syncUserWithOdoo(user: any) {
-  if (!user) return user;
+async function getOdooEmployeeId(idCompany: string | number, code: string) {
+  if (!idCompany || !code) return null;
 
   try {
-    const company = await getCompanyById(user.id_company);
+    const company = await getCompanyById(idCompany);
     if (!company) {
-      console.warn("No se encontro empresa para el usuario:", user.id_company);
-      return user;
+      console.warn("No se encontro empresa para sincronizar usuario:", idCompany);
+      return null;
     }
 
-    const employee = await getEmployeeFromOdoo(company, user.code);
+    const employee = await getEmployeeFromOdoo(company, code.trim());
     if (!employee) {
-      console.log(`Empleado con code ${user.code} no encontrado en Odoo`);
-      return user;
+      console.log(`Empleado con code ${code} no encontrado en Odoo`);
+      return null;
     }
 
-    const client = new Client(dbConfig);
-    try {
-      await client.connect();
-      await client.query(
-        `UPDATE users
-         SET odoo_id = $1, odoo_user_id = $1
-         WHERE code = $2`,
-        [employee.id, user.code]
-      );
-    } finally {
-      await client.end();
-    }
-
-    console.log(`Usuario ${user.code} vinculado a Odoo ID ${employee.id}`);
-    return {
-      ...user,
-      odoo_id: employee.id,
-      odoo_user_id: employee.id,
-    };
+    console.log(`Usuario ${code} vinculado a Odoo ID ${employee.id}`);
+    return employee.id;
   } catch (error) {
     console.error("Error al sincronizar usuario con Odoo:", error);
-    return user;
+    return null;
   }
 }
 
@@ -126,18 +109,19 @@ export async function getUsersByID(id: string) {
 
 export async function createUsers(user: any) {
   const client = new Client(dbConfig);
-  let newUser;
 
   try {
+    const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
+    const odooEmployeeId = await getOdooEmployeeId(id_company, code);
+
     await client.connect();
 
     const query = `
-      INSERT INTO users (code, email, id_company, name, password, rol, x_studio_new_material)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO users (code, email, id_company, name, password, rol, x_studio_new_material, odoo_id, odoo_user_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING *
     `;
 
-    const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
     const result = await client.query(query, [
       code,
       email,
@@ -146,24 +130,28 @@ export async function createUsers(user: any) {
       password,
       rol,
       Boolean(x_studio_new_material),
+      odooEmployeeId,
+      odooEmployeeId,
     ]);
 
-    newUser = result.rows[0];
+    return result.rows[0];
   } catch (error) {
     console.error("Error al crear usuario:", error);
     throw new Error("No se pudo crear el usuario");
   } finally {
     await client.end();
   }
-
-  return syncUserWithOdoo(newUser);
 }
 
 export async function updateUsers(user: any) {
   const client = new Client(dbConfig);
-  let updatedUser;
 
   try {
+    const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
+    const lookupCode = user.original_code || code;
+    const lookupCompany = user.original_id_company || id_company;
+    const odooEmployeeId = await getOdooEmployeeId(id_company, code);
+
     await client.connect();
 
     const query = `
@@ -174,13 +162,13 @@ export async function updateUsers(user: any) {
           name = $4,
           password = $5,
           rol = $6,
-          x_studio_new_material = $7
-      WHERE code = $8
+          x_studio_new_material = $7,
+          odoo_id = $8,
+          odoo_user_id = $9
+      WHERE code = $10
+        AND id_company = $11
       RETURNING *
     `;
-
-    const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
-    const lookupCode = user.original_code || code;
 
     const result = await client.query(query, [
       code,
@@ -190,7 +178,10 @@ export async function updateUsers(user: any) {
       password,
       rol,
       Boolean(x_studio_new_material),
+      odooEmployeeId,
+      odooEmployeeId,
       lookupCode,
+      lookupCompany,
     ]);
 
     if (result.rowCount === 0) {
@@ -198,14 +189,38 @@ export async function updateUsers(user: any) {
       return null;
     }
 
-    updatedUser = result.rows[0];
-    console.log(`Usuario ${updatedUser.name} actualizado en DB`);
+    console.log(`Usuario ${result.rows[0].name} actualizado en DB`);
+    return result.rows[0];
   } catch (error) {
     console.error("Error al actualizar usuario:", error);
     throw new Error("No se pudo actualizar el usuario");
   } finally {
     await client.end();
   }
+}
 
-  return syncUserWithOdoo(updatedUser);
+export async function deleteUsers(user: any) {
+  const client = new Client(dbConfig);
+
+  try {
+    await client.connect();
+    const code = user.original_code || user.code;
+    const idCompany = user.original_id_company || user.id_company;
+
+    const result = await client.query(
+      `DELETE FROM users
+       WHERE code = $1
+         AND id_company = $2
+       RETURNING code, id_company`,
+      [code, idCompany]
+    );
+
+    if (result.rowCount === 0) return null;
+    return result.rows[0];
+  } catch (error) {
+    console.error("Error al eliminar usuario:", error);
+    throw new Error("No se pudo eliminar el usuario");
+  } finally {
+    await client.end();
+  }
 }

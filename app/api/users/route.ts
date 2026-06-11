@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUsers, createUsers, updateUsers } from "./users";
+import { getUsers, createUsers, updateUsers, deleteUsers } from "./users";
 
 const requiredUserFields = [
   "code",
@@ -93,6 +93,35 @@ export async function PUT(req: Request) {
     console.error("Error en PUT /api/users:", error);
     return NextResponse.json(
       { message: "No se pudo actualizar el usuario" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const body = await req.json();
+
+    if (!isUserPayload(body) || !body.code || !body.id_company) {
+      return NextResponse.json(
+        { message: "Datos incompletos para eliminar el usuario" },
+        { status: 400 }
+      );
+    }
+
+    const deletedUser = await deleteUsers(body);
+    if (!deletedUser) {
+      return NextResponse.json(
+        { message: "Usuario no encontrado" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(deletedUser);
+  } catch (error) {
+    console.error("Error en DELETE /api/users:", error);
+    return NextResponse.json(
+      { message: "No se pudo eliminar el usuario" },
       { status: 500 }
     );
   }

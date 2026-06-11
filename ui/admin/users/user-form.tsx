@@ -27,6 +27,7 @@ export function ChronosUsersForm({
     email: user?.email?.trim() || '',
     x_studio_new_material: Boolean(user?.x_studio_new_material),
     original_code: user?.code?.trim() || '',
+    original_id_company: user?.id_company?.trim() || '',
   });
 
   const handleChange = (e: any) => {
@@ -77,6 +78,38 @@ export function ChronosUsersForm({
     }
 
     navigateOnSuccess()
+  };
+
+  const deleteUser = async () => {
+    if (!user) return;
+    const shouldDelete = window.confirm(`Eliminar usuario ${formData.name || formData.code}?`);
+    if (!shouldDelete) return;
+
+    setLoading(true);
+    setFormError(null);
+
+    try {
+      const response = await fetch("/api/users", {
+        method: 'DELETE',
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response, "Ha ocurrido un error al intentar eliminar el usuario");
+        setFormError(message);
+        return;
+      }
+
+      navigateOnSuccess();
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      setFormError("Ha ocurrido un error inesperado al eliminar el usuario");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -217,14 +250,26 @@ export function ChronosUsersForm({
         />
         Permite agregar materiales
       </label>
-      <button
-        type="submit"
-        className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
-        disabled={!formData.name || !formData.rol || !formData.email || !formData.id_company || !formData.password || !formData.code}
-      >
-        {!user ? "Crear Usuarios" : "Guardar Cambios"}
-        {loading && <Spinner /> }
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
+          disabled={loading || !formData.name || !formData.rol || !formData.email || !formData.id_company || !formData.password || !formData.code}
+        >
+          {!user ? "Crear Usuarios" : "Guardar Cambios"}
+          {loading && <Spinner /> }
+        </button>
+        {user && (
+          <button
+            type="button"
+            onClick={deleteUser}
+            className='disabled:opacity-50 font-bold bg-red-500 text-white p-3 rounded-md'
+            disabled={loading}
+          >
+            Eliminar Usuario
+          </button>
+        )}
+      </div>
     </form>
   )
 }
