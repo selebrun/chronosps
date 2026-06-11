@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCompanies, createCompany, updateCompany } from "./companies";
+import { getCompanies, createCompany, updateCompany, deleteCompany } from "./companies";
 
 /**
  * API endpoint POST /api/companies
@@ -47,4 +47,33 @@ export async function PUT(req: Request) {
   const updatedCompany = await updateCompany(body)
 
   return NextResponse.json(updatedCompany);
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const body = await req.json();
+    const deletedCompany = await deleteCompany(body);
+
+    if (!deletedCompany) {
+      return NextResponse.json(
+        { message: "Compania no encontrada" },
+        { status: 404 }
+      );
+    }
+
+    if (deletedCompany.status === false) {
+      return NextResponse.json(
+        { message: deletedCompany.message, usersCount: deletedCompany.usersCount },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(deletedCompany);
+  } catch (error) {
+    console.error("Error en DELETE /api/companies:", error);
+    return NextResponse.json(
+      { message: "No se pudo eliminar la compania" },
+      { status: 500 }
+    );
+  }
 }

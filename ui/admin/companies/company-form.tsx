@@ -69,6 +69,47 @@ export function ChronosCompanyForm({
     navigateOnSuccess()
   };
 
+  const getErrorMessage = async (response: Response, fallback: string) => {
+    try {
+      const data = await response.json();
+      return data?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  };
+
+  const deleteCompany = async () => {
+    if (!company?.id_company) return;
+    const shouldDelete = window.confirm(`Eliminar compania ${formData.name}?`);
+    if (!shouldDelete) return;
+
+    setLoading(true);
+    setFormError(null);
+
+    try {
+      const response = await fetch("/api/companies", {
+        method: 'DELETE',
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ id_company: company.id_company })
+      });
+
+      if (!response.ok) {
+        const message = await getErrorMessage(response, "Ha ocurrido un error al intentar eliminar la compania");
+        setFormError(message);
+        return;
+      }
+
+      navigateOnSuccess();
+    } catch (error) {
+      console.error("Error deleting company:", error);
+      setFormError("Ha ocurrido un error inesperado al eliminar la compania");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -186,14 +227,26 @@ export function ChronosCompanyForm({
         />
       </div>
 
-      <button
-        type="submit"
-        className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
-        disabled={!formData.name || !formData.domain || !formData.url || !formData.database || !formData.user_default || !formData.password}
-      >
-        {!company ? "Crear Compania" : "Guardar Cambios"}
-        {loading && <Spinner /> }
-      </button>
+      <div className="flex flex-wrap gap-3">
+        <button
+          type="submit"
+          className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
+          disabled={loading || !formData.name || !formData.domain || !formData.url || !formData.database || !formData.user_default || !formData.password}
+        >
+          {!company ? "Crear Compania" : "Guardar Cambios"}
+          {loading && <Spinner /> }
+        </button>
+        {company && (
+          <button
+            type="button"
+            onClick={deleteCompany}
+            className='disabled:opacity-50 font-bold bg-red-500 text-white p-3 rounded-md'
+            disabled={loading}
+          >
+            Eliminar Compania
+          </button>
+        )}
+      </div>
     </form>
   )
 }

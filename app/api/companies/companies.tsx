@@ -27,7 +27,7 @@ export async function getCompanies() {
   const client = new Client(config);
 
   try {
-   const a = await client.connect();
+    await client.connect();
     const res = await client.query('SELECT * FROM "company"');
     const companies = res.rows;
 
@@ -35,6 +35,8 @@ export async function getCompanies() {
   } catch (err) {
     console.error(config,err)
     throw new Error("There was an error trying to get companies");
+  } finally {
+    await client.end();
   }
 }
 
@@ -63,6 +65,8 @@ export async function getCompanyByID(companyId: string) {
   } catch (err) {
     console.error(err)
     throw new Error(`There was an error trying to get company with id ${companyId}`);
+  } finally {
+    await client.end();
   }
 }
 
@@ -86,7 +90,7 @@ export async function createCompany(companyData: any) {
         VALUES ($1, $2, $3, $4, $5, $6, $7)
       `;
 
-    client.query(query, [
+    await client.query(query, [
       companyData.id_company,
       companyData.name,
       companyData.url,
@@ -98,6 +102,9 @@ export async function createCompany(companyData: any) {
     return companyData
   } catch (error) {
     console.error("Error al crear la empresa:", error);
+    throw new Error("No se pudo crear la compania");
+  } finally {
+    await client.end();
   }
 }
 
@@ -133,11 +140,52 @@ export async function updateCompany(companyData: any) {
     ]);
   
     console.log(`Empresa con ID ${companyData.id_company} actualizada correctamente`);
-    await client.end();
-  
     return companyData
   
   } catch (error) {
     console.error("Error al actualizar la empresa:", error);
+    throw new Error("No se pudo actualizar la compania");
+  } finally {
+    await client.end();
+  }
+}
+
+export async function deleteCompany(companyData: any) {
+  const client = new Client(config);
+  const companyId = companyData?.id_company;
+
+  if (!companyId) {
+    throw new Error("Debe indicar la compania a eliminar");
+  }
+
+  try {
+    await client.connect();
+
+    const usersResult = await client.query(
+      'SELECT COUNT(*)::int AS total FROM "users" WHERE id_company = $1',
+      [companyId]
+    );
+    const usersCount = Number(usersResult.rows[0]?.total || 0);
+
+    if (usersCount > 0) {
+      return {
+        status: false,
+        message: "No se puede eliminar la compania porque tiene usuarios asociados.",
+        usersCount,
+      };
+    }
+
+    const result = await client.query(
+      'DELETE FROM "company" WHERE id_company = $1 RETURNING id_company',
+      [companyId]
+    );
+
+    if (result.rowCount === 0) return null;
+    return { status: true, company: result.rows[0] };
+  } catch (error) {
+    console.error("Error al eliminar la empresa:", error);
+    throw new Error("No se pudo eliminar la compania");
+  } finally {
+    await client.end();
   }
 }
