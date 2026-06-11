@@ -11,6 +11,7 @@ import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 
 function getWorkOrderDisplayStatus(order: any) {
+  if (order?.quality_failed) return 'quality_failed';
   if (order?.local_blocked) return 'blocked';
   if (order?.working_state === 'paused') return 'paused';
   return order?.state;
@@ -105,6 +106,14 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   }
 
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
+    if (['start_work_order', 'finish_work_order'].includes(action) && user?.role === 'Operario' && orderSelected?.quality_failed) {
+      setError('Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.')
+      setTimeout(() => {
+        setError('')
+      }, 7000);
+      return
+    }
+
     // Validation for start action
     if (action === 'start_work_order') {
       // Check if operator is assigned

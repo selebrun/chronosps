@@ -35,6 +35,25 @@ function sortQualityControlsAsc(a: any, b: any) {
   return sortByNameAsc(a, b);
 }
 
+function getProductionQualityPriority(production: any, qualityChecks: any[]) {
+  const productionChecks = qualityChecks.filter((check: any) => getMany2OneId(check.production_id) === production.id);
+  if (productionChecks.some((check: any) => check.quality_state === 'fail')) return 0;
+  if (productionChecks.some((check: any) => !['pass', 'fail'].includes(check.quality_state))) return 1;
+  return 2;
+}
+
+function sortProductionsByQualityPriority(qualityChecks: any[]) {
+  return (a: any, b: any) => {
+    const priorityComparison = getProductionQualityPriority(a, qualityChecks) - getProductionQualityPriority(b, qualityChecks);
+    if (priorityComparison !== 0) return priorityComparison;
+
+    const dateComparison = String(a?.date_planned_start || '').localeCompare(String(b?.date_planned_start || ''), 'es', { numeric: true });
+    if (dateComparison !== 0) return dateComparison;
+
+    return sortByNameAsc(a, b);
+  };
+}
+
 
 export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user: any }) {
   const [orderQualityDetail, setOrderQualityDetail] = useState([]);
@@ -48,9 +67,10 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
       (odooOrders?.data ?? []).map((work: any) => work?.production_id?.[0])
     )
 
+    const qualityChecks = odooOrders?.data ?? [];
     const orders = (odooOrders?.production_data ?? []).filter(
       (production: any) => productionIdsInQuality.has(production?.id)
-    ).sort(sortByNameAsc)
+    ).sort(sortProductionsByQualityPriority(qualityChecks))
 
     setOrdersQualityControl(orders)
   }, [odooOrders?.data, odooOrders?.production_data])

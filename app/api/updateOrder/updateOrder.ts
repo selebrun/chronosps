@@ -27,6 +27,17 @@ function createOdooRecord(model: string, values: any, companyId: string): Promis
   });
 }
 
+async function hasFailedQualityChecks(workOrderId: number, companyId: string) {
+  const qualityChecks: any = await getOdooRecord(
+    'quality.check',
+    [['workorder_id', '=', workOrderId], ['quality_state', '=', 'fail']],
+    ['id', 'name'],
+    companyId
+  );
+
+  return Boolean(qualityChecks?.data?.length);
+}
+
 function nowUtcString() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
@@ -119,6 +130,17 @@ export async function updateOrder(
         message: 'La orden de trabajo esta bloqueada en Piso. Solo un Lider o Jefe puede desbloquearla.',
         faultString: 'La orden de trabajo esta bloqueada en Piso. Solo un Lider o Jefe puede desbloquearla.',
       };
+    }
+
+    if (['start_work_order', 'finish_work_order'].includes(action) && user.role === 'Operario') {
+      const hasFailedQuality = await hasFailedQualityChecks(work_order.id, user.company_id);
+      if (hasFailedQuality) {
+        return {
+          status: false,
+          message: 'Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.',
+          faultString: 'Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.',
+        };
+      }
     }
 
     if (action === 'unblock_work_order' && !['Lider', 'Jefe'].includes(user.role)) {

@@ -5,6 +5,7 @@ import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 
 function getWorkOrderDisplayStatus(order: any) {
+  if (order?.quality_failed) return 'quality_failed';
   if (order?.local_blocked) return 'blocked';
   if (order?.working_state === 'paused') return 'paused';
   return order?.state;

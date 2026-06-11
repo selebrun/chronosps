@@ -161,6 +161,41 @@ async function addActiveWorkOrderTimers(user: any, workOrders: any[]) {
   });
 }
 
+async function addQualityStateToWorkOrders(user: any, workOrders: any[]) {
+  const workOrderIds = (workOrders || []).map((workOrder: any) => workOrder.id).filter(Boolean);
+  if (!workOrderIds.length) return workOrders || [];
+
+  const qualityChecks: any[] = await getOdooRecords(
+    'quality.check',
+    [['workorder_id', 'in', workOrderIds], ['quality_state', '=', 'fail']],
+    ['id', 'name', 'workorder_id', 'quality_state', 'point_id'],
+    user.company_id
+  );
+
+  if (!qualityChecks.length) return workOrders || [];
+
+  const failedByWorkOrder = new Map<number, any[]>();
+  qualityChecks.forEach((qualityCheck: any) => {
+    const workOrderId = Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[0] : qualityCheck?.workorder_id;
+    const list = failedByWorkOrder.get(Number(workOrderId)) || [];
+    list.push(qualityCheck);
+    failedByWorkOrder.set(Number(workOrderId), list);
+  });
+
+  return (workOrders || []).map((workOrder: any) => {
+    const failedChecks = failedByWorkOrder.get(Number(workOrder.id)) || [];
+    if (!failedChecks.length) return workOrder;
+
+    return {
+      ...workOrder,
+      quality_failed: true,
+      quality_failed_count: failedChecks.length,
+      quality_failed_points: failedChecks.map((check: any) => Array.isArray(check?.point_id) ? check.point_id[1] : check?.name).filter(Boolean),
+      is_user_working: false,
+    };
+  });
+}
+
 export async function getWorkOrders(user: any) {
   const ordersPro: any = await getProductionOrders(user) || []
   let filter: any = []
@@ -196,7 +231,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workorders.data);
+                const workOrdersWithQuality = await addQualityStateToWorkOrders(user, workorders.data);
+                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
                 const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
                 resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
@@ -238,7 +274,8 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, productions.data);
+                const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
+                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
                 const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
                 resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
@@ -278,7 +315,8 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
         
-                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, productions.data);
+                const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
+                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
                 const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
                 resolve({ status: true, message: '', data:  workOrdersWithLocalBlocks, production_data: workorders.data });
               },

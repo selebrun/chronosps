@@ -118,7 +118,9 @@ export function ModalDetailWork({
 
   const theoreticalDuration = formatDurationFromMinutes(showDetailOrderWork?.duration_expected, showDetailOrderWork?.theoretical_duration);
   const realDuration = formatElapsedTime(elapsedSeconds);
-  const displayStatus = showDetailOrderWork.local_blocked
+  const displayStatus = showDetailOrderWork.quality_failed
+    ? 'quality_failed'
+    : showDetailOrderWork.local_blocked
     ? 'blocked'
     : showDetailOrderWork.working_state === 'paused'
       ? 'paused'
@@ -129,8 +131,13 @@ export function ModalDetailWork({
     const isUserWorking = showDetailOrderWork.is_user_working;
     const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
     const canUnblock = ['Lider', 'Jefe'].includes(user?.role);
+    const isFailedForOperator = Boolean(showDetailOrderWork.quality_failed && user?.role === 'Operario');
     const buttons = [];
     const disabledBtns = ['done', 'completed', 'cancel'].includes(showDetailOrderWork.state)
+
+    if (isFailedForOperator) {
+      return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
+    }
 
     if (isBlocked) {
       if (canUnblock) {
@@ -310,6 +317,12 @@ export function ModalDetailWork({
               {showDetailOrderWork?.local_block_reason_name ? ` - Motivo: ${showDetailOrderWork.local_block_reason_name}` : ''}. Solo un Lider o Jefe puede desbloquear esta orden de trabajo.
             </div>
           )}
+          {showDetailOrderWork.quality_failed && (
+            <div className='mt-3 bg-red-100 border border-red-500 text-red-800 px-4 py-3 rounded'>
+              <strong>Control de calidad fallado</strong>
+              {showDetailOrderWork?.quality_failed_points?.length ? ` - ${showDetailOrderWork.quality_failed_points.join(', ')}` : ''}. El operador no puede continuar hasta que Lider o Calidad revise el control.
+            </div>
+          )}
           {showDetailOrderWork.working_state === "paused" && (
             <div className='mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded'>
               <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón &quot;Reanudar&quot;.
@@ -371,7 +384,7 @@ export function ModalDetailWork({
             <div className="mb-5 z-50">
               <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Cantidad</label>
               <div className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
-                {orderProductionSelected?.product_qty}
+                1
               </div>
             </div>
           ) : (
@@ -390,7 +403,7 @@ export function ModalDetailWork({
             disabled={user.role === "Operario" ? false : qtyDone === 0}
             onClick={() => {
               setModalIsOpenCompleteOrder(false)
-              const finalQty = user.role === "Operario" ? orderProductionSelected?.product_qty : qtyDone
+              const finalQty = user.role === "Operario" ? 1 : qtyDone
               setQtyDone(0)
               executeWorkOrderAction('finish_work_order', undefined, finalQty)
             }}
