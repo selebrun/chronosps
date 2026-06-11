@@ -10,6 +10,11 @@ import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 
+function getWorkOrderDisplayStatus(order: any) {
+  if (order?.local_blocked) return 'blocked';
+  if (order?.working_state === 'paused') return 'paused';
+  return order?.state;
+}
 
 export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
@@ -129,7 +134,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       let orderWorkSelected = orderSelected;
       if (action === 'finish_work_order') {
-        orderWorkSelected = {...orderWorkSelected, state: 'completed'}
+        orderWorkSelected = {...orderWorkSelected, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
       } else {
         orderWorkSelected = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id) || orderSelected
       }
@@ -281,7 +286,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
                       {order?.sequence}
                     </th>
                     <td className="px-3 py-2">
-                      <StatusBadge status={order.local_blocked ? 'blocked' : order.state} />
+                      <StatusBadge status={getWorkOrderDisplayStatus(order)} />
                     </td>
                     <td className="px-3 py-2">{order.name}</td>
                     <td className="px-3 py-2">{order.production_id[1]}</td>
