@@ -1,11 +1,9 @@
 "use client";
-import React, { useState, useContext } from "react";
-import { signIn } from "next-auth/react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
-import { validateEmail } from "@/helper/validateEmail";
 
 
 function SignInForm() {
@@ -32,20 +30,26 @@ function SignInForm() {
 
   const handleSubmit = async (event: { preventDefault: () => void; }) => {
     event.preventDefault();
+    setLoading(true);
 
-    const res = await signIn("credentials", {
-      username: formData.email,
-      password: formData.password,
-      isChronosAdmin: true,
-      redirect: false,
+    const res = await fetch("/api/admin-auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: formData.email,
+        password: formData.password,
+      }),
     });
 
-    if (res?.error)  {
+    if (!res.ok)  {
       setLoading(false)
       setError("Usuario o contrasena inválidos");
+      return
     }
    
-    if (res?.ok) return router.push("/admin/companies")
+    return router.push("/admin/companies")
   };
 
   return (

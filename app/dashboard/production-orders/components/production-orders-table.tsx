@@ -239,13 +239,19 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
+  const productionIdsWithWorkOrders = new Set(
+    (workoOrder?.data || []).map((workOrder: any) => Number(workOrder?.production_id?.[0])).filter(Boolean)
+  );
   const productionOrders = [...(odooOrders?.data || [])].sort((a: any, b: any) => {
     const nameOrder = String(a.name || '').localeCompare(String(b.name || ''), 'es', { numeric: true });
     if (nameOrder !== 0) return nameOrder;
     const dateA = String(a.date_planned_start || '');
     const dateB = String(b.date_planned_start || '');
     return dateA.localeCompare(dateB);
-  });
+  }).filter((order: any) =>
+    (Array.isArray(order?.workorder_ids) && order.workorder_ids.length > 0) ||
+    productionIdsWithWorkOrders.has(Number(order.id))
+  );
 
 
   return (

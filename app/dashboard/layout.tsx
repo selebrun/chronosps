@@ -24,6 +24,7 @@ export default async function Layout({
 
   const session = await getServerSession(config)
   if (!session) redirect(LOGIN_URL)
+  if (!session.user?.company_id || !session.user?.role || session.user.role === 'chronosAdmin') redirect(LOGIN_URL)
 
   return (
     <div className="min-h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
