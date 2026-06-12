@@ -8,10 +8,21 @@ import { addLocalBlockState } from '@/app/api/workOrderBlocks/workOrderBlocks';
 // good practise to add `server-only` preemptively.
 // import 'server-only';
 
-function onlyProductionsWithWorkOrders(productions: any[] = []) {
-  return productions.filter((production: any) =>
-    Array.isArray(production?.workorder_ids) && production.workorder_ids.length > 0
+async function filterProductionsWithRealWorkOrders(user: any, productions: any[] = []) {
+  const productionIds = productions.map((production: any) => production.id).filter(Boolean);
+  if (!productionIds.length) return [];
+
+  const workorders = await getOdooRecords(
+    'mrp.workorder',
+    [['production_id', 'in', productionIds]],
+    ['id', 'production_id'],
+    user.company_id
   );
+  const productionIdsWithWorkOrders = new Set(
+    workorders.map((workorder: any) => Number(asOdooId(workorder.production_id))).filter(Boolean)
+  );
+
+  return productions.filter((production: any) => productionIdsWithWorkOrders.has(Number(production.id)));
 }
 
 export async function getProductionOrders(user: any) {
@@ -72,7 +83,8 @@ export async function getProductionOrders(user: any) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            resolve({ status: true, message: '', data: onlyProductionsWithWorkOrders(productions.data) });
+            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
+            resolve({ status: true, message: '', data: productionsWithWorkOrders });
           },
           false
         )
@@ -85,14 +97,15 @@ export async function getProductionOrders(user: any) {
           [['state','in',['confirmed','progress']]],
           [],
           false,
-          'name asc, date_planned_start asc',
+          'name asc',
           user.company_id,
           async (productions: any) => {
             if (!productions || !productions.data) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            resolve({ status: true, message: '', data: onlyProductionsWithWorkOrders(productions.data) });
+            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
+            resolve({ status: true, message: '', data: productionsWithWorkOrders });
           },
           false
           )
@@ -112,7 +125,8 @@ export async function getProductionOrders(user: any) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            resolve({ status: true, message: '', data: onlyProductionsWithWorkOrders(productions.data) });
+            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
+            resolve({ status: true, message: '', data: productionsWithWorkOrders });
           },
           false
           )
@@ -208,7 +222,11 @@ async function addQualityStateToWorkOrders(user: any, workOrders: any[]) {
 export async function getWorkOrders(user: any) {
   const ordersPro: any = await getProductionOrders(user) || []
   let filter: any = []
-  const idOrders = ordersPro?.data.map((order: any) => order.id)
+  const idOrders = ordersPro?.data?.map((order: any) => order.id).filter(Boolean) || []
+
+  if (!idOrders.length) {
+    return { status: true, message: '', data: [], production_data: [] };
+  }
 
   switch(user.role) {
     case 'Operario':
@@ -306,7 +324,7 @@ export async function getWorkOrders(user: any) {
           filter,
           [],
           false,
-          'name asc, date_planned_start asc',
+          'name asc',
           user.company_id,
           async (workorders: any) => {
             if (!workorders || !workorders.data) {
@@ -488,7 +506,7 @@ export async function getQualityControl(user: any) {
           [['state','in',['confirmed','progress']]],
           [],
           false,
-          'name asc, date_planned_start asc',
+          'name asc',
           user.company_id,
           async (productions: any) => {
             if (!productions || !productions.data) {
