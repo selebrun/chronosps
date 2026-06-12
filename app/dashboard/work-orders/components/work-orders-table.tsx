@@ -17,6 +17,35 @@ function getWorkOrderDisplayStatus(order: any) {
   return order?.state;
 }
 
+function getOdooName(value: any) {
+  return Array.isArray(value) ? value[1] : value || '';
+}
+
+function getOdooId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getWorkOrderNumber(order: any) {
+  return Number(order?.sequence ?? order?.x_studio_nro_ot ?? order?.id) || 0;
+}
+
+function sortWorkOrdersByProductionAndSequence(workOrders: any[] = []) {
+  return [...workOrders].sort((a: any, b: any) => {
+    const productionNameA = getOdooName(a?.production_id);
+    const productionNameB = getOdooName(b?.production_id);
+    const productionOrder = productionNameA.localeCompare(productionNameB, 'es', { numeric: true });
+    if (productionOrder !== 0) return productionOrder;
+
+    const productionIdOrder = (Number(getOdooId(a?.production_id)) || 0) - (Number(getOdooId(b?.production_id)) || 0);
+    if (productionIdOrder !== 0) return productionIdOrder;
+
+    const workOrderNumberOrder = getWorkOrderNumber(a) - getWorkOrderNumber(b);
+    if (workOrderNumberOrder !== 0) return workOrderNumberOrder;
+
+    return String(a?.name || '').localeCompare(String(b?.name || ''), 'es', { numeric: true });
+  });
+}
+
 export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalIsOpenInstructions, setModalIsOpenInstructions] = useState(false);
@@ -95,6 +124,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   }
   
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
+  const orderedWorkOrders = sortWorkOrdersByProductionAndSequence(workoOrder?.data || [])
 
   const isQualityControlError = (message: string) => {
     const normalizedMessage = (message || '').toLowerCase();
@@ -289,7 +319,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
                 </tr>
             </thead>
             <tbody>
-              {workoOrder?.data.map((order: any) => (
+              {orderedWorkOrders.map((order: any) => (
                 <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:bg-white dark:border-white bg-lightCyan text-black">
                     <th className="px-3 py-2">
                       {order?.sequence}
