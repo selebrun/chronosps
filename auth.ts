@@ -6,7 +6,7 @@ import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 //Services
 //import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
-import { getUsers } from "./app/api/users/users";
+import { getUsers, refreshUserOdooLink } from "./app/api/users/users";
 
 
 export const config = {
@@ -51,9 +51,14 @@ export const config = {
 
           if (!chronosUsers.length) return null;
        
-          const user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );      
+          let user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );
           if (!user) return null;
           const role = user?.rol?.trim();
+          const shouldRefreshOdooLink = !Number(user?.odoo_id) || (['Lider', 'Jefe'].includes(role) && !Number(user?.odoo_user_id));
+
+          if (shouldRefreshOdooLink) {
+            user = await refreshUserOdooLink(user);
+          }
           
           const user_data = {
             name: user?.name?.trim(),
