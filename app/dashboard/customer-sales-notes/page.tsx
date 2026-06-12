@@ -4,8 +4,12 @@ import { config } from '@/auth';
 import { redirect } from 'next/navigation';
 import { CustomerSalesNotesTable } from './components/customer-sales-notes-table';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function Page() {
   const session = await getServerSession(config);
+  if (!session?.user) redirect('/login');
   const user = session.user;
 
   if (!['Cliente', 'Jefe'].includes(user.role)) redirect('/dashboard');
