@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { signIn } from "next-auth/react";
+import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -44,8 +44,18 @@ function SignIn() {
       });
 
       if (res?.ok) {
-        router.refresh();
-        window.location.assign("/dashboard");
+        for (let attempt = 0; attempt < 6; attempt += 1) {
+          const session = await getSession();
+          if (session?.user) {
+            router.refresh();
+            window.location.replace("/dashboard");
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 150));
+        }
+
+        setLoading(false);
+        setError("La sesion fue aceptada, pero el navegador no la dejo disponible. Refresque la pagina e intente nuevamente.");
         return;
       }
 
