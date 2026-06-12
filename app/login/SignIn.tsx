@@ -52,7 +52,10 @@ function SignIn() {
       setError(res.error);
     }
 
-    if (res?.ok) return router.push("/dashboard");
+    if (res?.ok) {
+      router.refresh();
+      window.location.assign("/dashboard");
+    }
   };
 
   return (
