@@ -252,8 +252,8 @@ export async function getWorkOrders(user: any) {
     case 'Lider':
       return new Promise(async (resolve, reject) => {
         if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
-        filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_id]]
-        filter.push(['id','=',  idOrders])
+        filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]]
+        filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
           filter,
@@ -486,8 +486,8 @@ export async function getQualityControl(user: any) {
     case 'Lider':
       return new Promise(async (resolve, reject) => {
         if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
-        filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_id]]
-        filter.push(['id','=',  idOrders])
+        filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]]
+        filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
           filter,
@@ -525,7 +525,7 @@ export async function getQualityControl(user: any) {
     case 'Jefe':
       return new Promise(async (resolve, reject) => {
         filter = [['state','in',['confirmed','progress']]]
-        filter.push(['id','=',  idOrders])
+        filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
           filter,
@@ -564,7 +564,7 @@ export async function getQualityControl(user: any) {
     case 'Calidad':
       return new Promise(async (resolve, reject) => {
         filter = [['state','in',['confirmed','progress']]]
-        filter.push(['id','=',  idOrders])
+        filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
           filter,
@@ -697,6 +697,8 @@ const CUSTOMER_PRODUCTION_FIELDS = [
   'product_qty',
   'qty_producing',
   'origin',
+  'sale_id',
+  'sale_line_id',
   'workorder_ids',
 ];
 
@@ -809,26 +811,54 @@ function getProductionDirectSaleId(production: any, sales: any[]) {
   return sale?.id || null;
 }
 
+function findProductionParentByOrigin(origin: any, productionsByName: Map<string, any>) {
+  const originText = normalizeText(origin);
+  if (!originText) return null;
+
+  const exactParent = productionsByName.get(originText);
+  if (exactParent) return exactParent;
+
+  return Array.from(productionsByName.values()).find((production: any) =>
+    production?.name && originText.includes(production.name)
+  ) || null;
+}
+
 async function getProductionChildren(productions: any[], user: any) {
   const productionsById = new Map(productions.map((production: any) => [production.id, production]));
   let productionsByName = new Map(productions.map((production: any) => [production.name, production]));
   let pendingNames = productions.map((production: any) => production.name).filter(Boolean);
 
   for (let depth = 0; depth < 5 && pendingNames.length; depth += 1) {
-    const children = await getOdooRecords(
+    const exactChildren = getOdooRecords(
       'mrp.production',
       [['origin', 'in', pendingNames]],
       CUSTOMER_PRODUCTION_FIELDS,
       user.company_id
     );
+    const partialChildren = Promise.all(
+      pendingNames.map((name: string) =>
+        getOdooRecords(
+          'mrp.production',
+          [['origin', 'ilike', name]],
+          CUSTOMER_PRODUCTION_FIELDS,
+          user.company_id
+        )
+      )
+    );
+    const [exactChildrenData, partialChildrenGroups] = await Promise.all([exactChildren, partialChildren]);
+    const children = Array.from(
+      new Map(
+        [...exactChildrenData, ...partialChildrenGroups.flat()].map((production: any) => [production.id, production])
+      ).values()
+    );
 
     const newChildren = children
       .filter((production: any) => !productionsById.has(production.id))
       .map((production: any) => {
-        const parent = productionsByName.get(normalizeText(production.origin));
+        const parent = findProductionParentByOrigin(production.origin, productionsByName);
         return {
           ...production,
-          customer_sale_id: parent?.customer_sale_id,
+          customer_sale_id: parent?.customer_sale_id || asOdooId(parent?.sale_id),
         };
       });
 
@@ -856,8 +886,7 @@ function getProductionSaleMap(productions: any[], sales: any[]) {
     productions.forEach((production: any) => {
       if (productionSaleMap.has(production.id)) return;
 
-      const parentKey = getProductionSaleKey(production);
-      const parent = productionByName.get(parentKey);
+      const parent = findProductionParentByOrigin(getProductionSaleKey(production), productionByName);
       const parentSaleId = parent ? productionSaleMap.get(parent.id) : null;
 
       if (parentSaleId) {
@@ -870,9 +899,12 @@ function getProductionSaleMap(productions: any[], sales: any[]) {
   return productionSaleMap;
 }
 
+function uniqueByOdooId(records: any[]) {
+  return Array.from(new Map((records || []).map((record: any) => [record.id, record])).values());
+}
+
 function getProductionParent(production: any, productionByName: Map<string, any>) {
-  const parentKey = getProductionSaleKey(production);
-  return parentKey ? productionByName.get(parentKey) : null;
+  return findProductionParentByOrigin(getProductionSaleKey(production), productionByName);
 }
 
 function productionBelongsToProduct(production: any, productId: number, productionByName: Map<string, any>) {
@@ -1027,7 +1059,7 @@ export async function getCustomerSalesNotes(user: any) {
           ).values()
         );
 
-        const productionData = await getProductionChildren(directProductions, user);
+        const productionData = uniqueByOdooId(await getProductionChildren(directProductions, user));
         const productionSaleMap = getProductionSaleMap(productionData, sales.data);
         const productionIds = productionData.map((production: any) => production.id);
         const productionWorkorderIds = productionData.flatMap((production: any) => production.workorder_ids || []);
@@ -1076,7 +1108,7 @@ export async function getCustomerSalesNotes(user: any) {
                 const workorderData = workorders?.data || [];
 
                 const data = sales.data.map((sale: any) => {
-                  const saleProductions = productionData.filter((production: any) => productionSaleMap.get(production.id) === sale.id);
+                  const saleProductions = uniqueByOdooId(productionData.filter((production: any) => productionSaleMap.get(production.id) === sale.id));
                   const productionsWithProgress = saleProductions.map((production: any) => {
                     const productionWorkorders = workorderData.filter((workorder: any) => asOdooId(workorder.production_id) === production.id);
 
@@ -1089,7 +1121,10 @@ export async function getCustomerSalesNotes(user: any) {
                     };
                   });
 
-                  const saleWorkorders = productionsWithProgress.flatMap((production: any) => production.workorders);
+                  const saleWorkorders = uniqueByOdooId(productionsWithProgress.flatMap((production: any) => production.workorders));
+                  const saleWorkorderCount = saleWorkorders.length || new Set(
+                    saleProductions.flatMap((production: any) => production.workorder_ids || [])
+                  ).size;
                   const saleProducts = buildSaleProductRows(sale, saleLines, productionsWithProgress, saleWorkorders);
 
                   console.log('Consulta Cliente NV detalle', {
@@ -1115,7 +1150,7 @@ export async function getCustomerSalesNotes(user: any) {
                     amount_total: sale.amount_total,
                     progress: averageProgress(saleWorkorders),
                     production_count: productionsWithProgress.length,
-                    workorder_count: saleWorkorders.length,
+                    workorder_count: saleWorkorderCount,
                     products: saleProducts,
                     productions: productionsWithProgress,
                   };

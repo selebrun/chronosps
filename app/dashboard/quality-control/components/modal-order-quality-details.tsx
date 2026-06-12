@@ -24,7 +24,11 @@ function ModalOrderQualityDetails({
   saveNotes: (observations?: string, measure?: number) => Promise<any>;
   user?: any;
 }) {
-  const [measureValue, setMeasureValue] = useState<number>(selectedOrderQuantity?.measure || 0);
+  const [measureValue, setMeasureValue] = useState<string>(
+    selectedOrderQuantity?.measure === null || selectedOrderQuantity?.measure === undefined || selectedOrderQuantity?.measure === false
+      ? ""
+      : String(selectedOrderQuantity.measure)
+  );
   const [observations, setObservations] = useState<string>(selectedOrderQuantity?.additional_note || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -44,15 +48,25 @@ function ModalOrderQualityDetails({
     : selectedOrderQuantity?.name || "N/A";
 
   useEffect(() => {
-    setMeasureValue(selectedOrderQuantity?.measure || 0);
+    setMeasureValue(
+      selectedOrderQuantity?.measure === null || selectedOrderQuantity?.measure === undefined || selectedOrderQuantity?.measure === false
+        ? ""
+        : String(selectedOrderQuantity.measure)
+    );
     setObservations(selectedOrderQuantity?.additional_note || "");
     setSaveMessage("");
   }, [selectedOrderQuantity?.id, selectedOrderQuantity?.measure, selectedOrderQuantity?.additional_note]);
 
+  const getMeasure = () => {
+    if (measureValue === "") return undefined;
+    const parsedMeasure = Number(measureValue);
+    return Number.isFinite(parsedMeasure) ? parsedMeasure : undefined;
+  };
+
   const onSaveNotes = async () => {
     setIsSubmitting(true);
     setSaveMessage("");
-    const response = await saveNotes(observations, measureValue);
+    const response = await saveNotes(observations, getMeasure());
     setSaveMessage(response?.message || (response?.status ? "Notas guardadas." : "No se pudieron guardar las notas."));
     setIsSubmitting(false);
   };
@@ -61,7 +75,7 @@ function ModalOrderQualityDetails({
     if (isQualityClosed && !canModifyClosedQuality) return;
 
     setIsSubmitting(true);
-    const response = action === "accept" ? await acceptOrder(observations, measureValue) : await rejectOrder(observations, measureValue);
+    const response = action === "accept" ? await acceptOrder(observations, getMeasure()) : await rejectOrder(observations, getMeasure());
 
     if (response?.status) {
       openJobDetail();
@@ -125,8 +139,9 @@ function ModalOrderQualityDetails({
               <input
                 type="number"
                 min="0"
+                step="any"
                 value={measureValue}
-                onChange={(event) => setMeasureValue(parseInt(event.target.value) || 0)}
+                onChange={(event) => setMeasureValue(event.target.value)}
                 className="bg-whiteInput min-h-12 w-full shadow-md rounded-md text-center focus:outline-none text-gray-900"
                 placeholder="0"
                 disabled={false}
