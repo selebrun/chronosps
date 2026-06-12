@@ -401,7 +401,7 @@ export async function getWorkOrders(user: any) {
               // ['id','name','state','x_studio_nro_ot','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working','worksheet','quality_state']
               [],
               false,
-              false,
+              'production_id asc, sequence asc, name asc',
               user.company_id,
               async (productions: any) => {
                 if (!productions || !productions.data) {
@@ -441,7 +441,7 @@ export async function getWorkOrders(user: any) {
               [['production_id','in',production_orders]],
               [],
               false,
-              'sequence asc, name asc',
+              'production_id asc, sequence asc, name asc',
               user.company_id,
               async (productions: any) => {
                 if (!productions || !productions.data) {
