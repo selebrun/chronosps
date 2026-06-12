@@ -31,30 +31,29 @@ function SignIn() {
 
   const handleSubmit = async (event: { preventDefault: () => void; }) => {
     event.preventDefault();
-    setLoading(true)
+    setError("");
+    setLoading(true);
 
-    const dni = removeSpecialCharacters(formData.dniUser)
+    try {
+      const dni = removeSpecialCharacters(formData.dniUser);
 
-    const res = await signIn("credentials", {
-      username: dni,
-      password: formData.password,
-      redirect: false,
-    });
+      const res = await signIn("credentials", {
+        username: dni,
+        password: formData.password,
+        redirect: false,
+      });
 
-    if (res?.error === 'CredentialsSignin') {
-      setLoading(false)
-      setError('Usuario o contraseña incorrectas')
-      return
-    }
+      if (res?.ok) {
+        router.refresh();
+        window.location.assign("/dashboard");
+        return;
+      }
 
-    if (res?.error)  {
-      setLoading(false)
-      setError(res.error);
-    }
-
-    if (res?.ok) {
-      router.refresh();
-      window.location.assign("/dashboard");
+      setLoading(false);
+      setError(res?.error === "CredentialsSignin" ? "Usuario o contrasena incorrectas" : res?.error || "No se pudo iniciar sesion.");
+    } catch (error) {
+      setLoading(false);
+      setError("No se pudo conectar con el servidor de autenticacion.");
     }
   };
 
@@ -122,7 +121,7 @@ function SignIn() {
               </div>
             </div>
           </div>
-          <button disabled={(formData.dniUser === '') || (formData.password === '')} className="bg-[#6BB2D7] flex justify-center  font-bold shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline">
+          <button disabled={loading || (formData.dniUser === '') || (formData.password === '')} className="bg-[#6BB2D7] flex justify-center  font-bold shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline disabled:opacity-50">
             <div>Ingresar</div>
             <div role="status"  className='relative left-4' >
               {loading && <svg width="20" height="20" fill="currentColor" className="mr-2 animate-spin" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">
