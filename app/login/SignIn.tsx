@@ -37,6 +37,12 @@ function SignIn() {
     try {
       const dni = removeSpecialCharacters(formData.dniUser);
 
+      await fetch("/api/session/clear-nextauth", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+
       const res = await signIn("credentials", {
         username: dni,
         password: formData.password,

@@ -23,6 +23,7 @@ export function LogoMenu({ userRole, isDashboardRoute, isAdminRoute = false }: {
     }
 
     await signOut({ redirect: false, callbackUrl: '/login' });
+    await fetch('/api/session/clear-nextauth', { method: 'POST' });
     localStorage.removeItem('admin');
     window.location.assign('/login');
   };
