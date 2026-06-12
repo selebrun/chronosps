@@ -25,6 +25,32 @@ async function filterProductionsWithRealWorkOrders(user: any, productions: any[]
   return productions.filter((production: any) => productionIdsWithWorkOrders.has(Number(production.id)));
 }
 
+function getLeaderOdooUserId(user: any) {
+  return Number(user?.odoo_user_id?.toString?.().trim?.() ?? user?.odoo_user_id) || 0;
+}
+
+async function resolveLeaderOdooUserId(user: any) {
+  const userId = getLeaderOdooUserId(user);
+  if (userId) return userId;
+
+  const employeeId = Number(user?.odoo_id?.toString?.().trim?.() ?? user?.odoo_id) || 0;
+  if (!employeeId) return 0;
+
+  const employees = await getOdooRecords(
+    'hr.employee',
+    [['id', '=', employeeId]],
+    ['id', 'user_id'],
+    user.company_id
+  );
+  return Number(asOdooId(employees?.[0]?.user_id)) || 0;
+}
+
+function getLeaderProductionDomain(userId: number, productionIds: number[] | false = false) {
+  const domain: any[] = [['state','in',['confirmed','progress']], ['user_id', '=', userId]];
+  if (Array.isArray(productionIds)) domain.push(['id', 'in', productionIds]);
+  return domain;
+}
+
 export async function getProductionOrders(user: any) {
 	switch(user.role) {
     case 'Operario':
@@ -66,14 +92,15 @@ export async function getProductionOrders(user: any) {
 
     case 'Lider':
       return new Promise(async (resolve, reject) => {
-        if(!user.odoo_user_id) {
+        const leaderUserId = await resolveLeaderOdooUserId(user);
+        if(!leaderUserId) {
           reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
           return;
         }
 
         getOdooData(
           'mrp.production',
-          [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]],
+          getLeaderProductionDomain(leaderUserId),
           [],
           false,
           false,
@@ -272,12 +299,12 @@ export async function getWorkOrders(user: any) {
 
     case 'Lider':
       return new Promise(async (resolve, reject) => {
-        if(!user.odoo_user_id) {
+        const leaderUserId = await resolveLeaderOdooUserId(user);
+        if(!leaderUserId) {
           reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
           return;
         }
-        filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]]
-        filter.push(['id','in',  idOrders])
+        filter = getLeaderProductionDomain(leaderUserId, idOrders)
         getOdooData(
           'mrp.production',
           filter,
