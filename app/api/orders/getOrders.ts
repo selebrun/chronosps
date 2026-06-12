@@ -289,7 +289,7 @@ export async function getWorkOrders(user: any) {
                 const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
                 const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
                 const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
-                resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
+                resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: workorders.data });
               },
               false
             );
@@ -478,52 +478,48 @@ export async function getWorkOrders(user: any) {
 }
 
 export async function getQualityControl(user: any) {
-  const ordersPro: any = await getProductionOrders(user) || []
-  const idOrders = ordersPro?.data.map((order: any) => order.id)
-
-  if (!idOrders.length) {
-    return new Promise(async (resolve, reject) => {
-      reject({ status: false, message: "No se han podido obtener las ódenes de producción." });
-    })
-  }
-
-  let filter: any = []
   switch(user.role) {
     case 'Lider':
-      return new Promise(async (resolve, reject) => {
-        if(!user.odoo_user_id) {
-          reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
-          return;
-        }
-        filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]]
-        filter.push(['id','in',  idOrders])
+    case 'Jefe':
+    case 'Calidad':
+      return new Promise(async (resolve) => {
         getOdooData(
           'mrp.production',
-          filter,
-          ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
+          [['state','in',['confirmed','progress']]],
+          [],
           false,
-          false,
+          'name asc, date_planned_start asc',
           user.company_id,
-          async (workorders: any) => {
-            if (!workorders || !workorders.data) {
-              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+          async (productions: any) => {
+            if (!productions || !productions.data) {
+              resolve({ status: true, message: '', data: [], production_data: [] });
               return;
             }
-            const production_orders = workorders.data.map((p: any) => p.id);
+
+            const productionOrders = productions.data.map((p: any) => p.id);
+            if (!productionOrders.length) {
+              resolve({ status: true, message: '', data: [], production_data: [] });
+              return;
+            }
+
             getOdooData(
               'quality.check',
-              [['production_id','in',production_orders]],
-              ['id','name','production_id','quality_state','product_id','point_id','note','additional_note','measure','test_type_id','workorder_id','workorder_id'],
+              [['production_id','in',productionOrders]],
+              [],
               false,
               false,
               user.company_id,
-              async (productions: any) => {
-                if (!productions || !productions.data) {
-                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+              async (qualityChecksResponse: any) => {
+                if (!qualityChecksResponse || !qualityChecksResponse.data) {
+                  resolve({ status: true, message: '', data: [], production_data: productions.data });
                   return;
                 }
-                const qualityChecks = await addWorkOrderSequenceToQualityChecks(productions.data, user.company_id);
-                resolve({ status: true, message: '', data:  qualityChecks, production_data: workorders.data });
+
+                const visibleQualityChecks = user.role === 'Calidad'
+                  ? qualityChecksResponse.data.filter((check: any) => !['pass', 'fail'].includes(check.quality_state))
+                  : qualityChecksResponse.data;
+                const qualityChecks = await addWorkOrderSequenceToQualityChecks(visibleQualityChecks, user.company_id);
+                resolve({ status: true, message: '', data: qualityChecks, production_data: productions.data });
               },
               false
             );
@@ -531,82 +527,6 @@ export async function getQualityControl(user: any) {
           false
         )
       });
-    case 'Jefe':
-      return new Promise(async (resolve, reject) => {
-        filter = [['state','in',['confirmed','progress']]]
-        filter.push(['id','in',  idOrders])
-        getOdooData(
-          'mrp.production',
-          filter,
-          [],
-          // ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
-          false,
-          false,
-          user.company_id,
-          async (workorders: any) => {
-            if (!workorders || !workorders.data) {
-              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-              return;
-            }
-            const production_orders = workorders.data.map((p: any) => p.id);
-            getOdooData(
-              'quality.check',
-              [['production_id','in',production_orders]],
-              [],
-              // ['id','production_id','name','quality_state','product_id','point_id','note','additional_note','test_type_id','workorder_id','workorder_id'],
-              false,
-              false,
-              user.company_id,
-              async (productions: any) => {
-                if (!productions || !productions.data) {
-                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-                  return;
-                }
-                const qualityChecks = await addWorkOrderSequenceToQualityChecks(productions.data, user.company_id);
-                resolve({ status: true, message: '', data:  qualityChecks, production_data: workorders.data });
-              },
-              false
-            );
-          },
-          false
-        )})
-    case 'Calidad':
-      return new Promise(async (resolve, reject) => {
-        filter = [['state','in',['confirmed','progress']]]
-        filter.push(['id','in',  idOrders])
-        getOdooData(
-          'mrp.production',
-          filter,
-          [],
-          false,
-          false,
-          user.company_id,
-          async (workorders: any) => {
-            if (!workorders || !workorders.data) {
-              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-              return;
-            }
-            const production_orders = workorders.data.map((p: any) => p.id);
-            getOdooData(
-              'quality.check',
-              [['production_id','in',production_orders]],
-              [],
-              false,
-              false,
-              user.company_id,
-              async (productions: any) => {
-                if (!productions || !productions.data) {
-                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-                  return;
-                }
-                const qualityChecks = await addWorkOrderSequenceToQualityChecks(productions.data, user.company_id);
-                resolve({ status: true, message: '', data:  qualityChecks, production_data: workorders.data });
-              },
-              false
-            );
-          },
-          false
-        )})
     default:
       return new Promise(async (resolve, reject) => {
         reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
