@@ -657,54 +657,47 @@ function getOdooRecords(
   });
 }
 
-async function getOdooRecordsWithRelation(
-  model: string,
-  domain: any[],
-  fields: string[],
-  companyId: string,
-  relation: Record<string, any>
-) {
-  const records = await getOdooRecords(model, domain, fields, companyId);
-  return records.map((record: any) => ({ ...record, ...relation }));
-}
-
 async function getProductionsBySaleId(saleIds: number[], companyId: string) {
-  const productionGroups = await Promise.all(
-    saleIds.map((saleId) =>
-      getOdooRecordsWithRelation(
-        'mrp.production',
-        [['sale_id', '=', saleId]],
-        CUSTOMER_PRODUCTION_FIELDS,
-        companyId,
-        { customer_sale_id: saleId }
-      )
-    )
+  const productions = await getOdooRecords(
+    'mrp.production',
+    [['sale_id', 'in', saleIds]],
+    CUSTOMER_PRODUCTION_FIELDS,
+    companyId
   );
 
-  return productionGroups.flat();
+  return productions.map((production: any) => ({
+    ...production,
+    customer_sale_id: asOdooId(production.sale_id),
+  }));
 }
 
 async function getProductionsBySaleLineId(saleLines: any[], companyId: string) {
-  const productionGroups = await Promise.all(
-    saleLines.map((line: any) =>
-      getOdooRecordsWithRelation(
-        'mrp.production',
-        [['sale_line_id', '=', line.id]],
-        CUSTOMER_PRODUCTION_FIELDS,
-        companyId,
-        {
-          customer_sale_id: asOdooId(line.order_id),
-          customer_sale_line_id: line.id,
-        }
-      )
-    )
+  const saleByLineId = new Map<number, number>(
+    saleLines.map((line: any) => [line.id, asOdooId(line.order_id)])
+  );
+  const lineIds = saleLines.map((line: any) => line.id).filter(Boolean);
+  if (!lineIds.length) return [];
+
+  const productions = await getOdooRecords(
+    'mrp.production',
+    [['sale_line_id', 'in', lineIds]],
+    CUSTOMER_PRODUCTION_FIELDS,
+    companyId
   );
 
-  return productionGroups.flat();
+  return productions.map((production: any) => {
+    const saleLineId = asOdooId(production.sale_line_id);
+    return {
+      ...production,
+      customer_sale_id: saleByLineId.get(saleLineId),
+      customer_sale_line_id: saleLineId,
+    };
+  });
 }
 
 async function getProductionsByOriginSales(sales: any[], companyId: string) {
-  const searches = sales.flatMap((sale: any) => {
+  const saleByOriginToken = new Map<string, number>();
+  sales.forEach((sale: any) => {
     const tokens = new Set<string>([sale.name]);
     const lastNamePart = sale.name?.split('/').pop();
 
@@ -713,22 +706,22 @@ async function getProductionsByOriginSales(sales: any[], companyId: string) {
       tokens.add(lastNamePart.replace(/^0+/, '') || lastNamePart);
     }
 
-    return Array.from(tokens)
-      .filter(Boolean)
-      .map((token) =>
-        getOdooRecordsWithRelation(
-          'mrp.production',
-          [['origin', 'ilike', token]],
-          CUSTOMER_PRODUCTION_FIELDS,
-          companyId,
-          { customer_sale_id: sale.id }
-        )
-      );
+    Array.from(tokens).map(normalizeText).filter(Boolean).forEach((token) => {
+      saleByOriginToken.set(token, sale.id);
+    });
   });
 
-  const productionGroups = await Promise.all(searches);
+  const productions = await getOdooRecords(
+    'mrp.production',
+    [['origin', 'in', Array.from(saleByOriginToken.keys())]],
+    CUSTOMER_PRODUCTION_FIELDS,
+    companyId
+  );
 
-  return productionGroups.flat();
+  return productions.map((production: any) => ({
+    ...production,
+    customer_sale_id: saleByOriginToken.get(normalizeText(production.origin)),
+  }));
 }
 
 function getProductionDirectSaleId(production: any, sales: any[]) {
@@ -757,28 +750,12 @@ async function getProductionChildren(productions: any[], user: any) {
   let productionsByName = new Map(productions.map((production: any) => [production.name, production]));
   let pendingNames = productions.map((production: any) => production.name).filter(Boolean);
 
-  for (let depth = 0; depth < 5 && pendingNames.length; depth += 1) {
-    const exactChildren = getOdooRecords(
+  for (let depth = 0; depth < 4 && pendingNames.length; depth += 1) {
+    const children = await getOdooRecords(
       'mrp.production',
       [['origin', 'in', pendingNames]],
       CUSTOMER_PRODUCTION_FIELDS,
       user.company_id
-    );
-    const partialChildren = Promise.all(
-      pendingNames.map((name: string) =>
-        getOdooRecords(
-          'mrp.production',
-          [['origin', 'ilike', name]],
-          CUSTOMER_PRODUCTION_FIELDS,
-          user.company_id
-        )
-      )
-    );
-    const [exactChildrenData, partialChildrenGroups] = await Promise.all([exactChildren, partialChildren]);
-    const children = Array.from(
-      new Map(
-        [...exactChildrenData, ...partialChildrenGroups.flat()].map((production: any) => [production.id, production])
-      ).values()
     );
 
     const newChildren = children
@@ -798,6 +775,8 @@ async function getProductionChildren(productions: any[], user: any) {
 
   return Array.from(productionsById.values());
 }
+
+const CUSTOMER_SALES_LIMIT = 50;
 
 function getProductionSaleMap(productions: any[], sales: any[]) {
   const productionSaleMap = new Map<number, number>();
@@ -963,7 +942,7 @@ export async function getCustomerSalesNotes(user: any) {
       'sale.order',
       salesDomain,
       ['id', 'name', 'partner_id', 'date_order', 'state', 'client_order_ref', 'amount_total'],
-      false,
+      CUSTOMER_SALES_LIMIT,
       'date_order desc',
       user.company_id,
       async (sales: any) => {
@@ -993,9 +972,8 @@ export async function getCustomerSalesNotes(user: any) {
         const productionIds = productionData.map((production: any) => production.id);
         const productionWorkorderIds = productionData.flatMap((production: any) => production.workorder_ids || []);
 
-        console.log('Consulta Cliente NV/OP', {
+        console.log('Consulta Cliente NV/OP resumen', {
           sale_count: sales.data.length,
-          sale_ids: saleIds,
           sale_line_count: saleLines.length,
           production_by_sale_id_count: productionsBySaleId.length,
           production_by_sale_line_id_count: productionsBySaleLineId.length,
@@ -1055,19 +1033,6 @@ export async function getCustomerSalesNotes(user: any) {
                     saleProductions.flatMap((production: any) => production.workorder_ids || [])
                   ).size;
                   const saleProducts = buildSaleProductRows(sale, saleLines, productionsWithProgress, saleWorkorders);
-
-                  console.log('Consulta Cliente NV detalle', {
-                    sale: sale.name,
-                    sale_id: sale.id,
-                    productions: saleProductions.map((production: any) => production.name),
-                    workorder_count: saleWorkorders.length,
-                    product_rows: saleProducts.map((product: any) => ({
-                      product: product.product,
-                      production_count: product.production_count,
-                      workorder_count: product.workorder_count,
-                      progress: product.progress,
-                    })),
-                  });
 
                   return {
                     id: sale.id,
