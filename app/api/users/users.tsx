@@ -191,25 +191,85 @@ export async function refreshUserOdooLink(user: any) {
     const odooEmployeeLink = await getOdooEmployeeLink(idCompany, code, { ...user, code });
     await client.connect();
 
+    const cleanCode = removeSpecialCharacters(code.toString()).trim();
     const result = await client.query(
       `UPDATE users
-       SET odoo_id = $1,
-           odoo_user_id = $2
-       WHERE code = $3
-         AND id_company = $4
+       SET odoo_id = COALESCE($1, odoo_id),
+           odoo_user_id = COALESCE($2, odoo_user_id)
+       WHERE TRIM(id_company) = $3
+         AND (
+           TRIM(code) = $4
+           OR regexp_replace(TRIM(code), '[^A-Za-z0-9]', '', 'g') = $5
+         )
        RETURNING *`,
       [
         odooEmployeeLink.employeeId,
         odooEmployeeLink.userId,
-        code,
-        idCompany,
+        idCompany.toString().trim(),
+        code.toString().trim(),
+        cleanCode,
       ]
     );
+
+    console.log('Sincronizacion IDs Odoo usuario', {
+      code: code.toString().trim(),
+      id_company: idCompany.toString().trim(),
+      odoo_id: odooEmployeeLink.employeeId,
+      odoo_user_id: odooEmployeeLink.userId,
+      updated: result.rowCount,
+    });
 
     return result.rows[0] || user;
   } catch (error) {
     console.error("Error al refrescar IDs de Odoo del usuario:", error);
     return user;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function saveUserOdooLink(user: any, employeeId: number | null, userId: number | null) {
+  const client = new Client(dbConfig);
+
+  try {
+    const code = user?.document || user?.code;
+    const idCompany = user?.company_id || user?.id_company;
+    if (!code || !idCompany || (!employeeId && !userId)) return null;
+
+    const cleanCode = removeSpecialCharacters(code.toString()).trim();
+    await client.connect();
+
+    const result = await client.query(
+      `UPDATE users
+       SET odoo_id = COALESCE($1, odoo_id),
+           odoo_user_id = COALESCE($2, odoo_user_id)
+       WHERE TRIM(id_company) = $3
+         AND (
+           TRIM(code) = $4
+           OR regexp_replace(TRIM(code), '[^A-Za-z0-9]', '', 'g') = $5
+         )
+       RETURNING *`,
+      [
+        employeeId || null,
+        userId || null,
+        idCompany.toString().trim(),
+        code.toString().trim(),
+        cleanCode,
+      ]
+    );
+
+    console.log('IDs Odoo guardados desde consulta', {
+      code: code.toString().trim(),
+      id_company: idCompany.toString().trim(),
+      odoo_id: employeeId,
+      odoo_user_id: userId,
+      updated: result.rowCount,
+    });
+
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error guardando IDs de Odoo del usuario:', error);
+    return null;
   } finally {
     await client.end();
   }
