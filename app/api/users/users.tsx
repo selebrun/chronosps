@@ -24,10 +24,22 @@ async function getCompanyById(idCompany: string | number) {
       `SELECT id_company, name, url, domain, database, user_default, password
        FROM company
        WHERE id_company = $1`,
-      [idCompany.toString()]
+      [idCompany.toString().trim()]
     );
 
-    return res.rows[0];
+    const company = res.rows[0];
+    if (!company) return null;
+
+    return {
+      ...company,
+      id_company: company.id_company?.trim(),
+      name: company.name?.trim(),
+      url: company.url?.trim(),
+      domain: company.domain?.trim(),
+      database: company.database?.trim(),
+      user_default: company.user_default?.trim(),
+      password: company.password?.trim(),
+    };
   } finally {
     await client.end();
   }
