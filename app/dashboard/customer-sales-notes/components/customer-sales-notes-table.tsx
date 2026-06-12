@@ -1,5 +1,3 @@
-"use client";
-
 import { StatusBadge } from '@/ui/status-badge/status-badge';
 
 function formatPercent(value: number) {
