@@ -240,53 +240,6 @@ export async function refreshUserOdooLink(user: any) {
   }
 }
 
-export async function saveUserOdooLink(user: any, employeeId: number | null, userId: number | null) {
-  const client = new Client(dbConfig);
-
-  try {
-    const code = user?.document || user?.code;
-    const idCompany = user?.company_id || user?.id_company;
-    if (!code || !idCompany || (!employeeId && !userId)) return null;
-
-    const cleanCode = removeSpecialCharacters(code.toString()).trim();
-    await client.connect();
-
-    const result = await client.query(
-      `UPDATE users
-       SET odoo_id = COALESCE($1, odoo_id),
-           odoo_user_id = COALESCE($2, odoo_user_id)
-       WHERE TRIM(id_company) = $3
-         AND (
-           TRIM(code) = $4
-           OR regexp_replace(TRIM(code), '[^A-Za-z0-9]', '', 'g') = $5
-         )
-       RETURNING *`,
-      [
-        employeeId || null,
-        userId || null,
-        idCompany.toString().trim(),
-        code.toString().trim(),
-        cleanCode,
-      ]
-    );
-
-    console.log('IDs Odoo guardados desde consulta', {
-      code: code.toString().trim(),
-      id_company: idCompany.toString().trim(),
-      odoo_id: employeeId,
-      odoo_user_id: userId,
-      updated: result.rowCount,
-    });
-
-    return result.rows[0] || null;
-  } catch (error) {
-    console.error('Error guardando IDs de Odoo del usuario:', error);
-    return null;
-  } finally {
-    await client.end();
-  }
-}
-
 export async function createUsers(user: any) {
   const client = new Client(dbConfig);
 
