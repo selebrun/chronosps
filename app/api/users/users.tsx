@@ -44,6 +44,12 @@ function getIdentificationDomain(candidates: string[]) {
   return ["|", ...candidates.slice(0, 2).map((candidate) => ["identification_id", "=", candidate])];
 }
 
+function buildOrDomain(conditions: any[]) {
+  const validConditions = conditions.filter(Boolean);
+  if (validConditions.length <= 1) return validConditions[0] || [];
+  return [...Array(validConditions.length - 1).fill("|"), ...validConditions];
+}
+
 async function getEmployeeFromOdoo(company: any, code: string) {
   const odoo = new Odoo({
     url: company.url,
@@ -57,8 +63,10 @@ async function getEmployeeFromOdoo(company: any, code: string) {
 
   const candidates = getDocumentCandidates(code);
   const empleados = await odoo.execute_kw("hr.employee", "search_read", [
-    [getIdentificationDomain(candidates)],
+    getIdentificationDomain(candidates),
     ["id", "identification_id", "name", "user_id"],
+    0,
+    1,
   ]);
 
   return empleados.length > 0 ? empleados[0] : null;
@@ -67,7 +75,8 @@ async function getEmployeeFromOdoo(company: any, code: string) {
 async function getUserFromOdoo(company: any, userData: any) {
   const name = userData?.name?.toString?.().trim?.() || "";
   const email = userData?.email?.toString?.().trim?.() || "";
-  if (!name && !email) return null;
+  const documentCandidates = getDocumentCandidates(userData?.code || userData?.document || userData?.identification_id || "");
+  if (!name && !email && !documentCandidates.length) return null;
 
   const odoo = new Odoo({
     url: company.url,
@@ -79,13 +88,18 @@ async function getUserFromOdoo(company: any, userData: any) {
 
   await odoo.connect();
 
-  const domain = email
-    ? ["|", "|", ["login", "=", email], ["email", "=", email], ["name", "ilike", name || email]]
-    : [["name", "ilike", name]];
+  const domain = buildOrDomain([
+    ...documentCandidates.map((candidate) => ["identification_id", "=", candidate]),
+    email ? ["login", "=", email] : null,
+    email ? ["email", "=", email] : null,
+    name ? ["name", "ilike", name] : null,
+  ]);
 
   const users = await odoo.execute_kw("res.users", "search_read", [
-    [domain],
-    ["id", "name", "login", "email"],
+    domain,
+    ["id", "name", "login", "email", "identification_id", "employee_ids"],
+    0,
+    10,
   ]);
 
   if (!users.length) return null;
@@ -93,6 +107,7 @@ async function getUserFromOdoo(company: any, userData: any) {
   const normalizedEmail = email.toLowerCase();
 
   return users.find((user: any) =>
+    documentCandidates.includes(user.identification_id?.toString?.().trim?.()) ||
     (normalizedEmail && [user.login, user.email].some((value: any) => value?.toString?.().trim?.().toLowerCase?.() === normalizedEmail)) ||
     (normalizedName && user.name?.toString?.().trim?.().toLowerCase?.() === normalizedName)
   ) || users[0];
@@ -120,6 +135,7 @@ async function getOdooEmployeeLink(idCompany: string | number, code: string, use
       const odooUser = await getUserFromOdoo(company, {
         name: employee.name || userData?.name,
         email: userData?.email,
+        code: employee.identification_id || code,
       });
       userId = odooUser?.id || null;
     }
@@ -172,7 +188,7 @@ export async function refreshUserOdooLink(user: any) {
     const idCompany = user?.id_company;
     if (!code || !idCompany) return user;
 
-    const odooEmployeeLink = await getOdooEmployeeLink(idCompany, code, user);
+    const odooEmployeeLink = await getOdooEmployeeLink(idCompany, code, { ...user, code });
     await client.connect();
 
     const result = await client.query(
@@ -204,7 +220,7 @@ export async function createUsers(user: any) {
 
   try {
     const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
-    const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email });
+    const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
 
     await client.connect();
 
@@ -242,7 +258,7 @@ export async function updateUsers(user: any) {
     const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
     const lookupCode = user.original_code || code;
     const lookupCompany = user.original_id_company || id_company;
-    const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email });
+    const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
 
     await client.connect();
 

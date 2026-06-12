@@ -41,32 +41,81 @@ function getIdentificationDomain(candidates: string[]) {
   return ['|', ...candidates.slice(0, 2).map((candidate) => ['identification_id', '=', candidate])];
 }
 
+function buildOrDomain(conditions: any[]) {
+  const validConditions = conditions.filter(Boolean);
+  if (validConditions.length <= 1) return validConditions[0] || [];
+  return [...Array(validConditions.length - 1).fill('|'), ...validConditions];
+}
+
+function getOdooUserDomain(user: any, fallbackName: any = '') {
+  const name = (fallbackName || user?.name || '').toString().trim();
+  const email = user?.email?.toString?.().trim?.() || '';
+  const documentCandidates = getDocumentCandidates(user?.document);
+
+  return buildOrDomain([
+    ...documentCandidates.map((candidate) => ['identification_id', '=', candidate]),
+    email ? ['login', '=', email] : null,
+    email ? ['email', '=', email] : null,
+    name ? ['name', 'ilike', name] : null,
+  ]);
+}
+
+async function resolveOdooUserByName(user: any, fallbackName: any = '') {
+  const name = (fallbackName || user?.name || '').toString().trim();
+  const email = user?.email?.toString?.().trim?.() || '';
+  const documentCandidates = getDocumentCandidates(user?.document);
+  if (!name && !email && !documentCandidates.length) return 0;
+
+  const users = await getOdooRecords(
+    'res.users',
+    getOdooUserDomain(user, fallbackName),
+    ['id', 'name', 'login', 'email', 'identification_id', 'employee_ids'],
+    user.company_id
+  );
+  const normalizedName = name.toLowerCase();
+  const normalizedEmail = email.toLowerCase();
+
+  const matchedUser = users.find((odooUser: any) =>
+    documentCandidates.includes(odooUser.identification_id?.toString?.().trim?.()) ||
+    (normalizedEmail && [odooUser.login, odooUser.email].some((value: any) => value?.toString?.().trim?.().toLowerCase?.() === normalizedEmail)) ||
+    (normalizedName && odooUser.name?.toString?.().trim?.().toLowerCase?.() === normalizedName)
+  ) || users[0];
+
+  return Number(matchedUser?.id) || 0;
+}
+
 async function resolveLeaderOdooUserId(user: any) {
   const userId = getLeaderOdooUserId(user);
   if (userId) return userId;
 
   const employeeId = Number(user?.odoo_id?.toString?.().trim?.() ?? user?.odoo_id) || 0;
+  let employeeName = '';
   if (employeeId) {
     const employees = await getOdooRecords(
       'hr.employee',
       [['id', '=', employeeId]],
-      ['id', 'user_id'],
+      ['id', 'name', 'user_id'],
       user.company_id
     );
+    employeeName = employees?.[0]?.name || '';
     const employeeUserId = Number(asOdooId(employees?.[0]?.user_id)) || 0;
     if (employeeUserId) return employeeUserId;
   }
 
   const documentCandidates = getDocumentCandidates(user?.document);
-  if (!documentCandidates.length) return 0;
+  if (documentCandidates.length) {
+    const employees = await getOdooRecords(
+      'hr.employee',
+      getIdentificationDomain(documentCandidates),
+      ['id', 'identification_id', 'name', 'user_id'],
+      user.company_id
+    );
+    employeeName = employees?.[0]?.name || employeeName;
+    const employeeUserId = Number(asOdooId(employees?.[0]?.user_id)) || 0;
+    if (employeeUserId) return employeeUserId;
+  }
 
-  const employees = await getOdooRecords(
-    'hr.employee',
-    getIdentificationDomain(documentCandidates),
-    ['id', 'identification_id', 'name', 'user_id'],
-    user.company_id
-  );
-  return Number(asOdooId(employees?.[0]?.user_id)) || 0;
+  return resolveOdooUserByName(user, employeeName);
 }
 
 function getLeaderProductionDomain(userId: number, productionIds: number[] | false = false) {
