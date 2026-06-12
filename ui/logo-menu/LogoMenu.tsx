@@ -18,13 +18,13 @@ export function LogoMenu({ userRole, isDashboardRoute, isAdminRoute = false }: {
   const logout = async () => {
     if (isAdminRoute) {
       await fetch('/api/admin-auth/logout', { method: 'POST' });
-      router.push('/admin/login');
+      window.location.assign('/admin/login');
       return;
     }
 
-    signOut({ redirect: false });
+    await signOut({ redirect: false, callbackUrl: '/login' });
     localStorage.removeItem('admin');
-    router.push('/login'); 
+    window.location.assign('/login');
   };
 
   const refreshPage = () => {
