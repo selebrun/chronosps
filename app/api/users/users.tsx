@@ -2,6 +2,7 @@
 
 import { Client } from "pg";
 import Odoo from "async-odoo-xmlrpc";
+import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 const dbConfig = {
   user: process.env.CHRONOS_DB_USER || "",
@@ -32,6 +33,17 @@ async function getCompanyById(idCompany: string | number) {
   }
 }
 
+function getDocumentCandidates(code: string) {
+  const rawCode = code?.toString?.().trim?.() || "";
+  const cleanCode = rawCode ? removeSpecialCharacters(rawCode).trim() : "";
+  return Array.from(new Set([rawCode, cleanCode].filter(Boolean)));
+}
+
+function getIdentificationDomain(candidates: string[]) {
+  if (candidates.length <= 1) return [["identification_id", "=", candidates[0] || ""]];
+  return ["|", ...candidates.slice(0, 2).map((candidate) => ["identification_id", "=", candidate])];
+}
+
 async function getEmployeeFromOdoo(company: any, code: string) {
   const odoo = new Odoo({
     url: company.url,
@@ -43,8 +55,9 @@ async function getEmployeeFromOdoo(company: any, code: string) {
 
   await odoo.connect();
 
+  const candidates = getDocumentCandidates(code);
   const empleados = await odoo.execute_kw("hr.employee", "search_read", [
-    [[["identification_id", "=", code]]],
+    [getIdentificationDomain(candidates)],
     ["id", "identification_id", "name", "user_id"],
   ]);
 
