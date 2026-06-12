@@ -54,13 +54,15 @@ export const config = {
        
           const user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );      
           if (!user) return null;
-          let odoo_user_id = 0;
+          let odoo_employee_id = Number(user?.odoo_id) || 0;
+          let odoo_user_id = Number(user?.odoo_user_id) || 0;
           await new Promise<void>((resolve, reject) => {
-              getOdooData('hr.employee', [], ['id', 'name', 'job_id', 'work_email', 'identification_id'], false, false, user.id_company, (odoo_user: any) => {
+              getOdooData('hr.employee', [], ['id', 'name', 'job_id', 'work_email', 'identification_id', 'user_id'], false, false, user.id_company, (odoo_user: any) => {
                   if (odoo_user && odoo_user?.data?.length) {
                       const userOdoo = odoo_user.data.find((item: any) => item.identification_id === user?.code.trim());
                       if (userOdoo) {
-                          odoo_user_id = userOdoo.id;
+                          odoo_employee_id = userOdoo.id;
+                          odoo_user_id = Array.isArray(userOdoo.user_id) ? userOdoo.user_id[0] : userOdoo.user_id || odoo_user_id;
                       }
                   }
                   resolve();
@@ -73,7 +75,7 @@ export const config = {
             name: user?.name?.trim(),
             email: user?.email?.trim(),
             company_id: user?.id_company?.trim(),
-            odoo_id:  odoo_user_id,
+            odoo_id:  odoo_employee_id,
             odoo_user_id: odoo_user_id,
             document: user?.code?.trim(),
             role: user?.rol?.trim(),
