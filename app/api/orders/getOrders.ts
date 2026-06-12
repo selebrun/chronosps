@@ -55,7 +55,10 @@ export async function getProductionOrders(user: any) {
 
     case 'Lider':
       return new Promise(async (resolve, reject) => {
-        if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+        if(!user.odoo_user_id) {
+          reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+          return;
+        }
 
         getOdooData(
           'mrp.production',
@@ -79,7 +82,7 @@ export async function getProductionOrders(user: any) {
       return new Promise(async (resolve, reject) => {
         getOdooData(
           'mrp.production',
-          [['state','in',['confirmed','progress']], ['user_id','!=', false]],
+          [['state','in',['confirmed','progress']]],
           [],
           false,
           'name asc, date_planned_start asc',
@@ -251,7 +254,10 @@ export async function getWorkOrders(user: any) {
 
     case 'Lider':
       return new Promise(async (resolve, reject) => {
-        if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+        if(!user.odoo_user_id) {
+          reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+          return;
+        }
         filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]]
         filter.push(['id','in',  idOrders])
         getOdooData(
@@ -293,7 +299,7 @@ export async function getWorkOrders(user: any) {
       });
     case 'Jefe':
       return new Promise(async (resolve, reject) => {
-        filter = [['state','in',['confirmed','progress']], ['user_id','!=', false]]
+        filter = [['state','in',['confirmed','progress']]]
         filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
@@ -485,7 +491,10 @@ export async function getQualityControl(user: any) {
   switch(user.role) {
     case 'Lider':
       return new Promise(async (resolve, reject) => {
-        if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+        if(!user.odoo_user_id) {
+          reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+          return;
+        }
         filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_user_id]]
         filter.push(['id','in',  idOrders])
         getOdooData(
