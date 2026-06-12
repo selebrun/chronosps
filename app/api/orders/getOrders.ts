@@ -1,6 +1,7 @@
 'use server'
 import { getOdooData } from '@/app/api/odoo/odooService';
 import { addLocalBlockState } from '@/app/api/workOrderBlocks/workOrderBlocks';
+import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
 
 // `server-only` guarantees any modules that import code in file
 // will never run on the client. Even though this particular api
@@ -29,17 +30,40 @@ function getLeaderOdooUserId(user: any) {
   return Number(user?.odoo_user_id?.toString?.().trim?.() ?? user?.odoo_user_id) || 0;
 }
 
+function getDocumentCandidates(document: any) {
+  const rawDocument = document?.toString?.().trim?.() || '';
+  const cleanDocument = rawDocument ? removeSpecialCharacters(rawDocument).trim() : '';
+  return Array.from(new Set([rawDocument, cleanDocument].filter(Boolean)));
+}
+
+function getIdentificationDomain(candidates: string[]) {
+  if (candidates.length <= 1) return [['identification_id', '=', candidates[0] || '']];
+  return ['|', ...candidates.slice(0, 2).map((candidate) => ['identification_id', '=', candidate])];
+}
+
 async function resolveLeaderOdooUserId(user: any) {
   const userId = getLeaderOdooUserId(user);
   if (userId) return userId;
 
   const employeeId = Number(user?.odoo_id?.toString?.().trim?.() ?? user?.odoo_id) || 0;
-  if (!employeeId) return 0;
+  if (employeeId) {
+    const employees = await getOdooRecords(
+      'hr.employee',
+      [['id', '=', employeeId]],
+      ['id', 'user_id'],
+      user.company_id
+    );
+    const employeeUserId = Number(asOdooId(employees?.[0]?.user_id)) || 0;
+    if (employeeUserId) return employeeUserId;
+  }
+
+  const documentCandidates = getDocumentCandidates(user?.document);
+  if (!documentCandidates.length) return 0;
 
   const employees = await getOdooRecords(
     'hr.employee',
-    [['id', '=', employeeId]],
-    ['id', 'user_id'],
+    getIdentificationDomain(documentCandidates),
+    ['id', 'identification_id', 'name', 'user_id'],
     user.company_id
   );
   return Number(asOdooId(employees?.[0]?.user_id)) || 0;
