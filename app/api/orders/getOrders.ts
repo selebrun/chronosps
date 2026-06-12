@@ -2,7 +2,6 @@
 import { getOdooData } from '@/app/api/odoo/odooService';
 import { addLocalBlockState } from '@/app/api/workOrderBlocks/workOrderBlocks';
 import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
-import { saveUserOdooLink } from '@/app/api/users/users';
 
 // `server-only` guarantees any modules that import code in file
 // will never run on the client. Even though this particular api
@@ -93,7 +92,6 @@ async function resolveLeaderOdooUserId(user: any) {
   if (userId) return userId;
 
   const employeeId = Number(user?.odoo_id?.toString?.().trim?.() ?? user?.odoo_id) || 0;
-  let resolvedEmployeeId = employeeId || null;
   let employeeName = '';
   if (employeeId) {
     const employees = await getOdooRecords(
@@ -104,10 +102,7 @@ async function resolveLeaderOdooUserId(user: any) {
     );
     employeeName = employees?.[0]?.name || '';
     const employeeUserId = Number(asOdooId(employees?.[0]?.user_id)) || 0;
-    if (employeeUserId) {
-      await saveUserOdooLink(user, employeeId, employeeUserId);
-      return employeeUserId;
-    }
+    if (employeeUserId) return employeeUserId;
   }
 
   const documentCandidates = getDocumentCandidates(user?.document);
@@ -118,19 +113,12 @@ async function resolveLeaderOdooUserId(user: any) {
       ['id', 'identification_id', 'name', 'user_id'],
       user.company_id
     );
-    resolvedEmployeeId = Number(employees?.[0]?.id) || resolvedEmployeeId;
     employeeName = employees?.[0]?.name || employeeName;
     const employeeUserId = Number(asOdooId(employees?.[0]?.user_id)) || 0;
-    if (employeeUserId) {
-      await saveUserOdooLink(user, resolvedEmployeeId, employeeUserId);
-      return employeeUserId;
-    }
+    if (employeeUserId) return employeeUserId;
   }
 
   const resolvedUser = await resolveOdooUserByName(user, employeeName);
-  if (resolvedUser.userId) {
-    await saveUserOdooLink(user, resolvedEmployeeId || resolvedUser.employeeId, resolvedUser.userId);
-  }
   return resolvedUser.userId;
 }
 

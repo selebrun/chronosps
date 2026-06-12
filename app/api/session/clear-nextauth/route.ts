@@ -15,16 +15,35 @@ const NEXTAUTH_COOKIE_NAMES = [
   '__Secure-next-auth.nonce',
 ];
 
-export async function POST() {
+function getCookieNames() {
+  return NEXTAUTH_COOKIE_NAMES.flatMap((name) => [
+    name,
+    `${name}.0`,
+    `${name}.1`,
+    `${name}.2`,
+    `${name}.3`,
+  ]);
+}
+
+function getCookieDomains(request: Request) {
+  const host = request.headers.get('host')?.split(':')[0] || '';
+  if (host.endsWith('.chronosps.app')) return [undefined, '.chronosps.app'];
+  return [undefined];
+}
+
+export async function POST(request: Request) {
   const response = NextResponse.json({ status: true });
 
-  NEXTAUTH_COOKIE_NAMES.forEach((name) => {
-    response.cookies.set(name, '', {
-      httpOnly: true,
-      maxAge: 0,
-      path: '/',
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+  getCookieDomains(request).forEach((domain) => {
+    getCookieNames().forEach((name) => {
+      response.cookies.set(name, '', {
+        domain,
+        httpOnly: true,
+        maxAge: 0,
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+      });
     });
   });
 

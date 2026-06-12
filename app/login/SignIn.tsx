@@ -29,6 +29,11 @@ function SignIn() {
     setShowPassword(!showPassword);
   };
 
+  const isValidDashboardSession = (session: any) =>
+    !!session?.user?.company_id &&
+    !!session?.user?.role &&
+    session.user.role !== 'chronosAdmin';
+
   const handleSubmit = async (event: { preventDefault: () => void; }) => {
     event.preventDefault();
     setError("");
@@ -52,7 +57,7 @@ function SignIn() {
       if (res?.ok) {
         for (let attempt = 0; attempt < 6; attempt += 1) {
           const session = await getSession();
-          if (session?.user) {
+          if (isValidDashboardSession(session)) {
             router.refresh();
             window.location.replace("/dashboard");
             return;
@@ -60,8 +65,13 @@ function SignIn() {
           await new Promise((resolve) => setTimeout(resolve, 150));
         }
 
+        await fetch("/api/session/clear-nextauth", {
+          method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
+        });
         setLoading(false);
-        setError("La sesion fue aceptada, pero el navegador no la dejo disponible. Refresque la pagina e intente nuevamente.");
+        setError("La sesion fue aceptada, pero Firefox no dejo disponible una sesion valida de Piso. Cierre las pestanas de Piso/Admin, refresque e intente nuevamente.");
         return;
       }
 
