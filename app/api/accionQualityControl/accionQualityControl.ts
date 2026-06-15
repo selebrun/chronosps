@@ -1,14 +1,9 @@
 'use server'
 import { setOdooData } from '@/app/api/odoo/odooService';
 
-function getOdooExecutionUserId(user: any) {
-  if (user?.role === 'Operario') return 1;
-  return Number(user?.odoo_user_id) || 1;
-}
-
-function writeOdooData(model: string, ids: any[], values: any, companyId: string, uidOverride: number | false = false): Promise<any> {
+function writeOdooData(model: string, ids: any[], values: any, companyId: string): Promise<any> {
   return new Promise((resolve) => {
-    setOdooData(model, ids, values, companyId, (data: any) => resolve(data), uidOverride);
+    setOdooData(model, ids, values, companyId, (data: any) => resolve(data));
   });
 }
 
@@ -39,8 +34,7 @@ async function updateQualityControl(
     'quality.check',
     [qualityControlId],
     { quality_state: qualityState },
-    user.company_id,
-    getOdooExecutionUserId(user)
+    user.company_id
   );
 
   if (!stateResult || !stateResult.status) {
@@ -55,8 +49,7 @@ async function updateQualityControl(
     'quality.check',
     [qualityControlId],
     detailValues,
-    user.company_id,
-    getOdooExecutionUserId(user)
+    user.company_id
   );
 
   if (!detailResult || !detailResult.status) {
@@ -106,8 +99,7 @@ export async function saveQualityControlNotes(user: any, quality_control: any, o
       'quality.check',
       [quality_control.id],
       values,
-      user.company_id,
-      getOdooExecutionUserId(user)
+      user.company_id
     );
 
     if (!result || !result.status) {

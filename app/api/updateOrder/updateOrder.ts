@@ -9,21 +9,21 @@ function getOdooRecord(model: string, domain: any[], fields: string[], companyId
   });
 }
 
-function callOdooMethod(model: string, method: string, args: any[], companyId: string, kwargs: any = false, uidOverride: number | false = false): Promise<any> {
+function callOdooMethod(model: string, method: string, args: any[], companyId: string, kwargs: any = false): Promise<any> {
   return new Promise((resolve) => {
-    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data), kwargs, uidOverride);
+    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data), kwargs);
   });
 }
 
-function writeOdooData(model: string, ids: any[], values: any, companyId: string, uidOverride: number | false = false): Promise<any> {
+function writeOdooData(model: string, ids: any[], values: any, companyId: string): Promise<any> {
   return new Promise((resolve) => {
-    setOdooData(model, ids, values, companyId, (data: any) => resolve(data), uidOverride);
+    setOdooData(model, ids, values, companyId, (data: any) => resolve(data));
   });
 }
 
-function createOdooRecord(model: string, values: any, companyId: string, uidOverride: number | false = false): Promise<any> {
+function createOdooRecord(model: string, values: any, companyId: string): Promise<any> {
   return new Promise((resolve) => {
-    createOdooData(model, values, companyId, (data: any) => resolve(data), false, uidOverride);
+    createOdooData(model, values, companyId, (data: any) => resolve(data), false);
   });
 }
 
@@ -86,7 +86,7 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     date_start: nowUtcString(),
   };
 
-  const created: any = await createOdooRecord('mrp.workcenter.productivity', values, user.company_id, getOdooExecutionUserId(user));
+  const created: any = await createOdooRecord('mrp.workcenter.productivity', values, user.company_id);
   if (!created?.status) {
     return { status: false, message: getOdooError(created, 'No se pudo bloquear la orden de trabajo en Odoo.') };
   }
@@ -180,22 +180,24 @@ export async function updateOrder(
       workorder_state: work_order.state,
       working_state: work_order.working_state,
       production_id: work_order.production_id?.[0],
+      odoo_context_user_id: getOdooExecutionUserId(user),
+      odoo_employee_id: Number(user?.odoo_id) || null,
     });
 
     switch (action) {
       case 'start_work_order':
-        response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, getOdooActionKwargs(user), getOdooExecutionUserId(user));
+        response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
         break;
       case 'stop_work_order':
-        response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, getOdooActionKwargs(user), getOdooExecutionUserId(user));
+        response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
         break;
       case 'finish_work_order':
-        await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id, getOdooExecutionUserId(user));
-        response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, getOdooActionKwargs(user), getOdooExecutionUserId(user));
+        await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
+        response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
         break;
       case 'unblock_work_order':
         if (work_order.working_state === 'blocked') {
-          response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id, getOdooActionKwargs(user), getOdooExecutionUserId(user));
+          response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
           if (!response?.status) {
             const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
             return { status: false, message: errorMsg, faultString: errorMsg };
