@@ -82,6 +82,17 @@ export const config = {
     session: {
       strategy: "jwt",
     },
+    cookies: {
+      sessionToken: {
+        name: `__Secure-next-auth.session-token`,
+        options: {
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/',
+          secure: true,
+        },
+      },
+    },
     callbacks: {
       async jwt({ token, user }: any) {
         if (user) token = { ...user };
