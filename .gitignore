@@ -27,6 +27,22 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.local
+.env.production
+.env.development
+
+# archivos de prueba con datos sensibles
+prueba.js
+odoo_remote_action.js
+mockedUsers.js
+.env.local
+.env.production
+.env.development
+
+# archivos de prueba con datos sensibles
+prueba.js
+odoo_remote_action.js
+mockedUsers.js
 
 # vercel
 .vercel
