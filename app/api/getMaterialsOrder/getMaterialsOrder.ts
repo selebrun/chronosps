@@ -1,9 +1,14 @@
 'use server'
 import { createOdooData, executeOdooMethod, getOdooData } from '@/app/api/odoo/odooService';
 
-function callOdooMethod(model: string, method: string, args: any[], companyId: string): Promise<any> {
+function getOdooExecutionUserId(user: any) {
+  if (user?.role === 'Operario') return 1;
+  return Number(user?.odoo_user_id) || 1;
+}
+
+function callOdooMethod(model: string, method: string, args: any[], companyId: string, uidOverride: number | false = false): Promise<any> {
   return new Promise((resolve) => {
-    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data));
+    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data), false, uidOverride);
   });
 }
 
@@ -82,7 +87,7 @@ export async function saveMaterialsOrder(
           return resolve({ status: false, message });
         }
 
-        const assignResult = await callOdooMethod('mrp.production', 'action_assign', [[production_id]], user.company_id);
+        const assignResult = await callOdooMethod('mrp.production', 'action_assign', [[production_id]], user.company_id, getOdooExecutionUserId(user));
         if (!assignResult?.status) {
           const message = getOdooError(assignResult, 'El material fue creado, pero no se pudo actualizar la disponibilidad de la OP.');
           return resolve({ status: false, message });
@@ -90,7 +95,8 @@ export async function saveMaterialsOrder(
 
         return resolve({ status: true, message: 'Agregado', data: moveResult.data });
       },
-      false
+      false,
+      getOdooExecutionUserId(user)
     );
   });
 }
