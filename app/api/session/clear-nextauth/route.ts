@@ -33,16 +33,29 @@ function getCookieDomains(request: Request) {
 
 export async function POST(request: Request) {
   const response = NextResponse.json({ status: true });
+  const isProduction = process.env.NODE_ENV === 'production';
 
   getCookieDomains(request).forEach((domain) => {
     getCookieNames().forEach((name) => {
+      // Attempt deletion as httpOnly (session-token, csrf-token, etc.)
       response.cookies.set(name, '', {
         domain,
         httpOnly: true,
         maxAge: 0,
         path: '/',
         sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
+        secure: isProduction,
+      });
+      // Also attempt deletion as non-httpOnly (callback-url).
+      // Firefox refuses to delete a non-httpOnly cookie via a Set-Cookie
+      // that has the HttpOnly flag set, so we must send both variants.
+      response.cookies.set(name, '', {
+        domain,
+        httpOnly: false,
+        maxAge: 0,
+        path: '/',
+        sameSite: 'lax',
+        secure: isProduction,
       });
     });
   });
