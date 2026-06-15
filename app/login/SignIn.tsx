@@ -55,14 +55,14 @@ function SignIn() {
       });
 
       if (res?.ok) {
-        for (let attempt = 0; attempt < 6; attempt += 1) {
+        for (let attempt = 0; attempt < 12; attempt += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 300));
           const session = await getSession();
           if (isValidDashboardSession(session)) {
             router.refresh();
             window.location.replace("/dashboard");
             return;
           }
-          await new Promise((resolve) => setTimeout(resolve, 150));
         }
 
         await fetch("/api/session/clear-nextauth", {

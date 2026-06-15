@@ -1,5 +1,15 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getUsers, createUsers, updateUsers, deleteUsers } from "./users";
+import { ADMIN_SESSION_COOKIE, isValidAdminSessionToken } from "@/app/api/admin-auth/adminSession";
+
+function requireAdminSession() {
+  const token = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  if (!isValidAdminSessionToken(token)) {
+    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
+  }
+  return null;
+}
 
 const requiredUserFields = [
   "code",
@@ -19,6 +29,9 @@ function isUserPayload(body: unknown): body is Record<string, any> {
 }
 
 export async function POST(req: Request) {
+  const authError = requireAdminSession();
+  if (authError) return authError;
+
   try {
     const body = await req.json();
 
@@ -49,6 +62,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const authError = requireAdminSession();
+  if (authError) return authError;
+
   try {
     const users = await getUsers();
     return NextResponse.json(users);
@@ -62,6 +78,9 @@ export async function GET() {
 }
 
 export async function PUT(req: Request) {
+  const authError = requireAdminSession();
+  if (authError) return authError;
+
   try {
     const body = await req.json();
 
@@ -99,6 +118,9 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const authError = requireAdminSession();
+  if (authError) return authError;
+
   try {
     const body = await req.json();
 

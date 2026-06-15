@@ -1,64 +1,67 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { getCompanies, createCompany, updateCompany, deleteCompany } from "./companies";
+import { ADMIN_SESSION_COOKIE, isValidAdminSessionToken } from "@/app/api/admin-auth/adminSession";
 
-/**
- * API endpoint POST /api/companies
- * 
- * Al consultar esta ruta se va a ajecutar la funcion createCompany
- * que devuelve los datos de la compania si esta se creo existosamente.
- * Si no se puede crear, se retorna un error con el detalle.
- * 
- * Esta API esta hecha esclusivamente para consultarla desde componentes
- * del lado del cliente
- */
+function requireAdminSession() {
+  const token = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  if (!isValidAdminSessionToken(token)) {
+    return NextResponse.json({ message: "No autorizado" }, { status: 401 });
+  }
+  return null;
+}
+
 export async function POST(req: Request) {
-  const body = await req.json();
-  const company = await createCompany(body)
+  const authError = requireAdminSession();
+  if (authError) return authError;
 
-  return NextResponse.json(company);
+  try {
+    const body = await req.json();
+    const company = await createCompany(body);
+    return NextResponse.json(company);
+  } catch (error) {
+    console.error("Error en POST /api/companies:", error);
+    return NextResponse.json({ message: "No se pudo crear la compania" }, { status: 500 });
+  }
 }
 
-/**
- * API endpoint GET /api/companies
- * 
- * Al hacer un GET a este endpoint se retorna un array de objetos
- * con los datos de las companias
- * 
- * Esta API esta hecha esclusivamente para consultarla desde componentes
- * del lado del cliente
- */
-export async function GET(req: Request) {
-  const companies = await getCompanies()
+export async function GET() {
+  const authError = requireAdminSession();
+  if (authError) return authError;
 
-  return NextResponse.json(companies);
+  try {
+    const companies = await getCompanies();
+    return NextResponse.json(companies);
+  } catch (error) {
+    console.error("Error en GET /api/companies:", error);
+    return NextResponse.json({ message: "No se pudieron consultar las companias" }, { status: 500 });
+  }
 }
 
-/**
- * API endpoint PUT /api/companies
- * 
- * Al hacer un PUT a este endpoint actualiza la compania por su ID
- * y retorna los datos actualizados
- * 
- * Esta API esta hecha esclusivamente para consultarla desde componentes
- * del lado del cliente
- */
 export async function PUT(req: Request) {
-  const body = await req.json();
-  const updatedCompany = await updateCompany(body)
+  const authError = requireAdminSession();
+  if (authError) return authError;
 
-  return NextResponse.json(updatedCompany);
+  try {
+    const body = await req.json();
+    const updatedCompany = await updateCompany(body);
+    return NextResponse.json(updatedCompany);
+  } catch (error) {
+    console.error("Error en PUT /api/companies:", error);
+    return NextResponse.json({ message: "No se pudo actualizar la compania" }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: Request) {
+  const authError = requireAdminSession();
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const deletedCompany = await deleteCompany(body);
 
     if (!deletedCompany) {
-      return NextResponse.json(
-        { message: "Compania no encontrada" },
-        { status: 404 }
-      );
+      return NextResponse.json({ message: "Compania no encontrada" }, { status: 404 });
     }
 
     if (deletedCompany.status === false) {
@@ -71,9 +74,6 @@ export async function DELETE(req: Request) {
     return NextResponse.json(deletedCompany);
   } catch (error) {
     console.error("Error en DELETE /api/companies:", error);
-    return NextResponse.json(
-      { message: "No se pudo eliminar la compania" },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: "No se pudo eliminar la compania" }, { status: 500 });
   }
 }
