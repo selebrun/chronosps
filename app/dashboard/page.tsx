@@ -4,12 +4,17 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
 
+function roleCanSeeItem(itemRoles: string[] = [], userRole: string = "") {
+  const normalizedUserRole = userRole.toString().trim();
+  return itemRoles.some((role) => role.toString().trim() === normalizedUserRole);
+}
+
 export default async function Page() {
   const session = await getServerSession(config);
   const user = session.user;
   const navSections =  navItems.map((item: any) => ({
                       ...item,
-                      items: item.items.filter((subItem: any) => subItem.role.includes(user.role)),
+                      items: item.items.filter((subItem: any) => roleCanSeeItem(subItem.role, user.role)),
                     }));
   
 

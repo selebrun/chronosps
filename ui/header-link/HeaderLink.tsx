@@ -4,9 +4,14 @@ import { usePathname } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 
+function roleCanSeeItem(itemRoles: string[] = [], userRole: string = "") {
+  const normalizedUserRole = userRole.toString().trim();
+  return itemRoles.some((role) => role.toString().trim() === normalizedUserRole);
+}
+
 export function HeaderLink({ userRole }: any) {
   const pathName = usePathname();
-  const isDashboardRoute = pathName.startsWith("/dashboard/");
+  const isDashboardRoute = pathName.startsWith("/dashboard");
 
   return (
     isDashboardRoute && (
@@ -36,7 +41,7 @@ export function HeaderLink({ userRole }: any) {
                   </div>
 
                   {section.items.map((item) =>
-                    item.role.includes(userRole) ? (
+                    roleCanSeeItem(item.role, userRole) ? (
                       <Link
                         href={`/dashboard/${item.slug}`}
                         key={item.name}

@@ -2,49 +2,37 @@ export type navItem = {
   name: string;
   slug: string;
   description?: string;
-  role: any[]
+  role: string[];
 };
 
 export const navItems: { name: string; items: navItem[] }[] = [
   {
-    name: 'Gestión piso de producción',
+    name: 'Gestion piso de produccion',
     items: [
-
       {
-        name: 'Órdenes de producción',
+        name: 'Ordenes de produccion',
         slug: 'production-orders',
-        description: 'Lista órdenes de produccion para piso',
-        role: ['Operario', 'Lider', 'Jefe']
+        description: 'Lista ordenes de produccion para piso',
+        role: ['Operario', 'Lider', 'Jefe'],
       },
       {
-        name: 'Órdenes de trabajo',
+        name: 'Ordenes de trabajo',
         slug: 'work-orders',
-        description: 'Lista órdenes de trabajo/operaciones para piso',
-        role: ['Operario', 'Lider', 'Jefe']
+        description: 'Lista ordenes de trabajo/operaciones para piso',
+        role: ['Operario', 'Lider', 'Jefe'],
       },
-      // {
-      //   name: 'Plan de producción',
-      //   slug: '',
-      //   description: 'Lista los planes de producción activos',
-      // },
       {
         name: 'Controles de calidad',
         slug: 'quality-control',
         description: 'Procesos de control de calidad para piso',
-        role: ['Lider', 'Jefe','Calidad']
+        role: ['Lider', 'Jefe', 'Calidad'],
       },
       {
         name: 'Notas de venta',
         slug: 'customer-sales-notes',
         description: 'Consulta de notas de venta y avance de produccion',
-        role: ['Cliente', 'Jefe']
+        role: ['Cliente', 'Jefe'],
       },
-      //{
-      //  name: 'Planificación',
-      //  slug: '',
-      //  description: 'Planificación',
-      //  role: ['Lider', 'Jefe']
-      //},
     ],
   },
 ];
