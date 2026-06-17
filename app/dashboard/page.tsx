@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 function roleCanSeeItem(itemRoles: string[] = [], userRole: string = "") {
   const normalizedUserRole = userRole.toString().trim();
   return itemRoles.some((role) => role.toString().trim() === normalizedUserRole);
