@@ -139,6 +139,7 @@ export function ModalDetailWork({
     const isUserWorking = showDetailOrderWork.is_user_working;
     const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
     const canUnblock = isRole(user, 'Jefe');
+    const canReleaseQualityFailure = isRole(user, 'Lider') || isRole(user, 'Jefe');
     const isFailedForOperator = Boolean(showDetailOrderWork.quality_failed && isRole(user, 'Operario'));
     const buttons = [];
     const disabledBtns = ['done', 'completed', 'cancel'].includes(showDetailOrderWork.state)
@@ -151,12 +152,25 @@ export function ModalDetailWork({
       return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Orden bloqueada</div>
     }
 
-    if (disabledBtns) {
-      return <div className="mb-3 rounded-md bg-gray-100 p-3 text-center font-bold text-gray-700">Orden terminada</div>
+    if (showDetailOrderWork.quality_failed) {
+      if (canReleaseQualityFailure) {
+        return (
+          <>
+            <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
+            <div className="mb-3">
+              <button key="release-quality" onClick={() => executeWorkOrderAction('release_quality_failure')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reactivar OT</button>
+            </div>
+          </>
+        )
+      }
+
+      if (isFailedForOperator) {
+        return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
+      }
     }
 
-    if (isFailedForOperator) {
-      return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
+    if (disabledBtns) {
+      return <div className="mb-3 rounded-md bg-gray-100 p-3 text-center font-bold text-gray-700">Orden terminada</div>
     }
 
     // Show Start button only if activity hasn't begun

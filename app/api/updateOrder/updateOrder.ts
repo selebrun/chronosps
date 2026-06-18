@@ -38,6 +38,33 @@ async function hasFailedQualityChecks(workOrderId: number, companyId: string) {
   return Boolean(qualityChecks?.data?.length);
 }
 
+async function releaseFailedQualityChecks(workOrderId: number, companyId: string) {
+  const qualityChecks: any = await getOdooRecord(
+    'quality.check',
+    [['workorder_id', '=', workOrderId], ['quality_state', '=', 'fail']],
+    ['id', 'name'],
+    companyId
+  );
+  const qualityCheckIds = (qualityChecks?.data || []).map((check: any) => check.id).filter(Boolean);
+
+  if (!qualityCheckIds.length) {
+    return { status: true, message: 'La orden de trabajo no tiene controles de calidad fallidos.' };
+  }
+
+  const result: any = await writeOdooData(
+    'quality.check',
+    qualityCheckIds,
+    { quality_state: 'none' },
+    companyId
+  );
+
+  if (!result?.status) {
+    return { status: false, message: getOdooError(result, 'No se pudo reactivar la orden de trabajo.') };
+  }
+
+  return { status: true, message: 'Orden de trabajo reactivada para retrabajo.' };
+}
+
 function nowUtcString() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
 }
@@ -164,7 +191,15 @@ export async function updateOrder(
       };
     }
 
-    if (['done', 'completed', 'cancel'].includes(work_order.state) && action !== 'unblock_work_order') {
+    if (action === 'release_quality_failure' && !['Lider', 'Jefe'].includes(user.role)) {
+      return {
+        status: false,
+        message: 'Solo Lider o Jefe pueden reactivar una orden con control de calidad fallido.',
+        faultString: 'Solo Lider o Jefe pueden reactivar una orden con control de calidad fallido.',
+      };
+    }
+
+    if (['done', 'completed', 'cancel'].includes(work_order.state) && !['unblock_work_order', 'release_quality_failure'].includes(action)) {
       return {
         status: false,
         message: 'La orden de trabajo ya esta terminada o cancelada. No se pueden ejecutar mas acciones desde Piso.',
@@ -207,6 +242,8 @@ export async function updateOrder(
         return { status: true, message: 'Orden de trabajo desbloqueada.' };
       case 'block_work_order':
         return createProductivityBlock(work_order, block_reason, user);
+      case 'release_quality_failure':
+        return releaseFailedQualityChecks(work_order.id, user.company_id);
       default:
         return { status: false, message: 'No se encontro la accion que desea ejecutar.' };
     }
