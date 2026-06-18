@@ -5,6 +5,14 @@ import Image from 'next/image'
 import close from '@/public/close.png'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 
+function isWorkOrderBlocked(workOrder: any) {
+  return Boolean(workOrder?.local_blocked || workOrder?.working_state === 'blocked');
+}
+
+function isRole(user: any, role: string) {
+  return String(user?.role || '').trim() === role;
+}
+
 
 export function ModalDetailWork({ 
   modalIsOpenJobDetail, 
@@ -74,7 +82,7 @@ export function ModalDetailWork({
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
   const isWorkOrderDone = ['done', 'completed', 'cancel'].includes(showDetailOrderWork?.state);
-  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && showDetailOrderWork?.working_state !== 'blocked' && !isWorkOrderDone);
+  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && !isWorkOrderBlocked(showDetailOrderWork) && !isWorkOrderDone);
   const baseElapsedSeconds = Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
   const expectedSeconds = Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
@@ -120,28 +128,20 @@ export function ModalDetailWork({
   const realDuration = formatElapsedTime(elapsedSeconds);
   const displayStatus = showDetailOrderWork.quality_failed
     ? 'quality_failed'
-    : showDetailOrderWork.local_blocked
+    : isWorkOrderBlocked(showDetailOrderWork)
     ? 'blocked'
     : showDetailOrderWork.working_state === 'paused'
       ? 'paused'
       : showDetailOrderWork.state;
 
   const renderButtons = (showDetailOrderWork: any) => {
-    const isBlocked = showDetailOrderWork.working_state === "blocked";
+    const isBlocked = isWorkOrderBlocked(showDetailOrderWork);
     const isUserWorking = showDetailOrderWork.is_user_working;
     const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
-    const canUnblock = user?.role === 'Jefe';
-    const isFailedForOperator = Boolean(showDetailOrderWork.quality_failed && user?.role === 'Operario');
+    const canUnblock = isRole(user, 'Jefe');
+    const isFailedForOperator = Boolean(showDetailOrderWork.quality_failed && isRole(user, 'Operario'));
     const buttons = [];
     const disabledBtns = ['done', 'completed', 'cancel'].includes(showDetailOrderWork.state)
-
-    if (disabledBtns) {
-      return <div className="mb-3 rounded-md bg-gray-100 p-3 text-center font-bold text-gray-700">Orden terminada</div>
-    }
-
-    if (isFailedForOperator) {
-      return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
-    }
 
     if (isBlocked) {
       if (canUnblock) {
@@ -149,6 +149,14 @@ export function ModalDetailWork({
       }
 
       return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Orden bloqueada</div>
+    }
+
+    if (disabledBtns) {
+      return <div className="mb-3 rounded-md bg-gray-100 p-3 text-center font-bold text-gray-700">Orden terminada</div>
+    }
+
+    if (isFailedForOperator) {
+      return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
     }
 
     // Show Start button only if activity hasn't begun
@@ -315,7 +323,7 @@ export function ModalDetailWork({
                 </div>
               </div>
           </div>
-          {showDetailOrderWork.working_state === "blocked" && (
+          {isWorkOrderBlocked(showDetailOrderWork) && (
             <div className='mt-3 bg-red-100 border border-red-500 text-red-800 px-4 py-3 rounded'>
               <strong>Estado: Bloqueada</strong>
               {showDetailOrderWork?.local_block_reason_name ? ` - Motivo: ${showDetailOrderWork.local_block_reason_name}` : ''}. Solo un Jefe puede desbloquear esta orden de trabajo.
@@ -327,7 +335,7 @@ export function ModalDetailWork({
               {showDetailOrderWork?.quality_failed_points?.length ? ` - ${showDetailOrderWork.quality_failed_points.join(', ')}` : ''}. El operador no puede continuar hasta que Lider o Calidad revise el control.
             </div>
           )}
-          {showDetailOrderWork.working_state === "paused" && (
+          {showDetailOrderWork.working_state === "paused" && !isWorkOrderBlocked(showDetailOrderWork) && (
             <div className='mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded'>
               <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón &quot;Reanudar&quot;.
             </div>
