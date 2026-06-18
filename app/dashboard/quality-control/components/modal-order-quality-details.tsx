@@ -33,9 +33,11 @@ function ModalOrderQualityDetails({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
-  const isQualityClosed = ["pass", "fail"].includes(selectedOrderQuantity?.quality_state);
-  const canModifyClosedQuality = ["Calidad", "Lider", "Jefe"].includes(user?.role);
-  const disableQualityDecision = isSubmitting || (isQualityClosed && !canModifyClosedQuality);
+  const isQualityApproved = selectedOrderQuantity?.quality_state === "pass";
+  const isQualityFailed = selectedOrderQuantity?.quality_state === "fail";
+  const canResolveFailedQuality = ["Calidad", "Lider", "Jefe"].includes(user?.role);
+  const canAcceptQuality = !isSubmitting && !isQualityApproved && (!isQualityFailed || canResolveFailedQuality);
+  const canRejectQuality = !isSubmitting && !isQualityApproved && !isQualityFailed;
   const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
     ? selectedOrderQuantity.workorder_id[1]
     : selectedOrderQuantity?.workorder_id || "");
@@ -72,7 +74,8 @@ function ModalOrderQualityDetails({
   };
 
   const onExecuteQualityAction = async (action: "accept" | "reject") => {
-    if (isQualityClosed && !canModifyClosedQuality) return;
+    if (action === "accept" && !canAcceptQuality) return;
+    if (action === "reject" && !canRejectQuality) return;
 
     setIsSubmitting(true);
     const response = action === "accept" ? await acceptOrder(observations, getMeasure()) : await rejectOrder(observations, getMeasure());
@@ -175,20 +178,43 @@ function ModalOrderQualityDetails({
         </div>
 
         <div className="min-w-[150px]">
-          <button
-            disabled={disableQualityDecision}
-            onClick={() => onExecuteQualityAction("accept")}
-            className="font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50"
-          >
-            Aprueba
-          </button>
-          <button
-            disabled={disableQualityDecision}
-            onClick={() => onExecuteQualityAction("reject")}
-            className="font-bold bg-red-500 p-3 rounded-md w-full mt-2 disabled:opacity-50"
-          >
-            Falla
-          </button>
+          {isQualityApproved && (
+            <div className="rounded-md bg-green-100 p-3 text-center font-bold text-green-800">
+              Control aprobado
+            </div>
+          )}
+          {isQualityFailed && canResolveFailedQuality && (
+            <button
+              disabled={!canAcceptQuality}
+              onClick={() => onExecuteQualityAction("accept")}
+              className="font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50"
+            >
+              Aprobar correccion
+            </button>
+          )}
+          {isQualityFailed && !canResolveFailedQuality && (
+            <div className="rounded-md bg-red-100 p-3 text-center font-bold text-red-800">
+              Control fallido
+            </div>
+          )}
+          {!isQualityApproved && !isQualityFailed && (
+            <>
+              <button
+                disabled={!canAcceptQuality}
+                onClick={() => onExecuteQualityAction("accept")}
+                className="font-bold bg-[#2FD28E] p-3 rounded-md w-full disabled:opacity-50"
+              >
+                Aprueba
+              </button>
+              <button
+                disabled={!canRejectQuality}
+                onClick={() => onExecuteQualityAction("reject")}
+                className="font-bold bg-red-500 p-3 rounded-md w-full mt-2 disabled:opacity-50"
+              >
+                Falla
+              </button>
+            </>
+          )}
           <button
             disabled={!selectedOrderQuantity?.note}
             onClick={() => setModalInstructionsOpen(true)}
