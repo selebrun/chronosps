@@ -1,5 +1,3 @@
-import React from 'react'
-import { useState, useEffect } from 'react'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
@@ -11,12 +9,16 @@ function getWorkOrderDisplayStatus(order: any) {
   return order?.state;
 }
 
+function getWorkOrderNumber(order: any) {
+  return order?.sequence ?? order?.x_studio_nro_ot ?? order?.id ?? '';
+}
+
 export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct, openJobDetail }: {
     orderDetail: any, 
     thOrder: string,
     thStatus: string,
     thProduct: string,
-    openJobDetail: (id: string) => void
+    openJobDetail: (order: any) => void
   }) => {
 
   return (
@@ -42,7 +44,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
             <th scope="row" className="px-5 font-medium text-black">
               <div className="flex items-center space-x-4 whitespace-normal">
                 <div className="dark:text-white">
-                  <div className="text-sm text-black">{order?.production_id[1]}</div>
+                  <div className="text-sm text-black">{getWorkOrderNumber(order)}</div>
                 </div>
               </div>
             </th>

@@ -271,7 +271,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
           {orderWorkDetail.length > 0 && 
            <OrderTableModalWork 
            orderDetail={orderWorkDetail} 
-           thOrder={'NO. de Orden'} 
+           thOrder={'No. OT'} 
            thStatus={'Estado'} 
            thProduct={'Centro de Trabajo'}
            openJobDetail={openJobDetail}
