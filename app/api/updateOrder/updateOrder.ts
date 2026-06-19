@@ -27,6 +27,53 @@ function createOdooRecord(model: string, values: any, companyId: string): Promis
   });
 }
 
+function getMany2OneId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getWorkOrderSequence(workOrder: any) {
+  const sequence = Number(workOrder?.sequence);
+  return Number.isFinite(sequence) ? sequence : Number(workOrder?.id) || 0;
+}
+
+function getWorkOrderLabel(workOrder: any) {
+  const sequence = getWorkOrderSequence(workOrder);
+  return sequence ? `OT ${sequence} - ${workOrder?.name || workOrder?.id}` : workOrder?.name || workOrder?.id || 'N/A';
+}
+
+async function validatePreviousWorkOrdersDone(workOrder: any, companyId: string) {
+  const productionId = getMany2OneId(workOrder?.production_id);
+  const currentSequence = getWorkOrderSequence(workOrder);
+
+  if (!productionId || !currentSequence) {
+    return { status: true };
+  }
+
+  const workOrders: any = await getOdooRecord(
+    'mrp.workorder',
+    [['production_id', '=', productionId]],
+    ['id', 'name', 'state', 'sequence'],
+    companyId
+  );
+
+  if (!workOrders?.data?.length) {
+    return { status: true };
+  }
+
+  const previousPendingWorkOrder = workOrders.data
+    .filter((item: any) => Number(item?.id) !== Number(workOrder.id))
+    .filter((item: any) => getWorkOrderSequence(item) < currentSequence)
+    .filter((item: any) => !['done', 'completed'].includes(item?.state))
+    .sort((a: any, b: any) => getWorkOrderSequence(a) - getWorkOrderSequence(b))[0];
+
+  if (!previousPendingWorkOrder) {
+    return { status: true };
+  }
+
+  const message = `No puede iniciar esta orden de trabajo. Primero debe terminar la operacion anterior: ${getWorkOrderLabel(previousPendingWorkOrder)}.`;
+  return { status: false, message, faultString: message };
+}
+
 async function hasFailedQualityChecks(workOrderId: number, companyId: string) {
   const qualityChecks: any = await getOdooRecord(
     'quality.check',
@@ -137,7 +184,7 @@ export async function updateOrder(
     const workorders: any = await getOdooRecord(
       'mrp.workorder',
       [['id', '=', workorder.id]],
-      ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids'],
+      ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'],
       user.company_id
     );
     const work_order = workorders?.data?.[0];
@@ -157,6 +204,13 @@ export async function updateOrder(
 
     if (action === 'start_work_order' && work_order.employee_assigned_ids.length === 0) {
       return { status: false, message: 'No hay operario asignado a esta orden de trabajo. Asigne un operario antes de iniciar.' };
+    }
+
+    if (action === 'start_work_order') {
+      const previousWorkOrdersValidation = await validatePreviousWorkOrdersDone(work_order, user.company_id);
+      if (!previousWorkOrdersValidation.status) {
+        return previousWorkOrdersValidation;
+      }
     }
 
     if (action === 'finish_work_order' && (!qtyDone || qtyDone < 1)) {
