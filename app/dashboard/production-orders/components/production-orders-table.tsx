@@ -114,9 +114,6 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
     if (['start_work_order', 'finish_work_order'].includes(action) && user?.role === 'Operario' && currentWorkOrder?.quality_failed) {
       setError('Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.')
-      setTimeout(() => {
-        setError('')
-      }, 7000);
       return
     }
 
@@ -125,18 +122,12 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       // Check if operator is assigned
       if (!currentWorkOrder?.employee_assigned_ids || currentWorkOrder?.employee_assigned_ids.length === 0) {
         setError('No hay operario asignado a esta orden de trabajo. Asigne un operario antes de iniciar.')
-        setTimeout(() => {
-          setError('')
-        }, 5000);
         return
       }
       
       // Validate materials exist (basic check - Odoo will do detailed validation)
       if (!orderProductionSelected.move_raw_ids || orderProductionSelected.move_raw_ids.length === 0) {
         setError('No hay materiales definidos para esta orden de producción. Defina los materiales en la BOM antes de iniciar.')
-        setTimeout(() => {
-          setError('')
-        }, 5000);
         return
       }
     }
@@ -179,9 +170,6 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       }
 
       setError(message)
-      setTimeout(() => {
-        setError('')
-      }, 4000);
       setLoadigAction(false)
     }
   }
@@ -224,15 +212,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
         setOrderMaterialsSelected({})
       } else {
         setError(data?.message || 'No se pudo agregar el material.')
-        setTimeout(() => {
-          setError('')
-        }, 5000);
       }
     } catch (error: any) {
       setError(error?.message || 'No se pudo agregar el material.')
-      setTimeout(() => {
-        setError('')
-      }, 5000);
     } finally {
       setLoadigSaveMaterials(false)
     }
@@ -309,6 +291,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          setDisabledBtnSaveMaterial={setDisabledBtnSaveMaterial}
          user={user}
          error={error}
+         onCloseError={() => setError('')}
          qualityPauseMessage={qualityPauseMessage}
          onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
         />

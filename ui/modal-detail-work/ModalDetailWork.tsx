@@ -42,6 +42,7 @@ export function ModalDetailWork({
   setDisabledBtnSaveMaterial,
   user,
   error,
+  onCloseError,
   qualityPauseMessage,
   onCloseQualityPauseMessage
 }: {
@@ -72,6 +73,7 @@ export function ModalDetailWork({
   setDisabledBtnSaveMaterial: any
   user: any
   error: string
+  onCloseError: () => void
   qualityPauseMessage?: string
   onCloseQualityPauseMessage?: () => void
 }) {
@@ -230,6 +232,22 @@ export function ModalDetailWork({
 
   return (
     <>
+      <Modal setOpen={Boolean(error)} title='Mensaje' className='max-w-md'>
+        <div className="text-gray-900">
+          <div className="mb-5 rounded-md bg-[#A9D1DC] p-4 font-medium">
+            {error}
+          </div>
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={onCloseError}
+              className="font-bold bg-[#2FD28E] p-3 rounded-md w-full"
+            >
+              Aceptar
+            </button>
+          </div>
+        </div>
+      </Modal>
       <Modal setOpen={Boolean(qualityPauseMessage)} title='Control de calidad pendiente' className='max-w-md'>
         <div className="text-gray-900">
           <div className="mb-5 rounded-md bg-[#A9D1DC] p-4 font-medium">
@@ -287,7 +305,6 @@ export function ModalDetailWork({
               </svg>
                 <span className="ml-2">Procesando ...</span>
             </div>}
-          {error !== '' && <div className='mb-5 font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>{error}</div>}
           <div className='flex justify-between'>
               <div className='w-[80vh]'>
                   <div className='mb-3 w-90'>
@@ -461,7 +478,6 @@ export function ModalDetailWork({
               <span className="ml-2">Cargando ...</span>
             </div>}
         {!user.materiales && <div className='pb-5'>Su usuario no tiene permitido añadir materiales adicionales al BOM. Contacte con un supervisor.</div>}
-        {error !== '' && <div className='mb-5 font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>{error}</div>}
         <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
           <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
             {materials.length > 0 && 
