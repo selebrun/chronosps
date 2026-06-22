@@ -10,6 +10,7 @@ export default async function Page() {
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
+      <h1 className="mb-4 text-xl font-bold text-gray-900">Controles de calidad</h1>
       {odooOrders?.production_data.length ? (
          <QualityOrdersTable odooOrders={odooOrders} user={user} />
       ) : (

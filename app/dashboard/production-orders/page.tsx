@@ -17,6 +17,7 @@ export default async function Page() {
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
+      <h1 className="mb-4 text-xl font-bold text-gray-900">Ordenes de produccion</h1>
       { odooOrders?.data.length ? (
         <ProductionOrdersTable odooOrders={odooOrders} ordersWork={odooOrdersWork} user={user} blockReasons={blockReasons} />
       ) : (

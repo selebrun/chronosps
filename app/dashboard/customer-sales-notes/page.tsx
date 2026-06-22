@@ -23,6 +23,7 @@ export default async function Page() {
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
+      <h1 className="mb-4 text-xl font-bold text-gray-900">Notas de venta</h1>
       {salesNotes?.data?.length ? (
         <CustomerSalesNotesTable salesNotes={salesNotes.data} />
       ) : (

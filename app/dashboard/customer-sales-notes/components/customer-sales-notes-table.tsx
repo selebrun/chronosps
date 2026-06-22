@@ -36,7 +36,7 @@ function formatQuantity(value: number) {
 
 export function CustomerSalesNotesTable({ salesNotes }: { salesNotes: any[] }) {
   return (
-    <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[68vh] rounded">
+    <div className="relative max-h-[calc(100vh-10rem)] min-h-[calc(100vh-10rem)] max-w-full overflow-x-auto overflow-y-auto rounded">
       <table className="w-full text-xs text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
         <thead className="text-xs text-black uppercase dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
           <tr>

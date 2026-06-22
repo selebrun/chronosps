@@ -331,7 +331,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
           className="w-full rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 focus:outline-none"
         />
       </div>
-      <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
+      <div className="relative max-h-[calc(100vh-13.5rem)] min-h-[calc(100vh-13.5rem)] max-w-full overflow-x-auto overflow-y-auto rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
           <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
             <tr>
