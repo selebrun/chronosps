@@ -1,74 +1,73 @@
 "use client";
-import { faUser, faRotateRight } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useRouter } from "next/navigation";
+
+import { faUser } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Image from "next/image";
 import { useState } from "react";
 import { signOut } from "next-auth/react";
 
-
-
-export function LogoMenu({ userRole, isDashboardRoute, isAdminRoute = false }: { userRole: string, isDashboardRoute: boolean, isAdminRoute?: boolean }) {
+export function LogoMenu({
+  userRole,
+  isDashboardRoute,
+  isAdminRoute = false,
+}: {
+  userRole: string;
+  isDashboardRoute: boolean;
+  isAdminRoute?: boolean;
+}) {
   const [showMenu, setShowMenu] = useState<boolean>(false);
-  const router = useRouter();
-  const onShowMenu = (): any => {
-    setShowMenu(!showMenu)
-  }
 
   const logout = async () => {
     if (isAdminRoute) {
-      await fetch('/api/admin-auth/logout', { method: 'POST' });
-      window.location.assign('/admin/login');
+      await fetch("/api/admin-auth/logout", { method: "POST" });
+      window.location.assign("/admin/login");
       return;
     }
 
-    await signOut({ redirect: false, callbackUrl: '/login' });
-    await fetch('/api/session/clear-nextauth', { method: 'POST' });
-    localStorage.removeItem('admin');
-    window.location.assign('/login');
+    await signOut({ redirect: false, callbackUrl: "/login" });
+    await fetch("/api/session/clear-nextauth", { method: "POST" });
+    localStorage.removeItem("admin");
+    window.location.assign("/login");
   };
 
-  const refreshPage = () => {
-    window.location.reload();
-  };
+  if (!isDashboardRoute) return null;
 
   return (
-    <>
-      {isDashboardRoute && 
-        <div className="flex flex-row justify-center items-center lg:px-8 lg:py-8 mx-auto max-w-7xl relative">
-          <button className="absolute left-8 py-2 px-3 rounded-md text-white hover:text-gray-50 hover:bg-sky-950" onClick={() => refreshPage()}>
-            <FontAwesomeIcon icon={faRotateRight} size="lg" />
-          </button>
+    <div className="space-y-4">
+      <div className="rounded-md bg-white p-3 shadow-sm">
+        <Image src="/logo.png" width={235} height={60} alt="Logo" className="h-auto w-full" />
+      </div>
 
-          <div>
-            <div className="bg-white rounded-lg p-3">
-              <Image src="/logo.png" width={235} height={60} alt="Logo" />
-            </div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setShowMenu((current) => !current)}
+          className="flex w-full items-center justify-between rounded-md bg-lightCyan px-3 py-2 text-left text-sm font-semibold text-gray-900 hover:bg-sky-950 hover:text-white"
+        >
+          <span>Usuario</span>
+          <Image src="/menu.png" width={38} height={8} alt="Menu" />
+        </button>
+
+        {showMenu && (
+          <div className="absolute left-0 right-0 z-20 mt-2 rounded-md bg-white shadow dark:bg-gray-700">
+            <ul className="p-2 text-sm text-gray-700 dark:text-gray-200">
+              <li className="flex items-center gap-2 rounded-md px-2 py-1">
+                <FontAwesomeIcon icon={faUser} size="1x" />
+                <span className="truncate">{userRole}</span>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="mt-2 w-full rounded-md px-2 py-1 text-left hover:bg-sky-950 hover:text-gray-50"
+                  onClick={logout}
+                >
+                  Cerrar sesion
+                </button>
+              </li>
+            </ul>
           </div>
-          
-          <div className="absolute right-8">
-            <div onClick={() => onShowMenu()}>
-              <Image src="/menu.png" width={60} height={10} alt="Menu"/>
-            </div>
-            {showMenu && 
-              <div  className="z-10 p- self-end right-1 absolute bg-white divide-y divide-gray-100 rounded-lg shadow w-44 dark:bg-gray-700">
-                {/* <select  id="countries" className=" py-2 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500">
-                  <option value="US">United States</option>
-                  <option value="FR">France</option>
-                  <option value="DE">Germany</option>
-                </select> */}
-                <ul className="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton">
-                  <li>
-                  <FontAwesomeIcon icon={faUser} size="1x" className="ml-2 px-1"/>{userRole}
-                  </li>
-                  <li>
-                    <button className="py-1 px-2 ml-3 rounded-md hover:text-gray-50 hover:bg-sky-950" onClick={() => logout()}>Cerrar Sessión</button>
-                  </li>
-                </ul>
-            </div>}
-          </div>
-        </div>
-      }
-    </>
+        )}
+      </div>
+    </div>
   );
 }
