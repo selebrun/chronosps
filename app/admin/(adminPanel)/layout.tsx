@@ -39,7 +39,8 @@ export default async function Layout({
   return (
     <div className="h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <LogoMenu
-        userRole={"Administrador"}
+        userName={"Administrador"}
+        userRole={"Admin"}
         isDashboardRoute={true}
         isAdminRoute={true}
       />

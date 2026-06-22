@@ -35,7 +35,8 @@ export default async function Layout({
       <div className="flex min-h-screen flex-col gap-4 p-3 lg:flex-row lg:p-5">
         <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:w-64">
           <LogoMenu
-            userRole={session.user.name}
+            userName={session.user.name}
+            userRole={session.user.role}
             isDashboardRoute={true}
           />
           <HeaderLink userRole={session.user.role}></HeaderLink>
