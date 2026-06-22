@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 // Providers
 import SessionProvider from '@/app/context/SessionProvider'
+import { ThemeProvider } from '@/app/context/ThemeContext'
 
 export const metadata: Metadata = {
   title: 'Chronos Piso App',
@@ -15,8 +16,24 @@ export default async function RootLayout({
 }) {
 
   return (
-    <html lang="en" className="[color-scheme:light]">
+    <html lang="en">
       <head>
+        {/* Script anti-flash: aplica el tema antes de que React hidrate la página */}
+        <script
+          id="theme-init"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('chronosps:theme');
+                  if (theme === 'dark') {
+                    document.documentElement.classList.add('dark');
+                  }
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
         <script
           id="chunk-load-recovery"
           dangerouslySetInnerHTML={{
@@ -60,11 +77,13 @@ export default async function RootLayout({
         />
       </head>
       <body>
-        <SessionProvider>
+        <ThemeProvider>
+          <SessionProvider>
             <div className="main">
               {children}
             </div>
-        </SessionProvider>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

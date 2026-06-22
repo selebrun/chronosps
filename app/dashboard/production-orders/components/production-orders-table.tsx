@@ -328,12 +328,12 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
           placeholder="Buscar por OP, producto, origen, lote, responsable o estado"
-          className="w-full rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 focus:outline-none"
+          className="w-full rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400 p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 dark:focus:border-sky-400 focus:outline-none"
         />
       </div>
       <div className="relative max-h-[calc(100vh-13.5rem)] min-h-[calc(100vh-13.5rem)] max-w-full overflow-x-auto overflow-y-auto rounded">
-        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
-          <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
+        <table className="w-full text-sm text-left text-gray-500 dark:text-gray-300 relative overflow-y-auto">
+          <thead className="text-xs text-black dark:text-gray-100 uppercase bg-strongCyan dark:bg-sky-900 border-b-8 border-white dark:border-gray-800 sticky top-0">
             <tr>
               <th scope="col" className="px-6 py-3 ">
                 NO. de Orden
@@ -364,11 +364,11 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
           </thead>
           <tbody>
             {productionOrders.map((order: any) => (
-              <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
-                <th scope="row" className="px-5 font-medium text-black">
+              <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:border-gray-800 bg-lightCyan dark:bg-gray-700 text-gray-700 dark:text-gray-100">
+                <th scope="row" className="px-5 font-medium text-black dark:text-gray-100">
                   <div className="flex items-center space-x-4 whitespace-normal">
-                    <div className="dark:text-white">
-                      <div className="text-sm text-black">{order.name}</div>
+                    <div>
+                      <div className="text-sm text-black dark:text-gray-100">{order.name}</div>
                     </div>
                   </div>
                 </th>

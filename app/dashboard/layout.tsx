@@ -23,7 +23,7 @@ export const revalidate = 0;
 export default async function Layout({
   children,
 }: {
-  children: React.ReactNode;  
+  children: React.ReactNode;
 }) {
 
   const session = await getServerSession(config)
@@ -42,7 +42,7 @@ export default async function Layout({
         </aside>
 
         <main className="min-w-0 flex-1">
-          <div className="min-h-[calc(100vh-2.5rem)] rounded-md bg-white p-px shadow-lg shadow-black/20">
+          <div className="min-h-[calc(100vh-2.5rem)] rounded-md bg-white dark:bg-gray-900 p-px shadow-lg shadow-black/20">
             <div className="flex min-h-[calc(100vh-2.75rem)] flex-col rounded-md p-3.5 lg:p-5">
               <RefreshButton />
               <div className="mt-3 min-h-0 flex-1">{children}</div>

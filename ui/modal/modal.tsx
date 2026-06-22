@@ -4,7 +4,7 @@ import { Fragment } from 'react'
 
 export function Modal({ children, title, onClose, setOpen, className }: {
   children: React.ReactNode
-  title?: string 
+  title?: string
   onClose?: Function
   setOpen: boolean
   className?: string
@@ -12,10 +12,6 @@ export function Modal({ children, title, onClose, setOpen, className }: {
 
   function closeModal() {
     if (onClose) onClose()
-  }
-
-  function openModal() {
-    
   }
 
   return (
@@ -32,7 +28,7 @@ export function Modal({ children, title, onClose, setOpen, className }: {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <div className="fixed inset-0 bg-black/25" />
+            <div className="fixed inset-0 bg-black/50" />
           </Transition.Child>
 
           <div className="fixed inset-0 overflow-y-auto">
@@ -47,11 +43,10 @@ export function Modal({ children, title, onClose, setOpen, className }: {
                 leaveTo="opacity-0 scale-95"
               >
                 <Dialog.Panel
-                  className={`w-full transform overflow-hidden rounded-2xl bg-white p-6 text-left align-middle shadow-xl transition-all ${className}`}
+                  className={`w-full transform overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 text-left align-middle shadow-xl transition-all ${className}`}
                 >
-                  
                   {title && (
-                    <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900 flex justify-center">
+                    <Dialog.Title as="h3" className="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100 flex justify-center">
                       {title}
                     </Dialog.Title>
                   )}
