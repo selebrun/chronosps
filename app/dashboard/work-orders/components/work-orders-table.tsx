@@ -163,10 +163,11 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
       let orderWorkSelected = orderSelected;
+      const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id)
       if (action === 'finish_work_order') {
-        orderWorkSelected = {...orderWorkSelected, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
+        orderWorkSelected = refreshedOrder || {...orderWorkSelected, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
       } else {
-        orderWorkSelected = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id) || orderSelected
+        orderWorkSelected = refreshedOrder || orderSelected
       }
 
       setOrderSelected(orderWorkSelected)

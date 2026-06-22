@@ -248,42 +248,70 @@ function parseOdooDate(dateValue: string) {
   return new Date(`${dateValue.replace(' ', 'T')}Z`);
 }
 
-async function addActiveWorkOrderTimers(user: any, workOrders: any[]) {
-  const activeWorkOrders = (workOrders || []).filter((workOrder: any) =>
-    workOrder?.id &&
-    workOrder?.is_user_working &&
-    workOrder?.working_state !== 'blocked' &&
-    !['done', 'completed', 'cancel'].includes(workOrder?.state)
-  );
+function getProductivityDurationSeconds(productivity: any, now: number) {
+  const dateStart = parseOdooDate(productivity?.date_start);
+  const dateEnd = parseOdooDate(productivity?.date_end);
 
-  if (!activeWorkOrders.length) return workOrders || [];
+  if (dateStart && !Number.isNaN(dateStart.getTime()) && (!productivity?.date_end || productivity.date_end === false)) {
+    return Math.max(0, Math.floor((now - dateStart.getTime()) / 1000));
+  }
+
+  const durationMinutes = Number(productivity?.duration);
+  if (Number.isFinite(durationMinutes) && durationMinutes > 0) {
+    return Math.max(0, Math.round(durationMinutes * 60));
+  }
+
+  if (dateStart && dateEnd && !Number.isNaN(dateStart.getTime()) && !Number.isNaN(dateEnd.getTime())) {
+    return Math.max(0, Math.floor((dateEnd.getTime() - dateStart.getTime()) / 1000));
+  }
+
+  return 0;
+}
+
+async function addWorkOrderDurationsFromProductivity(user: any, workOrders: any[]) {
+  const workOrderIds = (workOrders || []).map((workOrder: any) => workOrder.id).filter(Boolean);
+  if (!workOrderIds.length) return workOrders || [];
 
   const productivityData: any[] = await getOdooRecords(
     'mrp.workcenter.productivity',
-    [['workorder_id', 'in', activeWorkOrders.map((workOrder: any) => workOrder.id)], ['date_end', '=', false]],
-    ['id', 'workorder_id', 'date_start', 'date_end'],
+    [['workorder_id', 'in', workOrderIds]],
+    ['id', 'workorder_id', 'date_start', 'date_end', 'duration'],
     user.company_id
   );
 
-  const productivityByWorkOrder = new Map<number, any>();
+  const now = Date.now();
+  const secondsByWorkOrder = new Map<number, number>();
+  const activeSinceByWorkOrder = new Map<number, string>();
+
   (productivityData || []).forEach((productivity: any) => {
-    const workOrderId = Array.isArray(productivity?.workorder_id) ? productivity.workorder_id[0] : productivity?.workorder_id;
-    const current = productivityByWorkOrder.get(Number(workOrderId));
-    if (!current || String(productivity?.date_start || '') > String(current?.date_start || '')) {
-      productivityByWorkOrder.set(Number(workOrderId), productivity);
+    const workOrderId = Number(Array.isArray(productivity?.workorder_id) ? productivity.workorder_id[0] : productivity?.workorder_id);
+    if (!workOrderId) return;
+
+    const durationSeconds = getProductivityDurationSeconds(productivity, now);
+    secondsByWorkOrder.set(workOrderId, (secondsByWorkOrder.get(workOrderId) || 0) + durationSeconds);
+
+    if (productivity?.date_start && (!productivity?.date_end || productivity.date_end === false)) {
+      const currentActiveSince = activeSinceByWorkOrder.get(workOrderId);
+      if (!currentActiveSince || String(productivity.date_start) > String(currentActiveSince)) {
+        activeSinceByWorkOrder.set(workOrderId, productivity.date_start);
+      }
     }
   });
 
-  const now = Date.now();
   return (workOrders || []).map((workOrder: any) => {
-    const productivity = productivityByWorkOrder.get(Number(workOrder.id));
-    const dateStart = parseOdooDate(productivity?.date_start);
-    if (!dateStart || Number.isNaN(dateStart.getTime())) return workOrder;
+    const fallbackDurationSeconds = Math.max(0, Math.round(Number(workOrder?.duration || 0) * 60));
+    const realDurationSeconds = secondsByWorkOrder.has(Number(workOrder.id))
+      ? secondsByWorkOrder.get(Number(workOrder.id)) || 0
+      : fallbackDurationSeconds;
+    const expectedDurationSeconds = Math.max(0, Math.round(Number(workOrder?.duration_expected || 0) * 60));
+    const activeSince = activeSinceByWorkOrder.get(Number(workOrder.id));
 
     return {
       ...workOrder,
-      piso_active_elapsed_seconds: Math.max(0, Math.floor((now - dateStart.getTime()) / 1000)),
-      piso_active_since: productivity.date_start,
+      duration: realDurationSeconds / 60,
+      piso_real_duration_seconds: realDurationSeconds,
+      piso_expected_duration_seconds: expectedDurationSeconds,
+      piso_active_since: activeSince || false,
     };
   });
 }
@@ -363,8 +391,8 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
                 const workOrdersWithQuality = await addQualityStateToWorkOrders(user, workorders.data);
-                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
+                const workOrdersWithDurations = await addWorkOrderDurationsFromProductivity(user, workOrdersWithQuality);
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithDurations);
                 resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
               },
               false
@@ -409,8 +437,8 @@ export async function getWorkOrders(user: any) {
                   return;
                 }
                 const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
-                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
+                const workOrdersWithDurations = await addWorkOrderDurationsFromProductivity(user, workOrdersWithQuality);
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithDurations);
                 resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: workorders.data });
               },
               false
@@ -450,8 +478,8 @@ export async function getWorkOrders(user: any) {
                 }
         
                 const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
-                const workOrdersWithTimers = await addActiveWorkOrderTimers(user, workOrdersWithQuality);
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithTimers);
+                const workOrdersWithDurations = await addWorkOrderDurationsFromProductivity(user, workOrdersWithQuality);
+                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithDurations);
                 resolve({ status: true, message: '', data:  workOrdersWithLocalBlocks, production_data: workorders.data });
               },
               false

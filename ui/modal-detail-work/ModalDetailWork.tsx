@@ -85,9 +85,15 @@ export function ModalDetailWork({
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
   const isWorkOrderDone = ['done', 'completed', 'cancel'].includes(showDetailOrderWork?.state);
   const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && !isWorkOrderBlocked(showDetailOrderWork) && !isWorkOrderDone);
-  const baseElapsedSeconds = Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
+  const normalizedRealDurationSeconds = Number(showDetailOrderWork?.piso_real_duration_seconds);
+  const normalizedExpectedSeconds = Number(showDetailOrderWork?.piso_expected_duration_seconds);
+  const baseElapsedSeconds = Number.isFinite(normalizedRealDurationSeconds)
+    ? Math.max(0, Math.round(normalizedRealDurationSeconds))
+    : Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
-  const expectedSeconds = Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
+  const expectedSeconds = Number.isFinite(normalizedExpectedSeconds)
+    ? Math.max(0, Math.round(normalizedExpectedSeconds))
+    : Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
   const realProgress = expectedSeconds > 0 ? Math.floor((elapsedSeconds / expectedSeconds) * 100) : progress || 0;
   const progressBarWidth = Math.min(Math.max(realProgress, 0), 100);
 
@@ -126,7 +132,7 @@ export function ModalDetailWork({
     return formatElapsedTime(Math.round(minutes * 60));
   }
 
-  const theoreticalDuration = formatDurationFromMinutes(showDetailOrderWork?.duration_expected, showDetailOrderWork?.theoretical_duration);
+  const theoreticalDuration = expectedSeconds > 0 ? formatElapsedTime(expectedSeconds) : formatDurationFromMinutes(showDetailOrderWork?.duration_expected, showDetailOrderWork?.theoretical_duration);
   const realDuration = formatElapsedTime(elapsedSeconds);
   const displayStatus = showDetailOrderWork.quality_failed
     ? 'quality_failed'

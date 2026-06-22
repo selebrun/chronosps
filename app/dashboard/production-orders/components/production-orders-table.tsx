@@ -140,10 +140,11 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
 
       let orderWorkSelected1 = currentWorkOrder;
+      const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id)
       if (action === 'finish_work_order') {
-        orderWorkSelected1 = {...currentWorkOrder, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
+        orderWorkSelected1 = refreshedOrder || {...currentWorkOrder, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
       } else {
-        orderWorkSelected1 = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id) || currentWorkOrder
+        orderWorkSelected1 = refreshedOrder || currentWorkOrder
       }
 
       seOrderWorkSelected(orderWorkSelected1)
