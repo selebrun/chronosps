@@ -33,13 +33,18 @@ export default async function Layout({
   return (
     <div className="min-h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
       <div className="flex min-h-screen flex-col gap-4 p-3 lg:flex-row lg:p-5">
-        <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:w-64">
-          <LogoMenu
-            userName={session.user.name}
-            userRole={session.user.role}
-            isDashboardRoute={true}
-          />
-          <HeaderLink userRole={session.user.role}></HeaderLink>
+        <aside className="w-full shrink-0 lg:sticky lg:top-5 lg:h-[calc(100vh-2.5rem)] lg:w-64 lg:flex lg:flex-col">
+          <div className="space-y-4 flex-1">
+            <LogoMenu
+              userName={session.user.name}
+              userRole={session.user.role}
+              isDashboardRoute={true}
+            />
+            <HeaderLink userRole={session.user.role}></HeaderLink>
+          </div>
+          <div className="mt-4 px-1 text-center text-[10px] leading-tight text-gray-400 dark:text-gray-500">
+            © Chronos Producción Software<br />versión 1.5
+          </div>
         </aside>
 
         <main className="min-w-0 flex-1">
