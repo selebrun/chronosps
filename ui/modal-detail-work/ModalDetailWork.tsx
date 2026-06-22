@@ -13,6 +13,17 @@ function isRole(user: any, role: string) {
   return String(user?.role || '').trim() === role;
 }
 
+function getDefaultDoneQuantity(orderProductionSelected: any, showDetailOrderWork: any) {
+  const quantity = Number(
+    orderProductionSelected?.product_qty
+      ?? showDetailOrderWork?.product_qty
+      ?? showDetailOrderWork?.qty_production
+      ?? 0
+  );
+
+  return Number.isFinite(quantity) ? quantity : 0;
+}
+
 
 export function ModalDetailWork({ 
   modalIsOpenJobDetail, 
@@ -96,10 +107,18 @@ export function ModalDetailWork({
     : Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
   const realProgress = expectedSeconds > 0 ? Math.floor((elapsedSeconds / expectedSeconds) * 100) : progress || 0;
   const progressBarWidth = Math.min(Math.max(realProgress, 0), 100);
+  const defaultDoneQuantity = getDefaultDoneQuantity(orderProductionSelected, showDetailOrderWork);
+  const canEditDoneQuantity = isRole(user, 'Jefe') || isRole(user, 'Lider');
 
   useEffect(() => {
     setElapsedSeconds(baseElapsedSeconds);
   }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
+
+  useEffect(() => {
+    if (modalIsOpenCompleteOrder) {
+      setQtyDone(defaultDoneQuantity);
+    }
+  }, [modalIsOpenCompleteOrder, defaultDoneQuantity]);
 
   useEffect(() => {
     if (!isTimerRunning) return;
@@ -420,7 +439,7 @@ export function ModalDetailWork({
               type="button"
               onClick={() => {
                 setModalIsOpenCompleteOrder(false)
-                setQtyDone(0)
+                setQtyDone(defaultDoneQuantity)
               }}
             >
               <Image
@@ -429,11 +448,11 @@ export function ModalDetailWork({
               />
             </button>
           </div>
-          {user.role === "Operario" ? (
+          {!canEditDoneQuantity ? (
             <div className="mb-5 z-50">
               <label className="block mb-2 text-sm font-medium text-gray-900 dark:text-white">Cantidad</label>
               <div className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg block w-full p-2.5">
-                1
+                {defaultDoneQuantity}
               </div>
             </div>
           ) : (
@@ -443,17 +462,17 @@ export function ModalDetailWork({
               min="1" 
               type="number" 
               value={qtyDone}
-              onChange={(e) => setQtyDone(parseInt(e.target.value))} 
+              onChange={(e) => setQtyDone(Number(e.target.value))} 
               className="shadow-sm bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" required />
             </div>
           )}
           <div className="mb-3 mt-5 text-center">
             <button 
-            disabled={user.role === "Operario" ? false : qtyDone === 0}
+            disabled={canEditDoneQuantity ? qtyDone <= 0 : defaultDoneQuantity <= 0}
             onClick={() => {
               setModalIsOpenCompleteOrder(false)
-              const finalQty = user.role === "Operario" ? 1 : qtyDone
-              setQtyDone(0)
+              const finalQty = canEditDoneQuantity ? qtyDone : defaultDoneQuantity
+              setQtyDone(defaultDoneQuantity)
               executeWorkOrderAction('finish_work_order', undefined, finalQty)
             }}
             className='w-full font-bold bg-indigo-100 p-3 rounded-md disabled:opacity-50'>Aceptar</button>
