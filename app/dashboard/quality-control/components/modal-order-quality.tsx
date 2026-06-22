@@ -76,8 +76,8 @@ export function ModalOrderQuality({
           </div>
           {orderQualityDetail.length > 0 && 
             <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
-              <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
-                <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
+              <table className="w-full text-sm text-left text-gray-500 dark:text-gray-300 relative overflow-y-auto">
+                <thead className="text-xs text-black dark:text-gray-100 uppercase bg-strongCyan dark:bg-sky-900 border-b-8 border-white dark:border-gray-700 sticky top-0">
                   <tr>
                     <th scope="col" className="px-6 py-3 ">
                       {'Orden de trabajo'}
@@ -97,15 +97,13 @@ export function ModalOrderQuality({
                 </thead>
                 <tbody>
                   {orderQualityDetail.map((order: any) => (
-                    <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
-                      <td className="px-3 py-2 text-black">
+                    <tr key={`production-order-${order.id}`} className="border-b-8 border-white dark:border-gray-700 bg-lightCyan dark:bg-gray-600 text-gray-700 dark:text-gray-100">
+                      <td className="px-3 py-2 text-black dark:text-gray-100">
                         {getWorkOrderName(order)}
                       </td>
-                      <th scope="row" className="px-5 font-medium text-black">
+                      <th scope="row" className="px-5 font-medium text-black dark:text-gray-100">
                         <div className="flex items-center space-x-4 whitespace-normal">
-                          <div className="dark:text-white">
-                            <div className="text-sm text-black">{getQualityPointName(order)}</div>
-                          </div>
+                          <div className="text-sm">{getQualityPointName(order)}</div>
                         </div>
                       </th>
                       <td className="px-6 py-2">

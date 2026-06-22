@@ -99,47 +99,47 @@ function ModalOrderQualityDetails({
       <div className="flex flex-col gap-5 lg:flex-row lg:justify-between">
         <div className="w-full">
           <div className="mb-3">
-            <div className="font-bold text-center">Orden de produccion</div>
-            <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
+            <div className="font-bold text-center dark:text-gray-100">Orden de produccion</div>
+            <div className="bg-whiteInput dark:bg-gray-700 dark:text-gray-100 min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
               {selectedOrderQuantity?.production_id?.[1] || "N/A"}
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div>
-              <div className="font-bold text-center">Punto de control</div>
-              <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
+              <div className="font-bold text-center dark:text-gray-100">Punto de control</div>
+              <div className="bg-whiteInput dark:bg-gray-700 dark:text-gray-100 min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
                 {qualityPointLabel}
               </div>
             </div>
 
             <div>
-              <div className="font-bold text-center">Estado</div>
-              <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center">
+              <div className="font-bold text-center dark:text-gray-100">Estado</div>
+              <div className="bg-whiteInput dark:bg-gray-700 dark:text-gray-100 min-h-12 shadow-md p-2 rounded-md text-center">
                 <StatusBadge status={selectedOrderQuantity?.quality_state} />
               </div>
             </div>
 
             <div>
-              <div className="font-bold text-center">Centro de trabajo</div>
-              <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
+              <div className="font-bold text-center dark:text-gray-100">Centro de trabajo</div>
+              <div className="bg-whiteInput dark:bg-gray-700 dark:text-gray-100 min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
                 {selectedOrderQuantity?.workcenter_id?.[1] || "N/A"}
               </div>
             </div>
 
             <div>
-              <div className="font-bold text-center">Orden de trabajo</div>
-              <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
+              <div className="font-bold text-center dark:text-gray-100">Orden de trabajo</div>
+              <div className="bg-whiteInput dark:bg-gray-700 dark:text-gray-100 min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
                 {workOrderLabel}
               </div>
             </div>
           </div>
 
           <div className="mt-3">
-            <div className="font-bold text-center">Observaciones</div>
-            <div className="bg-whiteInput h-[12vh] shadow-md p-2 rounded-md text-center">
+            <div className="font-bold text-center dark:text-gray-100">Observaciones</div>
+            <div className="bg-whiteInput dark:bg-gray-700 h-[12vh] shadow-md p-2 rounded-md text-center">
               <textarea
-                className="h-[10vh] w-full p-2 border focus:border-primary rounded-md"
+                className="h-[10vh] w-full p-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 dark:text-gray-100 focus:border-primary rounded-md"
                 placeholder="Escribe tus notas aqui..."
                 value={observations}
                 onChange={(event) => setObservations(event.target.value)}
@@ -217,15 +217,15 @@ function ModalOrderQualityDetails({
             <Image src={close} alt="Close" />
           </button>
         </div>
-        <div className="text-gray-900">
-          <div className="mb-3 font-bold">{qualityPointLabel}</div>
+        <div className="text-gray-900 dark:text-gray-100">
+          <div className="mb-3 font-bold dark:text-gray-100">{qualityPointLabel}</div>
           {selectedOrderQuantity?.note ? (
             <div
-              className="max-h-[55vh] overflow-y-auto rounded bg-whiteInput p-4 text-sm leading-relaxed"
+              className="max-h-[55vh] overflow-y-auto rounded bg-whiteInput dark:bg-gray-700 dark:text-gray-100 p-4 text-sm leading-relaxed"
               dangerouslySetInnerHTML={{ __html: selectedOrderQuantity.note }}
             />
           ) : (
-            <div className="rounded bg-whiteInput p-4 text-sm">No hay instrucciones registradas.</div>
+            <div className="rounded bg-whiteInput dark:bg-gray-700 dark:text-gray-100 p-4 text-sm">No hay instrucciones registradas.</div>
           )}
         </div>
       </Modal>

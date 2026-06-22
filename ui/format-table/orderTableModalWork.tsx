@@ -14,7 +14,7 @@ function getWorkOrderNumber(order: any) {
 }
 
 export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct, openJobDetail }: {
-    orderDetail: any, 
+    orderDetail: any,
     thOrder: string,
     thStatus: string,
     thProduct: string,
@@ -23,10 +23,10 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
 
   return (
     <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
-    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
-      <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
+    <table className="w-full text-sm text-left text-gray-500 dark:text-gray-300 relative overflow-y-auto">
+      <thead className="text-xs text-black dark:text-gray-100 uppercase bg-strongCyan dark:bg-sky-900 border-b-8 border-white dark:border-gray-700 sticky top-0">
         <tr>
-          <th scope="col" className="px-3 py-3 ">
+          <th scope="col" className="px-3 py-3">
            {thOrder}
           </th>
           <th scope="col" className="px-3 py-3">
@@ -40,12 +40,10 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
       </thead>
       <tbody>
         {orderDetail?.map((order: any) => (
-          <tr key={`production-order-${order?.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
-            <th scope="row" className="px-5 font-medium text-black">
+          <tr key={`production-order-${order?.id}`} className="border-b-8 border-white dark:border-gray-700 bg-lightCyan dark:bg-gray-600 text-gray-700 dark:text-gray-100">
+            <th scope="row" className="px-5 font-medium text-black dark:text-gray-100">
               <div className="flex items-center space-x-4 whitespace-normal">
-                <div className="dark:text-white">
-                  <div className="text-sm text-black">{getWorkOrderNumber(order)}</div>
-                </div>
+                <div className="text-sm">{getWorkOrderNumber(order)}</div>
               </div>
             </th>
             <td className="px-3 py-2">
@@ -55,9 +53,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
               {order?.workcenter_id[1]}
             </td>
             <td className="py-2">
-              <button 
-              onClick={() => openJobDetail(order)}
-              >
+              <button onClick={() => openJobDetail(order)}>
                 <Image
                   src={eyeDetails}
                   alt="Eye Details"
