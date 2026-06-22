@@ -1,31 +1,25 @@
 'use server'
 
-import { Client } from 'pg';
+import { Pool } from 'pg';
 
 const dbConfig = {
   user: process.env.CHRONOS_DB_USER || '',
   host: process.env.CHRONOS_DB_HOST || '',
   database: process.env.CHRONOS_DB_NAME || '',
   password: process.env.CHRONOS_DB_PASSWORD || '',
-  port: process.env.CHRONOS_DB_PORT || 5432,
+  port: Number(process.env.CHRONOS_DB_PORT) || 5432,
   ssl: {
     rejectUnauthorized: false,
   },
 } as any;
 
-async function withClient<T>(callback: (client: Client) => Promise<T>) {
-  const client = new Client(dbConfig);
+// Pool reutilizable: evita abrir/cerrar conexión en cada consulta
+const _pool = new Pool({ ...dbConfig, max: 5 });
 
-  try {
-    await client.connect();
-    await ensureWorkOrderBlocksTable(client);
-    return await callback(client);
-  } finally {
-    await client.end();
-  }
-}
+// Solo verifica/crea la tabla una vez por ciclo de vida del proceso
+let _tableInitialized = false;
 
-async function ensureWorkOrderBlocksTable(client: Client) {
+async function ensureWorkOrderBlocksTable(client: any) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS work_order_blocks (
       id SERIAL PRIMARY KEY,
@@ -50,12 +44,25 @@ async function ensureWorkOrderBlocksTable(client: Client) {
   `);
 }
 
+async function withPool<T>(callback: (client: any) => Promise<T>) {
+  const client = await _pool.connect();
+  try {
+    if (!_tableInitialized) {
+      await ensureWorkOrderBlocksTable(client);
+      _tableInitialized = true;
+    }
+    return await callback(client);
+  } finally {
+    client.release();
+  }
+}
+
 function getMany2OneId(value: any) {
   return Array.isArray(value) ? value[0] : value;
 }
 
 export async function markWorkOrderBlocked(user: any, workOrder: any, reason: any) {
-  return withClient(async (client) => {
+  return withPool(async (client) => {
     await client.query(
       `
       UPDATE work_order_blocks
@@ -98,7 +105,7 @@ export async function markWorkOrderBlocked(user: any, workOrder: any, reason: an
 }
 
 export async function markWorkOrderUnblocked(user: any, workOrderId: number) {
-  return withClient(async (client) => {
+  return withPool(async (client) => {
     await client.query(
       `
       UPDATE work_order_blocks
@@ -121,7 +128,7 @@ export async function getActiveWorkOrderBlocks(user: any, workOrderIds: number[]
   if (!ids.length) return new Map<number, any>();
 
   try {
-    const rows = await withClient(async (client) => {
+    const rows = await withPool(async (client) => {
       const response = await client.query(
         `
         SELECT workorder_id, reason_id, reason_name, blocked_by, blocked_by_role, blocked_at

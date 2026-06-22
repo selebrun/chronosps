@@ -1,6 +1,6 @@
 'use server'
 import { getOdooData } from '@/app/api/odoo/odooService';
-import { addLocalBlockState } from '@/app/api/workOrderBlocks/workOrderBlocks';
+import { getActiveWorkOrderBlocks } from '@/app/api/workOrderBlocks/workOrderBlocks';
 import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
 
 // `server-only` guarantees any modules that import code in file
@@ -9,22 +9,48 @@ import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
 // good practise to add `server-only` preemptively.
 // import 'server-only';
 
-async function filterProductionsWithRealWorkOrders(user: any, productions: any[] = []) {
-  const productionIds = productions.map((production: any) => production.id).filter(Boolean);
-  if (!productionIds.length) return [];
+// ─── Helpers base ────────────────────────────────────────────────────────────
 
-  const workorders = await getOdooRecords(
-    'mrp.workorder',
-    [['production_id', 'in', productionIds]],
-    ['id', 'production_id'],
-    user.company_id
-  );
-  const productionIdsWithWorkOrders = new Set(
-    workorders.map((workorder: any) => Number(asOdooId(workorder.production_id))).filter(Boolean)
-  );
-
-  return productions.filter((production: any) => productionIdsWithWorkOrders.has(Number(production.id)));
+function asOdooId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
 }
+
+function asOdooName(value: any) {
+  return Array.isArray(value) ? value[1] : value || '';
+}
+
+function normalizeText(value: any) {
+  return (value || '').toString().trim();
+}
+
+/** Wrapper que convierte getOdooData en Promise y devuelve [] en caso de error */
+function getOdooRecords(
+  model: string,
+  domain: any[],
+  fields: string[],
+  companyId: string,
+  order: any = false,
+): Promise<any[]> {
+  return new Promise((resolve) => {
+    getOdooData(
+      model,
+      domain,
+      fields,
+      false,
+      order,
+      companyId,
+      async (response: any) => {
+        if (response && response.status === false) {
+          console.log(`Error consultando ${model}:`, response.message || response);
+        }
+        resolve(response?.data || []);
+      },
+      false
+    );
+  });
+}
+
+// ─── Resolución de usuario Líder ─────────────────────────────────────────────
 
 function getLeaderOdooUserId(user: any) {
   return Number(user?.odoo_user_id?.toString?.().trim?.() ?? user?.odoo_user_id) || 0;
@@ -122,126 +148,34 @@ async function resolveLeaderOdooUserId(user: any) {
   return resolvedUser.userId;
 }
 
+// ─── Dominios ─────────────────────────────────────────────────────────────────
+
 function getLeaderProductionDomain(userId: number, productionIds: number[] | false = false) {
   const domain: any[] = [['state','in',['confirmed','progress']], ['user_id', '=', userId]];
   if (Array.isArray(productionIds)) domain.push(['id', 'in', productionIds]);
   return domain;
 }
 
-export async function getProductionOrders(user: any) {
-	switch(user.role) {
-    case 'Operario':
-      return new Promise(async (resolve, reject) => {
-        getOdooData(
-          'mrp.workorder',
-          [['employee_assigned_ids','=',user.odoo_id], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
-          ['id', 'state', 'production_id'],
-          false,
-          false,
-          user.company_id,
-          async (workorders: any) => {
-            if (!workorders || !workorders.data) {
-              reject({ status: false, message: 'No se encontraron ordenes de trabajo.', data: false });
-              return;
-            }
-            const production_order_ids = workorders.data.map((w: any) => w.production_id[0]);
-    
-            getOdooData(
-              'mrp.production',
-              [['state', 'in', ['confirmed', 'progress']], ['id', 'in', production_order_ids]],
-              [],
-              false,
-              false,
-              user.company_id,
-              async (productions: any) => {
-                if (!productions || !productions.data) {
-                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-                  return;
-                }
-                resolve({ status: true, message: '', data: productions.data });
-              },
-              false
-            );
-          },
-          false
-        );
-      });
+// ─── Filtro de producciones con OTs ──────────────────────────────────────────
 
-    case 'Lider':
-      return new Promise(async (resolve, reject) => {
-        const leaderUserId = await resolveLeaderOdooUserId(user);
-        if(!leaderUserId) {
-          reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
-          return;
-        }
+async function filterProductionsWithRealWorkOrders(user: any, productions: any[] = []) {
+  const productionIds = productions.map((production: any) => production.id).filter(Boolean);
+  if (!productionIds.length) return [];
 
-        getOdooData(
-          'mrp.production',
-          getLeaderProductionDomain(leaderUserId),
-          [],
-          false,
-          false,
-          user.company_id,
-          async (productions: any) => {
-            if (!productions || !productions.data) {
-              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-              return;
-            }
-            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
-            resolve({ status: true, message: '', data: productionsWithWorkOrders });
-          },
-          false
-        )
-      });
+  const workorders = await getOdooRecords(
+    'mrp.workorder',
+    [['production_id', 'in', productionIds]],
+    ['id', 'production_id'],
+    user.company_id
+  );
+  const productionIdsWithWorkOrders = new Set(
+    workorders.map((workorder: any) => Number(asOdooId(workorder.production_id))).filter(Boolean)
+  );
 
-    case 'Jefe':
-      return new Promise(async (resolve, reject) => {
-        getOdooData(
-          'mrp.production',
-          [['state','in',['confirmed','progress']]],
-          [],
-          false,
-          'name asc',
-          user.company_id,
-          async (productions: any) => {
-            if (!productions || !productions.data) {
-              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-              return;
-            }
-            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
-            resolve({ status: true, message: '', data: productionsWithWorkOrders });
-          },
-          false
-          )
-      })
-
-    case 'Calidad':
-      return new Promise(async (resolve, reject) => {
-        getOdooData(
-          'mrp.production',
-          [['state','in',['confirmed','progress']]],
-          [],
-          false,
-          false,
-          user.company_id,
-          async (productions: any) => {
-            if (!productions || !productions.data) {
-              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-              return;
-            }
-            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
-            resolve({ status: true, message: '', data: productionsWithWorkOrders });
-          },
-          false
-          )
-      })
-
-    default:
-      return new Promise(async (resolve, reject) => {
-        reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
-      })
-  }
+  return productions.filter((production: any) => productionIdsWithWorkOrders.has(Number(production.id)));
 }
+
+// ─── Enriquecimiento de OTs (paralelo) ───────────────────────────────────────
 
 function parseOdooDate(dateValue: string) {
   if (!dateValue) return null;
@@ -351,24 +285,74 @@ async function addQualityStateToWorkOrders(user: any, workOrders: any[]) {
   });
 }
 
-export async function getWorkOrders(user: any) {
-  const ordersPro: any = await getProductionOrders(user) || []
-  let filter: any = []
-  const idOrders = ordersPro?.data?.map((order: any) => order.id).filter(Boolean) || []
+/**
+ * Enriquece las OTs con calidad, duraciones y bloqueos locales en paralelo.
+ * Sustituye la cadena secuencial: addQualityState → addDurations → addLocalBlockState
+ */
+async function enrichWorkOrders(user: any, workOrders: any[]) {
+  if (!workOrders.length) return workOrders;
 
-  if (!idOrders.length) {
-    return { status: true, message: '', data: [], production_data: [] };
-  }
+  const workOrderIds = workOrders.map((wo: any) => wo.id).filter(Boolean);
 
-  switch(user.role) {
+  const [withQuality, withDurations, blocksMap] = await Promise.all([
+    addQualityStateToWorkOrders(user, workOrders),
+    addWorkOrderDurationsFromProductivity(user, workOrders),
+    getActiveWorkOrderBlocks(user, workOrderIds),
+  ]);
+
+  // Índices para merge eficiente
+  const qualityById = new Map(withQuality.map((wo: any) => [Number(wo.id), wo]));
+  const durationsById = new Map(withDurations.map((wo: any) => [Number(wo.id), wo]));
+
+  return workOrders.map((wo: any) => {
+    const woId = Number(wo.id);
+    const withDur = durationsById.get(woId) || wo;
+    const withQual = qualityById.get(woId) || wo;
+    const block = blocksMap.get(woId);
+
+    const merged: any = {
+      ...wo,
+      // Campos de duración
+      duration: withDur.duration,
+      piso_real_duration_seconds: withDur.piso_real_duration_seconds,
+      piso_expected_duration_seconds: withDur.piso_expected_duration_seconds,
+      piso_active_since: withDur.piso_active_since,
+      // Campos de calidad (solo si hay falla)
+      ...(withQual.quality_failed ? {
+        quality_failed: withQual.quality_failed,
+        quality_failed_count: withQual.quality_failed_count,
+        quality_failed_points: withQual.quality_failed_points,
+        is_user_working: false,
+      } : {}),
+    };
+
+    if (block) {
+      return {
+        ...merged,
+        working_state: 'blocked',
+        is_user_working: false,
+        local_blocked: true,
+        local_block_reason_id: block.reason_id,
+        local_block_reason_name: block.reason_name,
+        local_blocked_by: block.blocked_by,
+        local_blocked_at: block.blocked_at,
+      };
+    }
+
+    return merged;
+  });
+}
+
+// ─── Órdenes de producción (OP) ──────────────────────────────────────────────
+
+export async function getProductionOrders(user: any) {
+	switch(user.role) {
     case 'Operario':
-      filter = [['state','in',['pending','waiting','ready','progress']]]
-      filter.push(['employee_assigned_ids','=',user.odoo_id])
       return new Promise(async (resolve, reject) => {
         getOdooData(
           'mrp.workorder',
-          filter,
-          [],
+          [['employee_assigned_ids','=',user.odoo_id], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
+          ['id', 'state', 'production_id'],
           false,
           false,
           user.company_id,
@@ -378,6 +362,7 @@ export async function getWorkOrders(user: any) {
               return;
             }
             const production_order_ids = workorders.data.map((w: any) => w.production_id[0]);
+
             getOdooData(
               'mrp.production',
               [['state', 'in', ['confirmed', 'progress']], ['id', 'in', production_order_ids]],
@@ -390,10 +375,7 @@ export async function getWorkOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                const workOrdersWithQuality = await addQualityStateToWorkOrders(user, workorders.data);
-                const workOrdersWithDurations = await addWorkOrderDurationsFromProductivity(user, workOrdersWithQuality);
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithDurations);
-                resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: productions.data });
+                resolve({ status: true, message: '', data: productions.data });
               },
               false
             );
@@ -409,223 +391,195 @@ export async function getWorkOrders(user: any) {
           reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
           return;
         }
-        filter = getLeaderProductionDomain(leaderUserId, idOrders)
+
         getOdooData(
           'mrp.production',
-          filter,
+          getLeaderProductionDomain(leaderUserId),
           [],
           false,
           false,
           user.company_id,
-          async (workorders: any) => {
-            if (!workorders || !workorders.data) {
+          async (productions: any) => {
+            if (!productions || !productions.data) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            const production_orders = workorders.data.map((p: any) => p.id);
-            getOdooData(
-              'mrp.workorder',
-              [['production_id','in',production_orders]],
-              // ['id','name','state','x_studio_nro_ot','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working','worksheet','quality_state']
-              [],
-              false,
-              'production_id asc, sequence asc, name asc',
-              user.company_id,
-              async (productions: any) => {
-                if (!productions || !productions.data) {
-                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-                  return;
-                }
-                const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
-                const workOrdersWithDurations = await addWorkOrderDurationsFromProductivity(user, workOrdersWithQuality);
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithDurations);
-                resolve({ status: true, message: '', data: workOrdersWithLocalBlocks, production_data: workorders.data });
-              },
-              false
-            );
+            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
+            resolve({ status: true, message: '', data: productionsWithWorkOrders });
           },
           false
         )
       });
+
     case 'Jefe':
       return new Promise(async (resolve, reject) => {
-        filter = [['state','in',['confirmed','progress']]]
-        filter.push(['id','in',  idOrders])
         getOdooData(
           'mrp.production',
-          filter,
+          [['state','in',['confirmed','progress']]],
           [],
           false,
           'name asc',
           user.company_id,
-          async (workorders: any) => {
-            if (!workorders || !workorders.data) {
+          async (productions: any) => {
+            if (!productions || !productions.data) {
               reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
               return;
             }
-            const production_orders = workorders.data.map((p: any) => p.id);
-            getOdooData(
-              'mrp.workorder',
-              [['production_id','in',production_orders]],
-              [],
-              false,
-              'production_id asc, sequence asc, name asc',
-              user.company_id,
-              async (productions: any) => {
-                if (!productions || !productions.data) {
-                  reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-                  return;
-                }
-        
-                const workOrdersWithQuality = await addQualityStateToWorkOrders(user, productions.data);
-                const workOrdersWithDurations = await addWorkOrderDurationsFromProductivity(user, workOrdersWithQuality);
-                const workOrdersWithLocalBlocks = await addLocalBlockState(user, workOrdersWithDurations);
-                resolve({ status: true, message: '', data:  workOrdersWithLocalBlocks, production_data: workorders.data });
-              },
-              false
-            );
+            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
+            resolve({ status: true, message: '', data: productionsWithWorkOrders });
           },
           false
-        )})
+          )
+      })
+
+    case 'Calidad':
+      return new Promise(async (resolve, reject) => {
+        getOdooData(
+          'mrp.production',
+          [['state','in',['confirmed','progress']]],
+          [],
+          false,
+          false,
+          user.company_id,
+          async (productions: any) => {
+            if (!productions || !productions.data) {
+              reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
+              return;
+            }
+            const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
+            resolve({ status: true, message: '', data: productionsWithWorkOrders });
+          },
+          false
+          )
+      })
+
     default:
       return new Promise(async (resolve, reject) => {
         reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
       })
-
   }
-
-
-
-
-
-
-
-  // const ordersPro: any = await getProductionOrders(user) || []
-  // const idOrders = ordersPro?.data.map((order: any) => order.id)
-
-  // if (!idOrders.length) {
-  //   return new Promise(async (resolve, reject) => {
-  //     reject({ status: false, message: "No se han podido obtener las ódenes de producción." });
-  //   })
-  // }
-
-  // let filter: any = []
-  // switch(user.role) {
-  //   case 'Operario':
-  //         filter = [['state','in',['pending','waiting','ready','progress']]]
-  //         filter.push(['production_id','=', idOrders])
-  //         filter.push(["x_studio_responsable","=",user.odoo_id])
-  //     return new Promise(async (resolve, reject) => {
-  //       getOdooData(
-  //         'mrp.workorder',
-  //         filter,
-  //         ['id','name','state','x_studio_nro_ot','x_studio_responsable','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working','worksheet','quality_state'],
-  //         false,
-  //         false,
-  //         user.company_id,
-  //         async (workorders: any) => {
-  //           if (!workorders || !workorders.data) {
-  //             reject({ status: false, message: 'No se encontraron ordenes de trabajo.', data: false });
-  //             return;
-  //           }
-  //           const production_order_ids = workorders.data.map((w: any) => w.production_id[0]);
-  //           getOdooData(
-  //             'mrp.production',
-  //             [['state', 'in', ['confirmed', 'progress']], ['id', 'in', production_order_ids]],
-  //             ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
-  //             false,
-  //             false,
-  //             user.company_id,
-  //             async (productions: any) => {
-  //               if (!productions || !productions.data) {
-  //                 reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-  //                 return;
-  //               }
-  //               resolve({ status: true, message: '', data: workorders.data, production_data: productions.data });
-  //             }
-  //           );
-  //         }
-  //       );
-  //     });
-
-  //   case 'Lider':
-  //     return new Promise(async (resolve, reject) => {
-  //       if(!user.odoo_user_id) reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
-  //       filter = [['state','in',['confirmed','progress']],['user_id','=',user.odoo_id]]
-  //       filter.push(['id','=',  idOrders])
-  //       getOdooData(
-  //         'mrp.production',
-  //         filter,
-  //         ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
-  //         false,
-  //         false,
-  //         user.company_id,
-  //         async (workorders: any) => {
-  //           if (!workorders || !workorders.data) {
-  //             reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-  //             return;
-  //           }
-  //           const production_orders = workorders.data.map((p: any) => p.id);
-  //           getOdooData(
-  //             'mrp.workorder',
-  //             [['production_id','in',production_orders]],
-  //             ['id','name','state','x_studio_responsable','x_studio_nro_ot','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working','worksheet','quality_state'],
-  //             false,
-  //             false,
-  //             user.company_id,
-  //             async (productions: any) => {
-  //               if (!productions || !productions.data) {
-  //                 reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-  //                 return;
-  //               }
-  //               resolve({ status: true, message: '', data: productions.data, production_data: productions.data });
-  //             }
-  //           );
-  //         }
-  //       )
-  //     });
-  //   case 'Jefe':
-  //     return new Promise(async (resolve, reject) => {
-  //       filter = [['state','in',['confirmed','progress']]]
-  //       filter.push(['id','=',  idOrders])
-  //       getOdooData(
-  //         'mrp.production',
-  //         filter,
-  //         ['id','name','state','product_id','product_qty','qty_producing','lot_producing_id','date_planned_start','user_id','bom_id','move_raw_ids'],
-  //         false,
-  //         false,
-  //         user.company_id,
-  //         async (workorders: any) => {
-  //           if (!workorders || !workorders.data) {
-  //             reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-  //             return;
-  //           }
-  //           const production_orders = workorders.data.map((p: any) => p.id);
-  //           getOdooData(
-  //             'mrp.workorder',
-  //             [['production_id','in',production_orders]],
-  //             ['id','name','state','x_studio_nro_ot','x_studio_responsable','production_id','date_planned_start','date_planned_finished','duration','duration_expected','operation_note','working_state','workcenter_id','is_user_working','worksheet','quality_state'],
-  //             false,
-  //             false,
-  //             user.company_id,
-  //             async (productions: any) => {
-  //               if (!productions || !productions.data) {
-  //                 reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
-  //                 return;
-  //               }
-        
-  //               resolve({ status: true, message: '', data:  productions.data, production_data: workorders.data });
-  //             }
-  //           );
-  //         }
-  //       )})
-  //   default:
-  //     return new Promise(async (resolve, reject) => {
-  //       reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
-  //     })
-
-  // }
 }
+
+// ─── Órdenes de trabajo (OT) ─────────────────────────────────────────────────
+
+export async function getWorkOrders(user: any) {
+  switch(user.role) {
+    case 'Operario': {
+      // 1. Obtener OTs asignadas al operario
+      const workOrders = await getOdooRecords(
+        'mrp.workorder',
+        [['employee_assigned_ids', '=', user.odoo_id], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
+        [],
+        user.company_id
+      );
+
+      if (!workOrders.length) {
+        return { status: true, message: '', data: [], production_data: [] };
+      }
+
+      const productionIds = Array.from(new Set<number>(
+        workOrders.map((wo: any) => Number(asOdooId(wo.production_id))).filter(Boolean)
+      ));
+
+      // 2. Producciones y enriquecimiento en paralelo
+      const [productions, enrichedWorkOrders] = await Promise.all([
+        getOdooRecords(
+          'mrp.production',
+          [['state', 'in', ['confirmed', 'progress']], ['id', 'in', productionIds]],
+          [],
+          user.company_id
+        ),
+        enrichWorkOrders(user, workOrders),
+      ]);
+
+      return { status: true, message: '', data: enrichedWorkOrders, production_data: productions };
+    }
+
+    case 'Lider': {
+      // 1. Resolver el usuario Odoo del líder (una sola vez)
+      const leaderUserId = await resolveLeaderOdooUserId(user);
+      if (!leaderUserId) {
+        return Promise.reject({ status: false, message: 'Su perfil es de Lider, pero no tiene un usuario en Odoo.' });
+      }
+
+      // 2. Producciones del líder
+      const productions = await getOdooRecords(
+        'mrp.production',
+        getLeaderProductionDomain(leaderUserId),
+        [],
+        user.company_id
+      );
+
+      if (!productions.length) {
+        return { status: true, message: '', data: [], production_data: [] };
+      }
+
+      const productionIds = productions.map((p: any) => p.id);
+
+      // 3. OTs de esas producciones
+      const workOrders = await getOdooRecords(
+        'mrp.workorder',
+        [['production_id', 'in', productionIds]],
+        [],
+        user.company_id,
+        'production_id asc, sequence asc, name asc'
+      );
+
+      // Filtrar producciones que tienen OTs (equivale a filterProductionsWithRealWorkOrders)
+      const productionIdsWithWorkOrders = new Set(
+        workOrders.map((wo: any) => Number(asOdooId(wo.production_id))).filter(Boolean)
+      );
+      const filteredProductions = productions.filter((p: any) => productionIdsWithWorkOrders.has(Number(p.id)));
+
+      // 4. Enriquecer OTs en paralelo
+      const enrichedWorkOrders = await enrichWorkOrders(user, workOrders);
+
+      return { status: true, message: '', data: enrichedWorkOrders, production_data: filteredProductions };
+    }
+
+    case 'Jefe': {
+      // 1. Producciones en curso
+      const productions = await getOdooRecords(
+        'mrp.production',
+        [['state', 'in', ['confirmed', 'progress']]],
+        [],
+        user.company_id,
+        'name asc'
+      );
+
+      if (!productions.length) {
+        return { status: true, message: '', data: [], production_data: [] };
+      }
+
+      const productionIds = productions.map((p: any) => p.id);
+
+      // 2. OTs de esas producciones
+      const workOrders = await getOdooRecords(
+        'mrp.workorder',
+        [['production_id', 'in', productionIds]],
+        [],
+        user.company_id,
+        'production_id asc, sequence asc, name asc'
+      );
+
+      // Filtrar producciones que tienen OTs
+      const productionIdsWithWorkOrders = new Set(
+        workOrders.map((wo: any) => Number(asOdooId(wo.production_id))).filter(Boolean)
+      );
+      const filteredProductions = productions.filter((p: any) => productionIdsWithWorkOrders.has(Number(p.id)));
+
+      // 3. Enriquecer OTs en paralelo
+      const enrichedWorkOrders = await enrichWorkOrders(user, workOrders);
+
+      return { status: true, message: '', data: enrichedWorkOrders, production_data: filteredProductions };
+    }
+
+    default:
+      return Promise.reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
+  }
+}
+
+// ─── Control de Calidad ───────────────────────────────────────────────────────
 
 export async function getQualityControl(user: any) {
   switch(user.role) {
@@ -685,6 +639,8 @@ export async function getQualityControl(user: any) {
   }
 }
 
+// ─── Razones de bloqueo ───────────────────────────────────────────────────────
+
 export async function getBlockReasons(user: any) {
   return new Promise(async (resolve, reject) => {
         getOdooData(
@@ -702,9 +658,7 @@ export async function getBlockReasons(user: any) {
     })
   }
 
-function asOdooId(value: any) {
-  return Array.isArray(value) ? value[0] : value;
-}
+// ─── Helpers para Quality Control ────────────────────────────────────────────
 
 async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], companyId: string) {
   const workorderIds = Array.from(new Set(
@@ -742,13 +696,7 @@ async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], company
   });
 }
 
-function asOdooName(value: any) {
-  return Array.isArray(value) ? value[1] : value || '';
-}
-
-function normalizeText(value: any) {
-  return (value || '').toString().trim();
-}
+// ─── Notas de Venta / Cliente ─────────────────────────────────────────────────
 
 function getWorkOrderProgress(workorder: any) {
   if (['done', 'completed'].includes(workorder?.state)) return 100;
@@ -780,32 +728,6 @@ const CUSTOMER_PRODUCTION_FIELDS = [
   'sale_line_id',
   'workorder_ids',
 ];
-
-function getOdooRecords(
-  model: string,
-  domain: any[],
-  fields: string[],
-  companyId: string,
-  order: any = false,
-): Promise<any[]> {
-  return new Promise((resolve) => {
-    getOdooData(
-      model,
-      domain,
-      fields,
-      false,
-      order,
-      companyId,
-      async (response: any) => {
-        if (response && response.status === false) {
-          console.log(`Error consultando ${model}:`, response.message || response);
-        }
-        resolve(response?.data || []);
-      },
-      false
-    );
-  });
-}
 
 async function getProductionsBySaleId(saleIds: number[], companyId: string) {
   const productions = await getOdooRecords(

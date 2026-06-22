@@ -4,6 +4,61 @@ const url = require('url');
 import { config } from '@/config/params';
 import { getCompanies } from "@/app/api/companies/companies";
 
+// Cache de empresas: evita consultar PostgreSQL en cada llamada a Odoo (TTL 5 min)
+let _companiesCache: { data: any[]; expiresAt: number } | null = null;
+
+async function getCachedCompanies() {
+  const now = Date.now();
+  if (_companiesCache && _companiesCache.expiresAt > now) return _companiesCache.data;
+  const data = await getCompanies();
+  _companiesCache = { data, expiresAt: now + 5 * 60 * 1000 };
+  return data;
+}
+
+// Cache de UID por empresa: evita llamada de autenticación XML-RPC en cada request (TTL 30 min)
+const _uidCache = new Map<string, { uid: number; expiresAt: number }>();
+
+async function getCachedUid(companyId: string, odooConnection: any): Promise<number | false> {
+  const now = Date.now();
+  const cached = _uidCache.get(companyId);
+  if (cached && cached.expiresAt > now) return cached.uid;
+
+  return new Promise((resolve) => {
+    const urlParts = url.parse(odooConnection.url);
+    const clientOptions = {
+      host: urlParts.hostname,
+      port: odooConnection.port || urlParts.port,
+      path: '/xmlrpc/2/common',
+    };
+    const client = urlParts.protocol === 'https:'
+      ? xmlrpc.createSecureClient(clientOptions)
+      : xmlrpc.createClient(clientOptions);
+
+    client.methodCall(
+      'authenticate',
+      [odooConnection.db, odooConnection.username, odooConnection.password, {}],
+      (err: any, uid: any) => {
+        if (err || !uid) {
+          console.log('Error autenticando con Odoo:', err);
+          resolve(false);
+          return;
+        }
+        const numUid = Number(uid);
+        _uidCache.set(companyId, { uid: numUid, expiresAt: Date.now() + 30 * 60 * 1000 });
+        resolve(numUid);
+      }
+    );
+  });
+}
+
+export function invalidateOdooUidCache(companyId?: string) {
+  if (companyId) {
+    _uidCache.delete(companyId);
+  } else {
+    _uidCache.clear();
+  }
+}
+
 function executeKwWithUid(
   odooConnection: any,
   uid: number,
@@ -49,8 +104,7 @@ async function odooRequest(
     return;
   }
 
-
-	const companies =  await getCompanies()
+	const companies = await getCachedCompanies();
 	const mapCompanies = companies.map(company => {
 		return(
 			{
@@ -66,18 +120,20 @@ async function odooRequest(
 			}
 	})})
 
-	const company_data =  mapCompanies.find(company => company.id == companyId);
-
-
-	//const company_data = mapCompanies.find((company) => {return company.odoo_connection.username === 'admin'})
+	const company_data = mapCompanies.find(company => company.id == companyId);
 	const odoo_connection = (company_data ? company_data.odoo_connection : false)
   if(!odoo_connection) return callback({status: false, message: 'No se encontro la compañia con ID:'+company_id})
+
   const onDone = (pError: any, result: any) => {
     if (pError) {
       const faultString = pError?.faultString || pError?.message || '';
       if (typeof faultString === 'string' && faultString.includes('cannot marshal None')) {
         callback({status: true, data: true})
         return
+      }
+      // Si el error es de autenticación, invalida el cache del UID para que se renueve
+      if (typeof faultString === 'string' && (faultString.includes('AccessDenied') || faultString.includes('Session expired'))) {
+        invalidateOdooUidCache(companyId);
       }
       console.log(pError)
       callback({status: false, message: pError})
@@ -90,16 +146,13 @@ async function odooRequest(
     executeKwWithUid(odoo_connection, uidOverride, pModel, action, params, onDone);
     return;
   }
-	const odoo = new Odoo(odoo_connection);
 
-    odoo.connect(function (pError: any) {
-        if (pError) { 
-            console.log(pError, "pErrorpError"); 
-            callback({status:false}); 
-        } else {
-            odoo.execute_kw(pModel, action, params, onDone);
-        }
-    });
+  const uid = await getCachedUid(companyId, odoo_connection);
+  if (!uid) {
+    callback({ status: false, message: 'No se pudo autenticar con Odoo para la empresa ' + companyId });
+    return;
+  }
+  executeKwWithUid(odoo_connection, uid, pModel, action, params, onDone);
 }
 
 
@@ -182,7 +235,7 @@ export async function countOdooData(pModel: any, pFilter: any, pFields: any, com
 	inParams.push(0);
 	params = [];
 	params.push(inParams);
-	
+
 	await odooRequest(pModel, action, params, company_id, (res: any) => {
 		callback(res)
 	}, false)
