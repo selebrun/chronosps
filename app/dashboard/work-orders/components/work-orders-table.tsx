@@ -46,6 +46,28 @@ function sortWorkOrdersByProductionAndSequence(workOrders: any[] = []) {
   });
 }
 
+function normalizeSearchText(value: any) {
+  return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function workOrderMatchesSearch(order: any, term: string) {
+  const normalizedTerm = normalizeSearchText(term);
+  if (!normalizedTerm) return true;
+
+  const searchableText = [
+    order?.sequence,
+    order?.x_studio_nro_ot,
+    order?.name,
+    getOdooName(order?.production_id),
+    getOdooName(order?.workcenter_id),
+    order?.date_planned_start,
+    order?.state,
+    order?.working_state,
+  ].map(normalizeSearchText).join(' ');
+
+  return searchableText.includes(normalizedTerm);
+}
+
 export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalIsOpenInstructions, setModalIsOpenInstructions] = useState(false);
@@ -64,6 +86,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
   const [error, setError] = useState<string>('');
   const [qualityPauseMessage, setQualityPauseMessage] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
 
 
   useEffect(()=>{
@@ -124,7 +147,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   }
   
   const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
-  const orderedWorkOrders = sortWorkOrdersByProductionAndSequence(workoOrder?.data || [])
+  const orderedWorkOrders = sortWorkOrdersByProductionAndSequence(workoOrder?.data || []).filter((order: any) => workOrderMatchesSearch(order, searchTerm))
 
   const isQualityControlError = (message: string) => {
     const normalizedMessage = (message || '').toLowerCase();
@@ -197,7 +220,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
 
   const getMaterials = async () => {
     setMaterials([])
-    const materials = await getMaterialsOrder(user, orderProduction.move_raw_ids).then( res => res).catch((err) => console.log(err))
+    const materials = await getMaterialsOrder(user, orderProduction.move_raw_ids, orderSelected).then( res => res).catch((err) => console.log(err))
     if(materials.status) {
       setMaterials(materials.data)
     }
@@ -224,7 +247,8 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
         orderMaterialsSelected.location_id[0],
         orderMaterialsSelected.location_dest_id[0],
         orderMaterialsSelected.company_id[0],
-        orderMaterialsSelected.product_id[1]
+        orderMaterialsSelected.product_id[1],
+        orderMaterialsSelected.operation_id?.[0]
       )
       if (data?.status) {
         setDisabledBtnSaveMaterial(true)
@@ -277,6 +301,15 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
         />
       }
+      <div className="mb-4">
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Buscar por OT, OP, operacion, centro o estado"
+          className="w-full rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 focus:outline-none"
+        />
+      </div>
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
             <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">

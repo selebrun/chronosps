@@ -6,6 +6,19 @@ import close from "@/public/close.png";
 import { Modal } from "@/ui/modal/modal";
 import { StatusBadge } from "@/ui/status-badge/status-badge";
 
+function normalizeQualityNote(value: any) {
+  if (value === null || value === undefined || value === false) return "";
+
+  return String(value)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>\s*<p[^>]*>/gi, "\n")
+    .replace(/<\/?p[^>]*>/gi, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">");
+}
+
 function ModalOrderQualityDetails({
   modalWorkOrderDetail,
   openJobDetail,
@@ -19,17 +32,12 @@ function ModalOrderQualityDetails({
   modalWorkOrderDetail: boolean;
   openJobDetail: () => void;
   selectedOrderQuantity: any;
-  acceptOrder: (observations?: string, measure?: number) => Promise<any>;
-  rejectOrder: (observations?: string, measure?: number) => Promise<any>;
-  saveNotes: (observations?: string, measure?: number) => Promise<any>;
+  acceptOrder: (observations?: string) => Promise<any>;
+  rejectOrder: (observations?: string) => Promise<any>;
+  saveNotes: (observations?: string) => Promise<any>;
   user?: any;
 }) {
-  const [measureValue, setMeasureValue] = useState<string>(
-    selectedOrderQuantity?.measure === null || selectedOrderQuantity?.measure === undefined || selectedOrderQuantity?.measure === false
-      ? ""
-      : String(selectedOrderQuantity.measure)
-  );
-  const [observations, setObservations] = useState<string>(selectedOrderQuantity?.additional_note || "");
+  const [observations, setObservations] = useState<string>(normalizeQualityNote(selectedOrderQuantity?.additional_note));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
@@ -50,25 +58,14 @@ function ModalOrderQualityDetails({
     : selectedOrderQuantity?.name || "N/A";
 
   useEffect(() => {
-    setMeasureValue(
-      selectedOrderQuantity?.measure === null || selectedOrderQuantity?.measure === undefined || selectedOrderQuantity?.measure === false
-        ? ""
-        : String(selectedOrderQuantity.measure)
-    );
-    setObservations(selectedOrderQuantity?.additional_note || "");
+    setObservations(normalizeQualityNote(selectedOrderQuantity?.additional_note));
     setSaveMessage("");
-  }, [selectedOrderQuantity?.id, selectedOrderQuantity?.measure, selectedOrderQuantity?.additional_note]);
-
-  const getMeasure = () => {
-    if (measureValue === "") return undefined;
-    const parsedMeasure = Number(measureValue);
-    return Number.isFinite(parsedMeasure) ? parsedMeasure : undefined;
-  };
+  }, [selectedOrderQuantity?.id, selectedOrderQuantity?.additional_note]);
 
   const onSaveNotes = async () => {
     setIsSubmitting(true);
     setSaveMessage("");
-    const response = await saveNotes(observations, getMeasure());
+    const response = await saveNotes(observations);
     setSaveMessage(response?.message || (response?.status ? "Notas guardadas." : "No se pudieron guardar las notas."));
     setIsSubmitting(false);
   };
@@ -78,7 +75,7 @@ function ModalOrderQualityDetails({
     if (action === "reject" && !canRejectQuality) return;
 
     setIsSubmitting(true);
-    const response = action === "accept" ? await acceptOrder(observations, getMeasure()) : await rejectOrder(observations, getMeasure());
+    const response = action === "accept" ? await acceptOrder(observations) : await rejectOrder(observations);
 
     if (response?.status) {
       openJobDetail();
@@ -135,20 +132,6 @@ function ModalOrderQualityDetails({
               <div className="bg-whiteInput min-h-12 shadow-md p-2 rounded-md text-center break-words overflow-hidden">
                 {workOrderLabel}
               </div>
-            </div>
-
-            <div>
-              <div className="font-bold text-center">Medida</div>
-              <input
-                type="number"
-                min="0"
-                step="any"
-                value={measureValue}
-                onChange={(event) => setMeasureValue(event.target.value)}
-                className="bg-whiteInput min-h-12 w-full shadow-md rounded-md text-center focus:outline-none text-gray-900"
-                placeholder="0"
-                disabled={false}
-              />
             </div>
           </div>
 

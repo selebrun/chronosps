@@ -12,6 +12,26 @@ function sortByNameAsc(a: any, b: any) {
   return (a?.name || '').localeCompare(b?.name || '', 'es', { numeric: true, sensitivity: 'base' });
 }
 
+function normalizeSearchText(value: any) {
+  return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function productionMatchesSearch(order: any, term: string) {
+  const normalizedTerm = normalizeSearchText(term);
+  if (!normalizedTerm) return true;
+
+  const searchableText = [
+    order?.name,
+    order?.state,
+    order?.product_id?.[1],
+    order?.lot_producing_id?.[1],
+    order?.user_id?.[1],
+    order?.date_planned_start,
+  ].map(normalizeSearchText).join(' ');
+
+  return searchableText.includes(normalizedTerm);
+}
+
 function getWorkOrderName(order: any) {
   return Array.isArray(order?.workorder_id) ? order.workorder_id[1] : order?.workorder_id || '';
 }
@@ -61,6 +81,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   const [modalDetailsIsOpen, setModalDetailsIsOpen] = useState(false);
   const [selectedOrderQuantity, setSelectedOrderQuantity] = useState({});
   const [ordersQualityControl, setOrdersQualityControl] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const productionIdsInQuality = new Set(
@@ -74,6 +95,8 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
 
     setOrdersQualityControl(orders)
   }, [odooOrders?.data, odooOrders?.production_data])
+
+  const filteredQualityOrders = ordersQualityControl.filter((order: any) => productionMatchesSearch(order, searchTerm));
 
 
   const  openJobDetail= () => {
@@ -97,12 +120,12 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
     setSelectedOrderQuantity(order)
   }
 
-  const acceptOrder = async (observations?: string, measure?: number) => {
-    return acceptQualityControl(user, selectedOrderQuantity, observations, measure)
+  const acceptOrder = async (observations?: string) => {
+    return acceptQualityControl(user, selectedOrderQuantity, observations)
       .then((res) => {
         if (res?.status) {
-          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'pass', additional_note: observations || '', measure }))
-          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'pass', additional_note: observations || '', measure } : item))
+          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'pass', additional_note: observations || '' }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'pass', additional_note: observations || '' } : item))
         }
         return res
       })
@@ -112,12 +135,12 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
       })
   }
 
-  const rejectOrder = async (observations?: string, measure?: number) => {
-    return rejectQualityControl(user, selectedOrderQuantity, observations, measure)
+  const rejectOrder = async (observations?: string) => {
+    return rejectQualityControl(user, selectedOrderQuantity, observations)
       .then((res) => {
         if (res?.status) {
-          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'fail', additional_note: observations || '', measure }))
-          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'fail', additional_note: observations || '', measure } : item))
+          setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'fail', additional_note: observations || '' }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'fail', additional_note: observations || '' } : item))
         }
         return res
       })
@@ -127,12 +150,12 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
       })
   }
 
-  const saveNotes = async (observations?: string, measure?: number) => {
-    return saveQualityControlNotes(user, selectedOrderQuantity, observations, measure)
+  const saveNotes = async (observations?: string) => {
+    return saveQualityControlNotes(user, selectedOrderQuantity, observations)
       .then((res) => {
         if (res?.status) {
-          setSelectedOrderQuantity((current: any) => ({ ...current, additional_note: observations || '', measure }))
-          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, additional_note: observations || '', measure } : item))
+          setSelectedOrderQuantity((current: any) => ({ ...current, additional_note: observations || '' }))
+          setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, additional_note: observations || '' } : item))
         }
         return res
       })
@@ -157,6 +180,15 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
         saveNotes={saveNotes}
         user={user}
       /> 
+      <div className="mb-4">
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Buscar por OP, producto, lote, responsable o estado"
+          className="w-full rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 focus:outline-none"
+        />
+      </div>
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
           <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
@@ -186,7 +218,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
             </tr>
           </thead>
           <tbody>
-            {ordersQualityControl?.map((order: any) => (
+            {filteredQualityOrders?.map((order: any) => (
               <tr key={`production-order-${order.id}`} className="border-b-8 border-white bg-lightCyan text-gray-700">
                 <th scope="row" className="px-5 font-medium text-black">
                   <div className="flex items-center space-x-4 whitespace-normal">
@@ -229,7 +261,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
             ))}
           </tbody>
         </table>
-        {ordersQualityControl.length  === 0 && 
+        {filteredQualityOrders.length  === 0 && 
               <div className='text-center w-full text-xl mt-10'>
                 No se encontro ordenes
               </div>}

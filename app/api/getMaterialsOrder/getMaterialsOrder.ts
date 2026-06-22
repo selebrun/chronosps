@@ -16,12 +16,18 @@ function getOdooError(data: any, fallback: string) {
   return data?.message?.faultString || data?.message || fallback;
 }
 
-export async function getMaterialsOrder(user: any, move_raw_ids: any): Promise<any> {
+function getMany2OneId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export async function getMaterialsOrder(user: any, move_raw_ids: any, workorder?: any): Promise<any> {
   return new Promise(async (resolve) => {
+    const workOrderOperationId = Number(getMany2OneId(workorder?.operation_id)) || 0;
+
     getOdooData(
       'stock.move',
       [['id', 'in', move_raw_ids]],
-      ['id', 'name', 'product_id', 'location_id', 'location_dest_id', 'company_id', 'product_uom_qty', 'product_uom', 'forecast_availability'],
+      ['id', 'name', 'product_id', 'location_id', 'location_dest_id', 'company_id', 'product_uom_qty', 'product_uom', 'forecast_availability', 'operation_id'],
       false,
       false,
       user.company_id,
@@ -30,7 +36,11 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any): Promise<a
           return resolve({ status: false, message: 'No se encontraron lineas del bom.', data: false });
         }
 
-        return resolve({ status: true, message: '', data: bom_products.data });
+        const operationProducts = workOrderOperationId
+          ? bom_products.data.filter((move: any) => Number(getMany2OneId(move?.operation_id)) === workOrderOperationId)
+          : [];
+
+        return resolve({ status: true, message: '', data: operationProducts.length ? operationProducts : bom_products.data });
       },
       false
     );
@@ -47,7 +57,8 @@ export async function saveMaterialsOrder(
   location_id: any,
   location_dest_id: any,
   company_id: any,
-  product_name?: string
+  product_name?: string,
+  operation_id?: any
 ): Promise<any> {
   return new Promise(async (resolve) => {
     if (!user.materiales) {
@@ -75,7 +86,9 @@ export async function saveMaterialsOrder(
       workorder_id,
       company_id,
       procure_method: 'make_to_stock',
-    };
+    } as any;
+
+    if (operation_id) values.operation_id = operation_id;
 
     createOdooData(
       'stock.move',

@@ -44,9 +44,9 @@ export function ModalOrderQuality({
   modalDetailsIsOpen: boolean,
   openJobDetail: any,
   selectedOrderQuantity:any,
-  acceptOrder: (observations?: string, measure?: number) => Promise<any>,
-  rejectOrder: (observations?: string, measure?: number) => Promise<any>,
-  saveNotes: (observations?: string, measure?: number) => Promise<any>,
+  acceptOrder: (observations?: string) => Promise<any>,
+  rejectOrder: (observations?: string) => Promise<any>,
+  saveNotes: (observations?: string) => Promise<any>,
   user: any
 }) {
   return (

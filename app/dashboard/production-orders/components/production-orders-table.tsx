@@ -12,7 +12,27 @@ import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 
+function normalizeSearchText(value: any) {
+  return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
 
+function productionMatchesSearch(order: any, term: string) {
+  const normalizedTerm = normalizeSearchText(term);
+  if (!normalizedTerm) return true;
+
+  const searchableText = [
+    order?.name,
+    order?.state,
+    order?.product_id?.[1],
+    order?.origin,
+    order?.x_studio_po,
+    order?.lot_producing_id?.[1],
+    order?.user_id?.[1],
+    order?.date_planned_start,
+  ].map(normalizeSearchText).join(' ');
+
+  return searchableText.includes(normalizedTerm);
+}
 
 export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReasons }: { odooOrders: any, ordersWork: any, user: any, blockReasons: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
@@ -34,6 +54,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [disabledBtnSaveMaterial, setDisabledBtnSaveMaterial] = useState(true);
   const [error, setError] = useState<string>('');
   const [qualityPauseMessage, setQualityPauseMessage] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
   
   useEffect(()=>{
     if(!user.materiales) {
@@ -177,7 +198,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
   const getMaterials = async () => {
     setMaterials([])
-    const materials = await getMaterialsOrder(user, orderProductionSelected.move_raw_ids).then( res => res).catch((err) => console.log(err))
+    const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
+    const materials = await getMaterialsOrder(user, orderProductionSelected.move_raw_ids, currentWorkOrder).then( res => res).catch((err) => console.log(err))
     if(materials?.status) {
       setMaterials(materials.data)
     }
@@ -194,9 +216,10 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const onSaveMaterialsOrder = async () => {
     setLoadigSaveMaterials(true)
     try {
+      const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
       const data = await saveMaterialsOrder(
         user,
-        orderWorkSelected.id,
+        currentWorkOrder.id,
         orderProductionSelected.id,
         orderMaterialsSelected.product_id[0],
         orderMaterialsSelected.product_uom[0],
@@ -204,7 +227,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
         orderMaterialsSelected.location_id[0],
         orderMaterialsSelected.location_dest_id[0],
         orderMaterialsSelected.company_id[0],
-        orderMaterialsSelected.product_id[1]
+        orderMaterialsSelected.product_id[1],
+        orderMaterialsSelected.operation_id?.[0]
       )
 
       if (data?.status) {
@@ -232,8 +256,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     const dateB = String(b.date_planned_start || '');
     return dateA.localeCompare(dateB);
   }).filter((order: any) =>
-    (Array.isArray(order?.workorder_ids) && order.workorder_ids.length > 0) ||
-    productionIdsWithWorkOrders.has(Number(order.id))
+    ((Array.isArray(order?.workorder_ids) && order.workorder_ids.length > 0) ||
+    productionIdsWithWorkOrders.has(Number(order.id))) &&
+    productionMatchesSearch(order, searchTerm)
   );
 
 
@@ -297,6 +322,15 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
         />
       }
+      <div className="mb-4">
+        <input
+          type="search"
+          value={searchTerm}
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Buscar por OP, producto, origen, lote, responsable o estado"
+          className="w-full rounded-md border border-gray-300 bg-white p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 focus:outline-none"
+        />
+      </div>
       <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[60vh] rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
           <thead className="text-xs text-black uppercase  dark:text-black bg-strongCyan border-b-8 border-white sticky top-0">
