@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ADMIN_SESSION_COOKIE, createAdminSessionToken } from '@/app/api/admin-auth/adminSession';
+import { ADMIN_API_SESSION_COOKIE, ADMIN_SESSION_COOKIE, createAdminSessionToken } from '@/app/api/admin-auth/adminSession';
 
 export async function POST(request: Request) {
   const { email, password } = await request.json();
@@ -23,6 +23,10 @@ export async function POST(request: Request) {
   response.cookies.set(ADMIN_SESSION_COOKIE, token, {
     ...cookieOptions,
     path: '/admin',
+  });
+  response.cookies.set(ADMIN_API_SESSION_COOKIE, token, {
+    ...cookieOptions,
+    path: '/api',
   });
 
   return response;

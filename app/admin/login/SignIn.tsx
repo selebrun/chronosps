@@ -34,6 +34,7 @@ function SignInForm() {
 
     const res = await fetch("/api/admin-auth/login", {
       method: "POST",
+      credentials: "same-origin",
       headers: {
         "Content-Type": "application/json",
       },

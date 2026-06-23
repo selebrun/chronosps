@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 
 export const ADMIN_SESSION_COOKIE = 'chronos-admin-session';
+export const ADMIN_API_SESSION_COOKIE = 'chronos-admin-api-session';
 
 function getAdminSecret() {
   return process.env.NEXTAUTH_SECRET || process.env.CHRONOS_ADMIN_PASSWORD || 'chronos-admin-session';

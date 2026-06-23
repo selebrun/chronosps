@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getCompanies, createCompany, updateCompany, deleteCompany } from "./companies";
-import { ADMIN_SESSION_COOKIE, isValidAdminSessionToken } from "@/app/api/admin-auth/adminSession";
+import { ADMIN_API_SESSION_COOKIE, ADMIN_SESSION_COOKIE, isValidAdminSessionToken } from "@/app/api/admin-auth/adminSession";
 
 function requireAdminSession() {
-  const token = cookies().get(ADMIN_SESSION_COOKIE)?.value;
+  const token = cookies().get(ADMIN_API_SESSION_COOKIE)?.value || cookies().get(ADMIN_SESSION_COOKIE)?.value;
   if (!isValidAdminSessionToken(token)) {
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   }

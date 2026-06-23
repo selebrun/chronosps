@@ -18,7 +18,7 @@ export function LogoMenu({
 }) {
   const logout = async () => {
     if (isAdminRoute) {
-      await fetch("/api/admin-auth/logout", { method: "POST" });
+      await fetch("/api/admin-auth/logout", { method: "POST", credentials: "same-origin" });
       window.location.assign("/admin/login");
       return;
     }
