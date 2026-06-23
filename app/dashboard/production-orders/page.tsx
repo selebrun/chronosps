@@ -9,16 +9,32 @@ import { ProductionOrdersTable } from '@/app/dashboard/production-orders/compone
 
 export default async function Page() {
   const session = await getServerSession(config);
+  if (!session?.user) redirect('/login');
   const user = session.user;
   if (user.role === 'Calidad') redirect('/dashboard/quality-control');
-  const odooOrders: any = await getProductionOrders(user).then( res => res).catch((err) => console.log(err));
-  const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
-  const blockReasons: any = await getBlockReasons(user).then( res => res).catch((err) => console.log(err))
+  const odooOrders: any = await getProductionOrders(user)
+    .then((res) => res)
+    .catch((err) => {
+      console.error('Error consultando ordenes de produccion:', err);
+      return { status: false, message: 'No se pudieron consultar las ordenes de produccion.', data: [] };
+    });
+  const odooOrdersWork: any = await getWorkOrders(user)
+    .then((res) => res)
+    .catch((err) => {
+      console.error('Error consultando ordenes de trabajo para OP:', err);
+      return { status: false, data: [], production_data: [] };
+    })
+  const blockReasons: any = await getBlockReasons(user)
+    .then((res) => res)
+    .catch((err) => {
+      console.error('Error consultando motivos de bloqueo:', err);
+      return { status: false, block_reasons: [] };
+    })
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
       <h1 className="mb-4 text-xl font-bold text-gray-900">Ordenes de produccion</h1>
-      { odooOrders?.data.length ? (
+      { odooOrders?.data?.length ? (
         <ProductionOrdersTable odooOrders={odooOrders} ordersWork={odooOrdersWork} user={user} blockReasons={blockReasons} />
       ) : (
       <div className="text-center block p-6 bg-white border border-gray-200 rounded-lg shadow bg-gray-100">
