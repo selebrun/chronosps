@@ -165,7 +165,7 @@ export async function getUsers() {
 
   try {
     await client.connect();
-    const res = await client.query('SELECT * FROM "users"');
+    const res = await client.query('SELECT * FROM "users" ORDER BY LOWER(TRIM(name)) ASC');
     return res.rows;
   } catch (err) {
     console.error(err);

@@ -28,7 +28,7 @@ export async function getCompanies() {
 
   try {
     await client.connect();
-    const res = await client.query('SELECT * FROM "company"');
+    const res = await client.query('SELECT * FROM "company" ORDER BY LOWER(TRIM(name)) ASC');
     const companies = res.rows;
 
     return companies;
