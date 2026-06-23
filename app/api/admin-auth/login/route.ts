@@ -9,10 +9,19 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ status: true });
-  response.cookies.set(ADMIN_SESSION_COOKIE, createAdminSessionToken(email), {
+  const token = createAdminSessionToken(email);
+  const cookieOptions = {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
+  } as const;
+
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, {
+    ...cookieOptions,
+    path: '/',
+  });
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, {
+    ...cookieOptions,
     path: '/admin',
   });
 

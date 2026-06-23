@@ -32,42 +32,23 @@ export function ChronosCompanyForm({
     setFormData({ ...formData, [name]: value });
   };
 
-  const createCompany = async () => {
-    formData["id_company"] = uuidv4()
-    const response = await fetch("/api/companies", {
-      method: 'POST',
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(formData)
-    });
+  const getPayload = (idCompany?: string) => ({
+    ...formData,
+    id_company: idCompany || formData.id_company?.trim() || '',
+    name: formData.name?.trim() || '',
+    url: formData.url?.trim() || '',
+    domain: formData.domain?.trim() || '',
+    database: formData.database?.trim() || '',
+    user_default: formData.user_default?.trim() || '',
+    password: formData.password?.trim() || '',
+  });
 
-    if (!response.ok) {
-      setFormError("Ha ocurrido un error al intentar crear una compania");
-      setLoading(false);
-    }
-
-    navigateOnSuccess()
-  };
-
-  const updateCompany = async () => {
-    if (!company?.id_company) return
-    formData["id_company"] = company.id_company
-    const response = await fetch("/api/companies", {
-      method: 'PUT',
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(formData)
-    });
-
-    if (!response.ok) {
-      setFormError("Ha ocurrido un error al intentar editar la compania");
-      setLoading(false);
-    }
-
-    navigateOnSuccess()
-  };
+  const isFormInvalid = !formData.name?.trim()
+    || !formData.domain?.trim()
+    || !formData.url?.trim()
+    || !formData.database?.trim()
+    || !formData.user_default?.trim()
+    || !formData.password?.trim();
 
   const getErrorMessage = async (response: Response, fallback: string) => {
     try {
@@ -76,6 +57,47 @@ export function ChronosCompanyForm({
     } catch {
       return fallback;
     }
+  };
+
+  const createCompany = async () => {
+    const payload = getPayload(uuidv4());
+    const response = await fetch("/api/companies", {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const message = await getErrorMessage(response, "Ha ocurrido un error al intentar crear una compania");
+      setFormError(message);
+      return;
+    }
+
+    navigateOnSuccess()
+  };
+
+  const updateCompany = async () => {
+    if (!company?.id_company) return
+    const payload = getPayload(company.id_company);
+    const response = await fetch("/api/companies", {
+      method: 'PUT',
+      credentials: 'same-origin',
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const message = await getErrorMessage(response, "Ha ocurrido un error al intentar editar la compania");
+      setFormError(message);
+      return;
+    }
+
+    navigateOnSuccess()
   };
 
   const deleteCompany = async () => {
@@ -89,6 +111,7 @@ export function ChronosCompanyForm({
     try {
       const response = await fetch("/api/companies", {
         method: 'DELETE',
+        credentials: 'same-origin',
         headers: {
           "Content-Type": "application/json"
         },
@@ -113,12 +136,20 @@ export function ChronosCompanyForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setFormError(null);
     // Si la compania no vienen en las Props del componente
     // se asume que la compania no existe y se crea una nueva
-    if (!company) {
-      createCompany()
-    } else {
-      updateCompany()
+    try {
+      if (!company) {
+        await createCompany()
+      } else {
+        await updateCompany()
+      }
+    } catch (error) {
+      console.error("Error saving company:", error);
+      setFormError("Ha ocurrido un error inesperado al guardar la compania");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -145,7 +176,7 @@ export function ChronosCompanyForm({
           type="text"
           id="name"
           name="name"
-          value={formData?.name?.trim()}
+          value={formData?.name || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -160,7 +191,7 @@ export function ChronosCompanyForm({
           type="text"
           id="domain"
           name="domain"
-          value={formData?.domain?.trim()}
+          value={formData?.domain || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -175,7 +206,7 @@ export function ChronosCompanyForm({
           type="text"
           id="url"
           name="url"
-          value={formData?.url?.trim()}
+          value={formData?.url || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -190,7 +221,7 @@ export function ChronosCompanyForm({
           type="text"
           id="database"
           name="database"
-          value={formData?.database?.trim()}
+          value={formData?.database || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -205,7 +236,7 @@ export function ChronosCompanyForm({
           type="text"
           id="user_default"
           name="user_default"
-          value={formData?.user_default?.trim()}
+          value={formData?.user_default || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -220,7 +251,7 @@ export function ChronosCompanyForm({
           type="password"
           id="password"
           name="password"
-          value={formData?.password?.trim()}
+          value={formData?.password || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -231,7 +262,7 @@ export function ChronosCompanyForm({
         <button
           type="submit"
           className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
-          disabled={loading || !formData.name || !formData.domain || !formData.url || !formData.database || !formData.user_default || !formData.password}
+          disabled={loading || isFormInvalid}
         >
           {!company ? "Crear Compania" : "Guardar Cambios"}
           {loading && <Spinner /> }

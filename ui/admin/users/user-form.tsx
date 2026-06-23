@@ -35,6 +35,22 @@ export function ChronosUsersForm({
     setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
   };
 
+  const getPayload = () => ({
+    ...formData,
+    id_company: formData.id_company?.trim() || '',
+    code: formData.code?.trim() || '',
+    password: formData.password?.trim() || '',
+    name: formData.name?.trim() || '',
+    rol: formData.rol?.trim() || '',
+    email: formData.email?.trim() || '',
+  });
+  const isFormInvalid = !formData.name?.trim()
+    || !formData.rol?.trim()
+    || !formData.email?.trim()
+    || !formData.id_company?.trim()
+    || !formData.password?.trim()
+    || !formData.code?.trim();
+
   const getErrorMessage = async (response: Response, fallback: string) => {
     try {
       const data = await response.json();
@@ -47,10 +63,11 @@ export function ChronosUsersForm({
   const createUser = async () => {
     const response = await fetch("/api/users", {
       method: 'POST',
+      credentials: 'same-origin',
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(formData)
+      body: JSON.stringify(getPayload())
     });
 
     if (!response.ok) {
@@ -65,10 +82,11 @@ export function ChronosUsersForm({
   const updateUser = async () => {
     const response = await fetch("/api/users", {
       method: 'PUT',
+      credentials: 'same-origin',
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(formData)
+      body: JSON.stringify(getPayload())
     });
 
     if (!response.ok) {
@@ -91,6 +109,7 @@ export function ChronosUsersForm({
     try {
       const response = await fetch("/api/users", {
         method: 'DELETE',
+        credentials: 'same-origin',
         headers: {
           "Content-Type": "application/json"
         },
@@ -156,7 +175,7 @@ export function ChronosUsersForm({
           type="text"
           id="code"
           name="code"
-          value={formData?.code?.trim()}
+          value={formData?.code || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -171,7 +190,7 @@ export function ChronosUsersForm({
           type="text"
           id="name"
           name="name"
-          value={formData?.name?.trim()}
+          value={formData?.name || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -186,7 +205,7 @@ export function ChronosUsersForm({
           type="text"
           id="email"
           name="email"
-          value={formData?.email?.trim()}
+          value={formData?.email || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -201,7 +220,7 @@ export function ChronosUsersForm({
           type="text"
           id="password"
           name="password"
-          value={formData?.password?.trim()}
+          value={formData?.password || ''}
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
@@ -213,7 +232,7 @@ export function ChronosUsersForm({
         </label>
         <select 
           name="id_company"
-          value={formData?.id_company?.trim()}
+          value={formData?.id_company || ''}
           onChange={handleChange}
           className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
             <option>{"Seleccionar compañia"}</option>
@@ -230,7 +249,7 @@ export function ChronosUsersForm({
         <select
           name='rol'
           onChange={handleChange}
-          value={formData?.rol?.trim()}
+          value={formData?.rol || ''}
           className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
               <option>{"Seleccionar rol"}</option>
             <option value={'Lider'}>Lider</option>
@@ -254,7 +273,7 @@ export function ChronosUsersForm({
         <button
           type="submit"
           className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md'
-          disabled={loading || !formData.name || !formData.rol || !formData.email || !formData.id_company || !formData.password || !formData.code}
+          disabled={loading || isFormInvalid}
         >
           {!user ? "Crear Usuarios" : "Guardar Cambios"}
           {loading && <Spinner /> }
