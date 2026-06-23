@@ -43,7 +43,7 @@ export default async function Layout({
             <HeaderLink userRole={session.user.role}></HeaderLink>
           </div>
           <div className="mt-4 px-1 text-center text-[10px] leading-tight text-gray-400 dark:text-gray-500">
-            © Chronos Producción Software<br />versión 1.5
+            © Chronos Producción Software 2026<br />versión 1.5
           </div>
         </aside>
 
