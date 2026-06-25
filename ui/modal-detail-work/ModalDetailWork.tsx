@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Modal } from "@/ui/modal/modal"
 import Image from 'next/image'
 import close from '@/public/close.png'
@@ -22,6 +22,13 @@ function getDefaultDoneQuantity(orderProductionSelected: any, showDetailOrderWor
   );
 
   return Number.isFinite(quantity) ? quantity : 0;
+}
+
+function getSecondsSince(value: any) {
+  if (!value) return 0;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
 }
 
 
@@ -98,9 +105,13 @@ export function ModalDetailWork({
   const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && !isWorkOrderBlocked(showDetailOrderWork) && !isWorkOrderDone);
   const normalizedRealDurationSeconds = Number(showDetailOrderWork?.piso_real_duration_seconds);
   const normalizedExpectedSeconds = Number(showDetailOrderWork?.piso_expected_duration_seconds);
-  const baseElapsedSeconds = Number.isFinite(normalizedRealDurationSeconds)
-    ? Math.max(0, Math.round(normalizedRealDurationSeconds))
-    : Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
+  const baseElapsedSeconds = useMemo(() => {
+    const snapshotElapsedSeconds = isTimerRunning ? getSecondsSince(showDetailOrderWork?.piso_duration_calculated_at) : 0;
+
+    return Number.isFinite(normalizedRealDurationSeconds)
+      ? Math.max(0, Math.round(normalizedRealDurationSeconds) + snapshotElapsedSeconds)
+      : Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
+  }, [isTimerRunning, normalizedRealDurationSeconds, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.piso_duration_calculated_at]);
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
   const expectedSeconds = Number.isFinite(normalizedExpectedSeconds)
     ? Math.max(0, Math.round(normalizedExpectedSeconds))
@@ -112,7 +123,7 @@ export function ModalDetailWork({
 
   useEffect(() => {
     setElapsedSeconds(baseElapsedSeconds);
-  }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
+  }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.piso_duration_calculated_at, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
 
   useEffect(() => {
     if (modalIsOpenCompleteOrder) {

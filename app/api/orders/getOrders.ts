@@ -257,6 +257,7 @@ async function addWorkOrderDurationsFromProductivity(user: any, workOrders: any[
       piso_real_duration_seconds: realDurationSeconds,
       piso_expected_duration_seconds: expectedDurationSeconds,
       piso_active_since: activeSince || false,
+      piso_duration_calculated_at: new Date(now).toISOString(),
     };
   });
 }
