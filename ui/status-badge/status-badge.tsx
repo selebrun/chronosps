@@ -9,7 +9,7 @@ const STATUS_DICT: Record<string, { name: string; color: string }> = {
   none: { name: "Por realizar", color: "bg-purple-200 text-purple-800" },
   pass: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
   normal: { name: "Aprobado", color: "bg-[#2FD28E] text-purple-800" },
-  ready: { name: "Completado", color: "bg-green-400 text-white" },
+  ready: { name: "Disponible", color: "bg-blue-100 text-blue-800" },
   fail: { name: "Fallado", color: "bg-red-500 text-white" },
   quality_failed: { name: "Fallada", color: "bg-red-600 text-white" },
   draft: { name: "Borrador", color: "bg-gray-200 text-gray-800" },
