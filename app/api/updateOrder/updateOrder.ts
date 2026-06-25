@@ -3,6 +3,8 @@
 import { createOdooData, executeOdooMethod, getOdooData, setOdooData } from '@/app/api/odoo/odooService';
 import { isWorkOrderLocallyBlocked, markWorkOrderBlocked, markWorkOrderUnblocked } from '@/app/api/workOrderBlocks/workOrderBlocks';
 
+const WORK_ORDER_FIELDS = ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'];
+
 function getOdooRecord(model: string, domain: any[], fields: string[], companyId: string): Promise<any> {
   return new Promise((resolve) => {
     getOdooData(model, domain, fields, false, false, companyId, (data: any) => resolve(data), false);
@@ -85,12 +87,12 @@ async function hasFailedQualityChecks(workOrderId: number, companyId: string) {
   return Boolean(qualityChecks?.data?.length);
 }
 
-async function releaseFailedQualityChecks(workOrderId: number, companyId: string) {
+async function releaseFailedQualityChecks(workOrderId: number, user: any) {
   const qualityChecks: any = await getOdooRecord(
     'quality.check',
     [['workorder_id', '=', workOrderId], ['quality_state', '=', 'fail']],
     ['id', 'name'],
-    companyId
+    user.company_id
   );
   const qualityCheckIds = (qualityChecks?.data || []).map((check: any) => check.id).filter(Boolean);
 
@@ -102,14 +104,19 @@ async function releaseFailedQualityChecks(workOrderId: number, companyId: string
     'quality.check',
     qualityCheckIds,
     { quality_state: 'none' },
-    companyId
+    user.company_id
   );
 
   if (!result?.status) {
     return { status: false, message: getOdooError(result, 'No se pudo reactivar la orden de trabajo.') };
   }
 
-  return { status: true, message: 'Orden de trabajo reactivada para retrabajo.' };
+  const pauseResponse = await pauseWorkOrderIfRunning({ id: workOrderId }, user);
+  if (!pauseResponse?.status) {
+    return { status: false, message: `Se reactivo la orden, pero no se pudo pausar la OT: ${pauseResponse.message}` };
+  }
+
+  return { status: true, message: 'Orden de trabajo reactivada para retrabajo. El reloj permanece detenido hasta iniciar o reanudar.' };
 }
 
 function nowUtcString() {
@@ -153,6 +160,34 @@ function getOdooExecutionUserId(user: any) {
   return Number(user?.odoo_user_id) || 1;
 }
 
+async function getFreshWorkOrder(workOrderId: number, companyId: string) {
+  const workOrders: any = await getOdooRecord(
+    'mrp.workorder',
+    [['id', '=', workOrderId]],
+    WORK_ORDER_FIELDS,
+    companyId
+  );
+
+  return workOrders?.data?.[0] || null;
+}
+
+async function pauseWorkOrderIfRunning(workOrder: any, user: any) {
+  const workOrderId = Number(workOrder?.id);
+  if (!workOrderId) return { status: true, paused: false };
+
+  const freshWorkOrder = await getFreshWorkOrder(workOrderId, user.company_id);
+  if (!freshWorkOrder?.is_user_working) {
+    return { status: true, paused: false };
+  }
+
+  const response: any = await callOdooMethod('mrp.workorder', 'button_pending', [[workOrderId]], user.company_id, getOdooActionKwargs(user));
+  if (!response?.status) {
+    return { status: false, paused: false, message: getOdooError(response, 'No se pudo pausar la orden de trabajo en Odoo.') };
+  }
+
+  return { status: true, paused: true };
+}
+
 async function createProductivityBlock(workOrder: any, blockReason: any, user: any) {
   const reasonId = parseInt(blockReason);
   if (!reasonId) {
@@ -185,6 +220,11 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     return { status: false, message: getOdooError(created, 'No se pudo bloquear la orden de trabajo en Odoo.') };
   }
 
+  const pauseResponse = await pauseWorkOrderIfRunning(workOrder, user);
+  if (!pauseResponse?.status) {
+    return { status: false, message: `Se registro el bloqueo, pero no se pudo pausar la OT: ${pauseResponse.message}` };
+  }
+
   const localBlock = await markWorkOrderBlocked(user, workOrder, loss);
   if (!localBlock?.status) {
     return { status: false, message: 'Se registro el bloqueo en Odoo, pero no se pudo bloquear la OT en Piso.' };
@@ -204,7 +244,7 @@ export async function updateOrder(
     const workorders: any = await getOdooRecord(
       'mrp.workorder',
       [['id', '=', workorder.id]],
-      ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'],
+      WORK_ORDER_FIELDS,
       user.company_id
     );
     const work_order = workorders?.data?.[0];
@@ -330,12 +370,18 @@ export async function updateOrder(
             return { status: false, message: errorMsg, faultString: errorMsg };
           }
         }
+        {
+          const pauseResponse = await pauseWorkOrderIfRunning(work_order, user);
+          if (!pauseResponse?.status) {
+            return { status: false, message: `La orden fue desbloqueada, pero no se pudo pausar la OT: ${pauseResponse.message}` };
+          }
+        }
         await markWorkOrderUnblocked(user, work_order.id);
-        return { status: true, message: 'Orden de trabajo desbloqueada.' };
+        return { status: true, message: 'Orden de trabajo desbloqueada. El reloj permanece detenido hasta iniciar o reanudar.' };
       case 'block_work_order':
         return createProductivityBlock(work_order, block_reason, user);
       case 'release_quality_failure':
-        return releaseFailedQualityChecks(work_order.id, user.company_id);
+        return releaseFailedQualityChecks(work_order.id, user);
       default:
         return { status: false, message: 'No se encontro la accion que desea ejecutar.' };
     }

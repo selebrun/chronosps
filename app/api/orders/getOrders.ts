@@ -300,7 +300,7 @@ async function addQualityStateToWorkOrders(user: any, workOrders: any[]) {
  * Enriquece las OTs con calidad, duraciones y bloqueos locales en paralelo.
  * Sustituye la cadena secuencial: addQualityState → addDurations → addLocalBlockState
  */
-async function enrichWorkOrders(user: any, workOrders: any[]) {
+async function enrichWorkOrdersLegacy(user: any, workOrders: any[]) {
   if (!workOrders.length) return workOrders;
 
   const workOrderIds = workOrders.map((wo: any) => wo.id).filter(Boolean);
@@ -355,6 +355,32 @@ async function enrichWorkOrders(user: any, workOrders: any[]) {
 }
 
 // ─── Órdenes de producción (OP) ──────────────────────────────────────────────
+
+async function enrichWorkOrders(user: any, workOrders: any[]) {
+  if (!workOrders.length) return workOrders;
+
+  const workOrderIds = workOrders.map((wo: any) => wo.id).filter(Boolean);
+  const blocksMap = await getActiveWorkOrderBlocks(user, workOrderIds);
+  const withBlockState = workOrders.map((wo: any) => {
+    const woId = Number(wo.id);
+    const block = blocksMap.get(woId);
+    if (!block) return wo;
+
+    return {
+      ...wo,
+      working_state: 'blocked',
+      is_user_working: false,
+      local_blocked: true,
+      local_block_reason_id: block.reason_id,
+      local_block_reason_name: block.reason_name,
+      local_blocked_by: block.blocked_by,
+      local_blocked_at: block.blocked_at,
+    };
+  });
+
+  const withQuality = await addQualityStateToWorkOrders(user, withBlockState);
+  return addWorkOrderDurationsFromProductivity(user, withQuality);
+}
 
 export async function getProductionOrders(user: any) {
 	switch(user.role) {
