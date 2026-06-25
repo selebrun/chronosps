@@ -8,6 +8,7 @@ import { getStatusLabel, StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
 import { OrderTableModalWork } from '@/ui/format-table/orderTableModalWork'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
+import { StatusHelpButton } from '@/ui/status-help-button/StatusHelpButton'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
@@ -336,7 +337,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
         />
       }
-      <div className="mb-4">
+      <div className="mb-4 flex gap-2">
         <input
           type="search"
           value={searchTerm}
@@ -344,6 +345,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
           placeholder="Buscar por OP, producto, origen, lote, responsable o estado"
           className="w-full rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400 p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 dark:focus:border-sky-400 focus:outline-none"
         />
+        <StatusHelpButton module="production" />
       </div>
       <div className="relative max-h-[calc(100vh-13.5rem)] min-h-[calc(100vh-13.5rem)] max-w-full overflow-x-auto overflow-y-auto rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-300 relative overflow-y-auto">
