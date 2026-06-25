@@ -120,6 +120,26 @@ function getOdooError(data: any, fallback: string) {
   return data?.message?.faultString || data?.message || fallback;
 }
 
+function isQualityControlError(message: string) {
+  const normalizedMessage = (message || '').toLowerCase();
+  return normalizedMessage.includes('calidad') || normalizedMessage.includes('quality');
+}
+
+function getQualityPauseMessage(message: string, paused: boolean) {
+  const baseMessage = (message || 'Debe completar los controles de calidad antes de marcar la orden de trabajo como lista.')
+    .replace('usando el taller', 'usando el módulo de calidad');
+
+  if (!paused) {
+    return `${baseMessage} No se pudo pausar automaticamente la orden de trabajo; verifique la OT en Odoo.`;
+  }
+
+  if (baseMessage.toLowerCase().includes('fue pausada')) {
+    return baseMessage;
+  }
+
+  return `${baseMessage} La orden de trabajo fue pausada para realizar los controles de calidad.`;
+}
+
 function getOdooActionKwargs(user: any) {
   const context: any = {};
   if (user?.odoo_id) context.employee_id = Number(user.odoo_id);
@@ -283,6 +303,24 @@ export async function updateOrder(
       case 'finish_work_order':
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+        if (!response?.status) {
+          const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
+          if (isQualityControlError(errorMsg)) {
+            let pauseResponse: any = { status: true };
+            if (work_order.is_user_working) {
+              pauseResponse = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+            }
+            const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
+            const message = getQualityPauseMessage(errorMsg, paused);
+            return {
+              status: false,
+              message,
+              faultString: message,
+              qualityPause: true,
+              paused,
+            };
+          }
+        }
         break;
       case 'unblock_work_order':
         if (work_order.working_state === 'blocked') {

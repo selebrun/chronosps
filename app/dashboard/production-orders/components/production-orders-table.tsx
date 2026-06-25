@@ -4,7 +4,7 @@ import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 import close from '@/public/close.png'
 // UI Components
-import { StatusBadge } from '@/ui/status-badge/status-badge'
+import { getStatusLabel, StatusBadge } from '@/ui/status-badge/status-badge'
 import { Modal } from '@/ui/modal/modal'
 import { OrderTableModalWork } from '@/ui/format-table/orderTableModalWork'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
@@ -23,6 +23,7 @@ function productionMatchesSearch(order: any, term: string) {
   const searchableText = [
     order?.name,
     order?.state,
+    getStatusLabel(order?.state),
     order?.product_id?.[1],
     order?.origin,
     order?.x_studio_po,
@@ -32,6 +33,20 @@ function productionMatchesSearch(order: any, term: string) {
   ].map(normalizeSearchText).join(' ');
 
   return searchableText.includes(normalizedTerm);
+}
+
+function getWorkOrderProgress(workOrder: any) {
+  const realSeconds = Number(workOrder?.piso_real_duration_seconds);
+  const expectedSeconds = Number(workOrder?.piso_expected_duration_seconds);
+
+  if (Number.isFinite(realSeconds) && Number.isFinite(expectedSeconds) && expectedSeconds > 0) {
+    return Math.min(Math.max(Math.floor((realSeconds / expectedSeconds) * 100), 0), 100);
+  }
+
+  const duration = Number(workOrder?.duration);
+  const expectedDuration = Number(workOrder?.duration_expected);
+  if (!Number.isFinite(duration) || !Number.isFinite(expectedDuration) || expectedDuration <= 0) return 0;
+  return Math.min(Math.max(Math.floor((duration / expectedDuration) * 100), 0), 100);
 }
 
 export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReasons }: { odooOrders: any, ordersWork: any, user: any, blockReasons: any}) {
@@ -83,7 +98,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       k = Math.floor(minutes/(60*24)); duration_expected += k + "Dias "; minutes -= k*60*24
     }
     if(minutes >= 60) {
-      k = Math.floor(minutes/60); duration_expected += k + "Horas "; minutes -= k*60*24
+      k = Math.floor(minutes/60); duration_expected += k + "Horas "; minutes -= k*60
     }
     if(minutes >= 1) duration_expected += Math.floor(minutes) + "Minutos"
 
@@ -94,7 +109,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     }
 
     if(minutes >= 60) {
-      k = Math.floor(minutes/60); duration += k + "Horas "; minutes -= k*60*24
+      k = Math.floor(minutes/60); duration += k + "Horas "; minutes -= k*60
     }
 
     if(minutes >= 1) duration += Math.floor(minutes) + "Minutos"
@@ -176,7 +191,6 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     } else {
       const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
       if (action === 'finish_work_order' && isQualityControlError(message)) {
-        await updateOrder(user, currentWorkOrder, 'stop_work_order').then(res => res).catch((err) => console.log(err))
         const odooOrdersWork: any = await getWorkOrders(user).then(res => res).catch((err) => console.log(err))
         const dateilOrden = odooOrdersWork?.data?.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
         const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id)
@@ -186,7 +200,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
         }
         if (dateilOrden) setOrderWorkDetail(dateilOrden)
         if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
-        setQualityPauseMessage(getQualityPauseMessage(message))
+        setQualityPauseMessage(update?.qualityPause ? message : getQualityPauseMessage(message))
         setLoadigAction(false)
         return
       }
@@ -245,7 +259,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     }
   }
 
-  const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100);
+  const progress = getWorkOrderProgress(showDetailOrderWork);
   const productionIdsWithWorkOrders = new Set(
     (workoOrder?.data || []).map((workOrder: any) => Number(workOrder?.production_id?.[0])).filter(Boolean)
   );

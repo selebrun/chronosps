@@ -182,11 +182,18 @@ function parseOdooDate(dateValue: string) {
   return new Date(`${dateValue.replace(' ', 'T')}Z`);
 }
 
-function getProductivityDurationSeconds(productivity: any, now: number) {
+function isWorkOrderActivelyWorking(workOrder: any) {
+  if (!workOrder?.is_user_working) return false;
+  if (['done', 'completed', 'cancel'].includes(workOrder?.state)) return false;
+  if (['paused', 'blocked', 'done'].includes(workOrder?.working_state)) return false;
+  return true;
+}
+
+function getProductivityDurationSeconds(productivity: any, now: number, countOpenUntilNow = true) {
   const dateStart = parseOdooDate(productivity?.date_start);
   const dateEnd = parseOdooDate(productivity?.date_end);
 
-  if (dateStart && !Number.isNaN(dateStart.getTime()) && (!productivity?.date_end || productivity.date_end === false)) {
+  if (countOpenUntilNow && dateStart && !Number.isNaN(dateStart.getTime()) && (!productivity?.date_end || productivity.date_end === false)) {
     return Math.max(0, Math.floor((now - dateStart.getTime()) / 1000));
   }
 
@@ -216,15 +223,18 @@ async function addWorkOrderDurationsFromProductivity(user: any, workOrders: any[
   const now = Date.now();
   const secondsByWorkOrder = new Map<number, number>();
   const activeSinceByWorkOrder = new Map<number, string>();
+  const workOrderById = new Map((workOrders || []).map((workOrder: any) => [Number(workOrder.id), workOrder]));
 
   (productivityData || []).forEach((productivity: any) => {
     const workOrderId = Number(Array.isArray(productivity?.workorder_id) ? productivity.workorder_id[0] : productivity?.workorder_id);
     if (!workOrderId) return;
+    const workOrder = workOrderById.get(workOrderId);
+    const countOpenUntilNow = isWorkOrderActivelyWorking(workOrder);
 
-    const durationSeconds = getProductivityDurationSeconds(productivity, now);
+    const durationSeconds = getProductivityDurationSeconds(productivity, now, countOpenUntilNow);
     secondsByWorkOrder.set(workOrderId, (secondsByWorkOrder.get(workOrderId) || 0) + durationSeconds);
 
-    if (productivity?.date_start && (!productivity?.date_end || productivity.date_end === false)) {
+    if (countOpenUntilNow && productivity?.date_start && (!productivity?.date_end || productivity.date_end === false)) {
       const currentActiveSince = activeSinceByWorkOrder.get(workOrderId);
       if (!currentActiveSince || String(productivity.date_start) > String(currentActiveSince)) {
         activeSinceByWorkOrder.set(workOrderId, productivity.date_start);
@@ -234,9 +244,10 @@ async function addWorkOrderDurationsFromProductivity(user: any, workOrders: any[
 
   return (workOrders || []).map((workOrder: any) => {
     const fallbackDurationSeconds = Math.max(0, Math.round(Number(workOrder?.duration || 0) * 60));
-    const realDurationSeconds = secondsByWorkOrder.has(Number(workOrder.id))
+    const calculatedDurationSeconds = secondsByWorkOrder.has(Number(workOrder.id))
       ? secondsByWorkOrder.get(Number(workOrder.id)) || 0
       : fallbackDurationSeconds;
+    const realDurationSeconds = Math.max(calculatedDurationSeconds, fallbackDurationSeconds);
     const expectedDurationSeconds = Math.max(0, Math.round(Number(workOrder?.duration_expected || 0) * 60));
     const activeSince = activeSinceByWorkOrder.get(Number(workOrder.id));
 
@@ -700,8 +711,15 @@ async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], company
 
 function getWorkOrderProgress(workorder: any) {
   if (['done', 'completed'].includes(workorder?.state)) return 100;
-  if (workorder?.state === 'progress' && workorder?.duration_expected > 0) {
-    return Math.min(Math.round((workorder.duration / workorder.duration_expected) * 100), 100);
+  const realSeconds = Number(workorder?.piso_real_duration_seconds);
+  const expectedSeconds = Number(workorder?.piso_expected_duration_seconds);
+  if (Number.isFinite(realSeconds) && Number.isFinite(expectedSeconds) && expectedSeconds > 0) {
+    return Math.min(Math.max(Math.round((realSeconds / expectedSeconds) * 100), 0), 100);
+  }
+  const duration = Number(workorder?.duration);
+  const expectedDuration = Number(workorder?.duration_expected);
+  if (workorder?.state === 'progress' && Number.isFinite(duration) && Number.isFinite(expectedDuration) && expectedDuration > 0) {
+    return Math.min(Math.max(Math.round((duration / expectedDuration) * 100), 0), 100);
   }
   return 0;
 }

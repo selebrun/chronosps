@@ -4,7 +4,7 @@ import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 import close from '@/public/close.png'
 // UI Components
-import { StatusBadge } from '@/ui/status-badge/status-badge'
+import { getStatusLabel, StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalOrderQuality } from './modal-order-quality'
 import { acceptQualityControl, rejectQualityControl, saveQualityControlNotes } from '@/app/api/accionQualityControl/accionQualityControl'
 
@@ -23,6 +23,7 @@ function productionMatchesSearch(order: any, term: string) {
   const searchableText = [
     order?.name,
     order?.state,
+    getStatusLabel(order?.state),
     order?.product_id?.[1],
     order?.lot_producing_id?.[1],
     order?.user_id?.[1],

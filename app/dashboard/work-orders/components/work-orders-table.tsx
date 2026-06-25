@@ -4,7 +4,7 @@ import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 // UI Components
 
-import { StatusBadge } from '@/ui/status-badge/status-badge'
+import { getStatusLabel, StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
@@ -63,9 +63,24 @@ function workOrderMatchesSearch(order: any, term: string) {
     order?.date_planned_start,
     order?.state,
     order?.working_state,
+    getStatusLabel(getWorkOrderDisplayStatus(order)),
   ].map(normalizeSearchText).join(' ');
 
   return searchableText.includes(normalizedTerm);
+}
+
+function getWorkOrderProgress(workOrder: any) {
+  const realSeconds = Number(workOrder?.piso_real_duration_seconds);
+  const expectedSeconds = Number(workOrder?.piso_expected_duration_seconds);
+
+  if (Number.isFinite(realSeconds) && Number.isFinite(expectedSeconds) && expectedSeconds > 0) {
+    return Math.min(Math.max(Math.floor((realSeconds / expectedSeconds) * 100), 0), 100);
+  }
+
+  const duration = Number(workOrder?.duration);
+  const expectedDuration = Number(workOrder?.duration_expected);
+  if (!Number.isFinite(duration) || !Number.isFinite(expectedDuration) || expectedDuration <= 0) return 0;
+  return Math.min(Math.max(Math.floor((duration / expectedDuration) * 100), 0), 100);
 }
 
 export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
@@ -146,7 +161,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     setOrderProduction(dateilOrden)
   }
   
-  const progress = Math.floor((showDetailOrderWork?.duration / showDetailOrderWork?.duration_expected) * 100) || 0
+  const progress = getWorkOrderProgress(showDetailOrderWork)
   const orderedWorkOrders = sortWorkOrdersByProductionAndSequence(workoOrder?.data || []).filter((order: any) => workOrderMatchesSearch(order, searchTerm))
 
   const isQualityControlError = (message: string) => {
@@ -200,7 +215,6 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     } else {
       const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
       if (action === 'finish_work_order' && isQualityControlError(message)) {
-        await updateOrder(user, orderSelected, 'stop_work_order').then(res => res).catch((err) => console.log(err))
         const odooOrdersWork: any = await getWorkOrders(user).then(res => res).catch((err) => console.log(err))
         const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id)
         if (refreshedOrder) {
@@ -208,7 +222,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
           getDetailOrderWork(refreshedOrder)
         }
         if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
-        setQualityPauseMessage(getQualityPauseMessage(message))
+        setQualityPauseMessage(update?.qualityPause ? message : getQualityPauseMessage(message))
         setLoadigAction(false)
         return
       }
