@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth'
+import { getCompanyByID } from '@/app/api/companies/companies'
 
 // Config
 import { LOGIN_URL } from '@/config/constants'
@@ -20,6 +21,31 @@ export const metadata: Metadata = {
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+function normalizeCompanyIdentity(value?: string | null) {
+  return value?.toString().trim().toLowerCase() || "";
+}
+
+function isHidrosumiCompany(company: any, companyId?: string | null) {
+  const values = [
+    companyId,
+    company?.id_company,
+    company?.name,
+    company?.domain,
+    company?.database,
+  ].map(normalizeCompanyIdentity);
+
+  return values.some((value) => value.includes("hidrosumi"));
+}
+
+async function getDashboardCompany(companyId: string) {
+  try {
+    return await getCompanyByID(companyId);
+  } catch (error) {
+    console.error("No se pudo resolver la compania del dashboard:", error);
+    return null;
+  }
+}
+
 export default async function Layout({
   children,
 }: {
@@ -29,6 +55,8 @@ export default async function Layout({
   const session = await getServerSession(config)
   if (!session) redirect(LOGIN_URL)
   if (!session.user?.company_id || !session.user?.role || session.user.role === 'chronosAdmin') redirect(LOGIN_URL)
+  const company = await getDashboardCompany(session.user.company_id);
+  const useHidrosumiLogo = isHidrosumiCompany(company, session.user.company_id);
 
   return (
     <div className="min-h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
@@ -39,6 +67,8 @@ export default async function Layout({
               userName={session.user.name}
               userRole={session.user.role}
               isDashboardRoute={true}
+              logoSrc={useHidrosumiLogo ? "/logo-hidrosumi.png" : "/logo.png"}
+              logoAlt={useHidrosumiLogo ? "Logo Hidrosumi" : "Logo Chronos"}
             />
             <HeaderLink userRole={session.user.role}></HeaderLink>
           </div>

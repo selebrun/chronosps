@@ -10,11 +10,15 @@ export function LogoMenu({
   userRole,
   isDashboardRoute,
   isAdminRoute = false,
+  logoSrc = "/logo.png",
+  logoAlt = "Logo",
 }: {
   userName: string;
   userRole: string;
   isDashboardRoute: boolean;
   isAdminRoute?: boolean;
+  logoSrc?: string;
+  logoAlt?: string;
 }) {
   const logout = async () => {
     if (isAdminRoute) {
@@ -34,7 +38,7 @@ export function LogoMenu({
   return (
     <div className="space-y-4">
       <div className="rounded-md bg-white dark:bg-gray-800 p-3 shadow-sm">
-        <Image src="/logo.png" width={195} height={60} alt="Logo" className="h-auto w-auto" />
+        <Image src={logoSrc} width={195} height={60} alt={logoAlt} className="h-auto w-auto" />
       </div>
 
       <div className="rounded-md bg-white dark:bg-gray-800 p-3 shadow-sm space-y-3">
