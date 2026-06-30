@@ -14,6 +14,15 @@ const config = {
   }
 } as any;
 
+async function ensureCompanyDefaultOdooUserColumn(client: Client) {
+  await client.query('ALTER TABLE "company" ADD COLUMN IF NOT EXISTS default_odoo_user_id INTEGER');
+}
+
+function normalizeDefaultOdooUserId(value: any) {
+  const userId = Number(value);
+  return Number.isFinite(userId) && userId > 0 ? userId : null;
+}
+
 /**
  * getCompanies
  * 
@@ -28,6 +37,7 @@ export async function getCompanies() {
 
   try {
     await client.connect();
+    await ensureCompanyDefaultOdooUserColumn(client);
     const res = await client.query('SELECT * FROM "company" ORDER BY LOWER(TRIM(name)) ASC');
     const companies = res.rows;
 
@@ -54,6 +64,7 @@ export async function getCompanyByID(companyId: string) {
 
   try {
     await client.connect();
+    await ensureCompanyDefaultOdooUserColumn(client);
     const res = await client.query('SELECT * FROM "company" WHERE id_company = $1', [companyId]);
     const company = res.rows[0];
 
@@ -86,10 +97,11 @@ export async function createCompany(companyData: any) {
     console.log("Conectado correctamente al servidor PostgreSQL en Azure");
 
     const query = `
-        INSERT INTO company (id_company, name, url, domain, database, user_default, password)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO company (id_company, name, url, domain, database, user_default, password, default_odoo_user_id)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       `;
 
+    await ensureCompanyDefaultOdooUserColumn(client);
     await client.query(query, [
       companyData.id_company,
       companyData.name,
@@ -97,7 +109,8 @@ export async function createCompany(companyData: any) {
       companyData.domain,
       companyData.database,
       companyData.user_default,
-      companyData.password
+      companyData.password,
+      normalizeDefaultOdooUserId(companyData.default_odoo_user_id)
     ]);
     return companyData
   } catch (error) {
@@ -125,10 +138,11 @@ export async function updateCompany(companyData: any) {
 
     const query = `
         UPDATE company
-        SET name = $1, url = $2, domain = $3, database = $4, user_default = $5, password = $6
-        WHERE id_company = $7
+        SET name = $1, url = $2, domain = $3, database = $4, user_default = $5, password = $6, default_odoo_user_id = $7
+        WHERE id_company = $8
       `;
 
+    await ensureCompanyDefaultOdooUserColumn(client);
     await client.query(query, [
       companyData.name,
       companyData.url,
@@ -136,6 +150,7 @@ export async function updateCompany(companyData: any) {
       companyData.database,
       companyData.user_default,
       companyData.password,
+      normalizeDefaultOdooUserId(companyData.default_odoo_user_id),
       companyData.id_company
     ]);
   

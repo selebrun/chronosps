@@ -148,17 +148,18 @@ function getQualityPauseMessage(message: string, paused: boolean) {
   return `${baseMessage} La orden de trabajo fue pausada para realizar los controles de calidad.`;
 }
 
-function getOdooActionKwargs(user: any) {
+async function getOdooActionKwargs(user: any) {
   const context: any = {};
   if (user?.odoo_id) context.employee_id = Number(user.odoo_id);
-  context.user_id = getOdooExecutionUserId(user);
+  context.user_id = await getOdooExecutionUserId(user);
 
   return Object.keys(context).length ? { context } : false;
 }
 
-function getOdooExecutionUserId(user: any) {
-  if (user?.role === 'Operario') return getDefaultOdooUserId();
-  return Number(user?.odoo_user_id) || getDefaultOdooUserId();
+async function getOdooExecutionUserId(user: any) {
+  const defaultUserId = await getDefaultOdooUserId(user?.company_id);
+  if (user?.role === 'Operario') return defaultUserId;
+  return Number(user?.odoo_user_id) || defaultUserId;
 }
 
 async function getFreshWorkOrder(workOrderId: number, companyId: string) {
@@ -181,7 +182,7 @@ async function pauseWorkOrderIfRunning(workOrder: any, user: any) {
     return { status: true, paused: false };
   }
 
-  const response: any = await callOdooMethod('mrp.workorder', 'button_pending', [[workOrderId]], user.company_id, getOdooActionKwargs(user));
+  const response: any = await callOdooMethod('mrp.workorder', 'button_pending', [[workOrderId]], user.company_id, await getOdooActionKwargs(user));
   if (!response?.status) {
     return { status: false, paused: false, message: getOdooError(response, 'No se pudo pausar la orden de trabajo en Odoo.') };
   }
@@ -206,11 +207,12 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     return { status: false, message: 'No se encontro el motivo de bloqueo en Odoo.' };
   }
 
+  const executionUserId = await getOdooExecutionUserId(user);
   const values = {
     workorder_id: workOrder.id,
     workcenter_id: Array.isArray(workOrder.workcenter_id) ? workOrder.workcenter_id[0] : workOrder.workcenter_id,
     company_id: Array.isArray(workOrder.company_id) ? workOrder.company_id[0] : 1,
-    user_id: getOdooExecutionUserId(user),
+    user_id: executionUserId,
     loss_id: reasonId,
     description: `Bloqueo: ${loss.name}`,
     date_start: nowUtcString(),
@@ -323,6 +325,7 @@ export async function updateOrder(
     }
 
     let response: any;
+    const odooExecutionUserId = await getOdooExecutionUserId(user);
     console.log('Accion OT directa', {
       action,
       workorder_id: work_order.id,
@@ -330,26 +333,26 @@ export async function updateOrder(
       workorder_state: work_order.state,
       working_state: work_order.working_state,
       production_id: work_order.production_id?.[0],
-      odoo_context_user_id: getOdooExecutionUserId(user),
+      odoo_context_user_id: odooExecutionUserId,
       odoo_employee_id: Number(user?.odoo_id) || null,
     });
 
     switch (action) {
       case 'start_work_order':
-        response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+        response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         break;
       case 'stop_work_order':
-        response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+        response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         break;
       case 'finish_work_order':
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
-        response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+        response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (!response?.status) {
           const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
           if (isQualityControlError(errorMsg)) {
             let pauseResponse: any = { status: true };
             if (work_order.is_user_working) {
-              pauseResponse = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+              pauseResponse = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
             }
             const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
             const message = getQualityPauseMessage(errorMsg, paused);
@@ -365,7 +368,7 @@ export async function updateOrder(
         break;
       case 'unblock_work_order':
         if (work_order.working_state === 'blocked') {
-          response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id, getOdooActionKwargs(user));
+          response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
           if (!response?.status) {
             const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
             return { status: false, message: errorMsg, faultString: errorMsg };

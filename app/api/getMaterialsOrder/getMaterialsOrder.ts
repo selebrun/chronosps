@@ -2,14 +2,15 @@
 import { getDefaultOdooUserId } from '@/app/api/odoo/defaultOdooUser';
 import { createOdooData, executeOdooMethod, getOdooData } from '@/app/api/odoo/odooService';
 
-function getOdooExecutionUserId(user: any) {
-  if (user?.role === 'Operario') return getDefaultOdooUserId();
-  return Number(user?.odoo_user_id) || getDefaultOdooUserId();
+async function getOdooExecutionUserId(user: any) {
+  const defaultUserId = await getDefaultOdooUserId(user?.company_id);
+  if (user?.role === 'Operario') return defaultUserId;
+  return Number(user?.odoo_user_id) || defaultUserId;
 }
 
-function callOdooMethod(model: string, method: string, args: any[], companyId: string): Promise<any> {
+function callOdooMethod(model: string, method: string, args: any[], companyId: string, uidOverride: number | false = false): Promise<any> {
   return new Promise((resolve) => {
-    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data));
+    executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data), false, uidOverride);
   });
 }
 
@@ -91,6 +92,8 @@ export async function saveMaterialsOrder(
 
     if (operation_id) values.operation_id = operation_id;
 
+    const odooExecutionUserId = await getOdooExecutionUserId(user);
+
     createOdooData(
       'stock.move',
       values,
@@ -101,7 +104,7 @@ export async function saveMaterialsOrder(
           return resolve({ status: false, message });
         }
 
-        const assignResult = await callOdooMethod('mrp.production', 'action_assign', [[production_id]], user.company_id);
+        const assignResult = await callOdooMethod('mrp.production', 'action_assign', [[production_id]], user.company_id, odooExecutionUserId);
         if (!assignResult?.status) {
           const message = getOdooError(assignResult, 'El material fue creado, pero no se pudo actualizar la disponibilidad de la OP.');
           return resolve({ status: false, message });
@@ -109,7 +112,8 @@ export async function saveMaterialsOrder(
 
         return resolve({ status: true, message: 'Agregado', data: moveResult.data });
       },
-      false
+      false,
+      odooExecutionUserId
     );
   });
 }

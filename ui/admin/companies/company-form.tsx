@@ -25,6 +25,7 @@ export function ChronosCompanyForm({
     database: company?.database || '',
     user_default: company?.user_default || '',
     password: company?.password || '',
+    default_odoo_user_id: company?.default_odoo_user_id || '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -41,6 +42,7 @@ export function ChronosCompanyForm({
     database: formData.database?.trim() || '',
     user_default: formData.user_default?.trim() || '',
     password: formData.password?.trim() || '',
+    default_odoo_user_id: formData.default_odoo_user_id?.toString?.().trim?.() || '',
   });
 
   const isFormInvalid = !formData.name?.trim()
@@ -255,6 +257,22 @@ export function ChronosCompanyForm({
           onChange={handleChange}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
+        />
+      </div>
+
+      <div className="mb-4">
+        <label htmlFor="default_odoo_user_id" className="text-xs block text-gray-700 font-bold mb-2">
+          ID usuario Odoo por defecto
+        </label>
+        <input
+          type="number"
+          min="1"
+          id="default_odoo_user_id"
+          name="default_odoo_user_id"
+          value={formData?.default_odoo_user_id || ''}
+          onChange={handleChange}
+          className="w-full p-2 border border-gray-300 rounded-md"
+          placeholder="Ej: 6"
         />
       </div>
 
