@@ -1,9 +1,10 @@
 'use server'
+import { getDefaultOdooUserId } from '@/app/api/odoo/defaultOdooUser';
 import { createOdooData, executeOdooMethod, getOdooData } from '@/app/api/odoo/odooService';
 
 function getOdooExecutionUserId(user: any) {
-  if (user?.role === 'Operario') return 1;
-  return Number(user?.odoo_user_id) || 1;
+  if (user?.role === 'Operario') return getDefaultOdooUserId();
+  return Number(user?.odoo_user_id) || getDefaultOdooUserId();
 }
 
 function callOdooMethod(model: string, method: string, args: any[], companyId: string): Promise<any> {

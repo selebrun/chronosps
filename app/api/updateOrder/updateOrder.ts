@@ -1,6 +1,7 @@
 'use server'
 
 import { createOdooData, executeOdooMethod, getOdooData, setOdooData } from '@/app/api/odoo/odooService';
+import { getDefaultOdooUserId } from '@/app/api/odoo/defaultOdooUser';
 import { isWorkOrderLocallyBlocked, markWorkOrderBlocked, markWorkOrderUnblocked } from '@/app/api/workOrderBlocks/workOrderBlocks';
 
 const WORK_ORDER_FIELDS = ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'];
@@ -156,8 +157,8 @@ function getOdooActionKwargs(user: any) {
 }
 
 function getOdooExecutionUserId(user: any) {
-  if (user?.role === 'Operario') return 1;
-  return Number(user?.odoo_user_id) || 1;
+  if (user?.role === 'Operario') return getDefaultOdooUserId();
+  return Number(user?.odoo_user_id) || getDefaultOdooUserId();
 }
 
 async function getFreshWorkOrder(workOrderId: number, companyId: string) {
