@@ -174,7 +174,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     return `${message.replace('usando el taller', 'usando el módulo de calidad')} La orden de trabajo fue pausada para realizar los controles de calidad.`
   }
 
-  const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined ) => {
+  const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined, elapsedSeconds?: number | undefined ) => {
     if (['start_work_order', 'finish_work_order'].includes(action) && user?.role === 'Operario' && orderSelected?.quality_failed) {
       setError('Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.')
       return
@@ -197,7 +197,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
 
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
-    const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone).then( res => res).catch((err) => console.log(err))
+    const update = await updateOrder(user, orderSelected, action, block_reason, qtyDone, elapsedSeconds).then( res => res).catch((err) => console.log(err))
 
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))

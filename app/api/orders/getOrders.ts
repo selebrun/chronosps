@@ -1,6 +1,7 @@
 'use server'
 import { getOdooData } from '@/app/api/odoo/odooService';
 import { getActiveWorkOrderBlocks } from '@/app/api/workOrderBlocks/workOrderBlocks';
+import { applyWorkOrderTimerSnapshots } from '@/app/api/workOrderTimers/workOrderTimers';
 import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
 
 // `server-only` guarantees any modules that import code in file
@@ -316,7 +317,7 @@ async function enrichWorkOrdersLegacy(user: any, workOrders: any[]) {
   const qualityById = new Map(withQuality.map((wo: any) => [Number(wo.id), wo]));
   const durationsById = new Map(withDurations.map((wo: any) => [Number(wo.id), wo]));
 
-  return workOrders.map((wo: any) => {
+  const mergedWorkOrders = workOrders.map((wo: any) => {
     const woId = Number(wo.id);
     const withDur = durationsById.get(woId) || wo;
     const withQual = qualityById.get(woId) || wo;
@@ -353,6 +354,8 @@ async function enrichWorkOrdersLegacy(user: any, workOrders: any[]) {
 
     return merged;
   });
+
+  return applyWorkOrderTimerSnapshots(user, mergedWorkOrders);
 }
 
 // ─── Órdenes de producción (OP) ──────────────────────────────────────────────
@@ -380,7 +383,8 @@ async function enrichWorkOrders(user: any, workOrders: any[]) {
   });
 
   const withQuality = await addQualityStateToWorkOrders(user, withBlockState);
-  return addWorkOrderDurationsFromProductivity(user, withQuality);
+  const withDurations = await addWorkOrderDurationsFromProductivity(user, withQuality);
+  return applyWorkOrderTimerSnapshots(user, withDurations);
 }
 
 export async function getProductionOrders(user: any) {

@@ -71,7 +71,7 @@ export function ModalDetailWork({
   setModalIsOpenJobDetail: any
   modalIsOpenInstructions: boolean
   openModalInstructions: () => void
-  executeWorkOrderAction: (action:string, block_reason?: any | undefined, qtyDone?: number | undefined ) => void
+  executeWorkOrderAction: (action:string, block_reason?: any | undefined, qtyDone?: number | undefined, elapsedSeconds?: number | undefined ) => void
   loadigAction: boolean
   modalIsOpenBlocks: boolean 
   setModalIsOpenBlocks: any
@@ -184,7 +184,7 @@ export function ModalDetailWork({
 
     if (isBlocked) {
       if (canUnblock) {
-        return <div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order')} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>
+        return <div className="mb-3"><button key="unblock" onClick={() => executeWorkOrderAction('unblock_work_order', undefined, undefined, elapsedSeconds)} className='font-bold bg-red-500 p-3 rounded-md w-full'>Desbloquear</button></div>
       }
 
       return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Orden bloqueada</div>
@@ -196,7 +196,7 @@ export function ModalDetailWork({
           <>
             <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
             <div className="mb-3">
-              <button key="release-quality" onClick={() => executeWorkOrderAction('release_quality_failure')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reactivar OT</button>
+              <button key="release-quality" onClick={() => executeWorkOrderAction('release_quality_failure', undefined, undefined, elapsedSeconds)} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reactivar OT</button>
             </div>
           </>
         )
@@ -213,19 +213,19 @@ export function ModalDetailWork({
 
     // Show Start button only if activity hasn't begun
     if (!isBlocked && !isUserWorking && showDetailOrderWork.duration === 0) {
-      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order')} key="start" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
+      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order', undefined, undefined, elapsedSeconds)} key="start" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Inicio</button></div>)
     }
 
     // Show Resume button if paused
     if (!isBlocked && isPaused && !isUserWorking) {
-      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order')} key="resume" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reanudar</button></div>)
+      buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => executeWorkOrderAction('start_work_order', undefined, undefined, elapsedSeconds)} key="resume" className='disabled:opacity-50 font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Reanudar</button></div>)
     }
 
     buttons.push(<div className="mb-3"><button disabled={disabledBtns} onClick={() => setModalIsOpenBlocks(true)} key="block" className='disabled:opacity-50 font-bold bg-red-500 p-3 rounded-md w-full'>Bloquear</button></div>)
   
     // Pause is only available while the timer is running.
     if (!isBlocked && isUserWorking) {
-      buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order')} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Pausar</button></div>)
+      buttons.push(<div className="mb-3"><button key="stop" onClick={() => executeWorkOrderAction('stop_work_order', undefined, undefined, elapsedSeconds)} className='font-bold bg-[#2FD28E] p-3 rounded-md w-full'>Pausar</button></div>)
     }
 
     // Done is available while running or paused; Odoo validates quality and final state.
@@ -440,7 +440,7 @@ export function ModalDetailWork({
           <div className="mb-3 mt-5 text-center">
             <button 
             disabled={disabledBtnBlock}
-            onClick={() => executeWorkOrderAction('block_work_order', valueSelect)} key="block" className='font-bold bg-red-500 p-3 rounded-md w-[400] disabled:opacity-50'>Bloquear</button>
+            onClick={() => executeWorkOrderAction('block_work_order', valueSelect, undefined, elapsedSeconds)} key="block" className='font-bold bg-red-500 p-3 rounded-md w-[400] disabled:opacity-50'>Bloquear</button>
           </div>
             
       </Modal>
@@ -484,7 +484,7 @@ export function ModalDetailWork({
               setModalIsOpenCompleteOrder(false)
               const finalQty = canEditDoneQuantity ? qtyDone : defaultDoneQuantity
               setQtyDone(defaultDoneQuantity)
-              executeWorkOrderAction('finish_work_order', undefined, finalQty)
+              executeWorkOrderAction('finish_work_order', undefined, finalQty, elapsedSeconds)
             }}
             className='w-full font-bold bg-indigo-100 p-3 rounded-md disabled:opacity-50'>Aceptar</button>
           </div>
