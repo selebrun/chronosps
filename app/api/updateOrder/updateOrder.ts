@@ -52,6 +52,8 @@ async function saveTimerSnapshot(user: any, workOrder: any, elapsedSeconds: any,
   if (!result?.status) {
     throw new Error('No se pudo guardar el tiempo compartido de la orden de trabajo en Piso.');
   }
+
+  return { elapsed_seconds: Number((result as any).elapsed_seconds) || 0 };
 }
 
 function getWorkOrderSequence(workOrder: any) {
@@ -142,6 +144,100 @@ async function releaseFailedQualityChecks(workOrderId: number, user: any) {
 
 function nowUtcString() {
   return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function parseOdooDate(value: any) {
+  if (!value) return null;
+  const date = new Date(`${String(value).replace(' ', 'T')}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function toOdooDate(date: Date) {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function getProductivitySeconds(productivity: any, fallbackEnd: Date) {
+  const start = parseOdooDate(productivity?.date_start);
+  const end = parseOdooDate(productivity?.date_end) || fallbackEnd;
+  if (start && end) {
+    return Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+  }
+
+  const durationMinutes = Number(productivity?.duration);
+  return Number.isFinite(durationMinutes) && durationMinutes > 0
+    ? Math.round(durationMinutes * 60)
+    : 0;
+}
+
+async function synchronizeWorkOrderDurationToOdoo(user: any, workOrderId: number, elapsedSeconds: number) {
+  const productivityResponse: any = await getOdooRecord(
+    'mrp.workcenter.productivity',
+    [['workorder_id', '=', workOrderId]],
+    ['id', 'date_start', 'date_end', 'duration', 'loss_id'],
+    user.company_id
+  );
+  const synchronizedAt = new Date();
+  const productiveRecords = (productivityResponse?.data || [])
+    .filter((record: any) => !getMany2OneId(record?.loss_id))
+    .map((record: any) => ({
+      ...record,
+      seconds: getProductivitySeconds(record, synchronizedAt),
+      end: parseOdooDate(record?.date_end) || synchronizedAt,
+    }))
+    .sort((left: any, right: any) => right.end.getTime() - left.end.getTime());
+
+  if (!productiveRecords.length) {
+    return { status: false, message: 'Odoo no devolvio registros productivos para sincronizar el tiempo de la OT.' };
+  }
+
+  let remainingSeconds = Math.max(0, Math.round(Number(elapsedSeconds) || 0));
+  for (let index = 0; index < productiveRecords.length; index += 1) {
+    const productivity = productiveRecords[index];
+    let targetSeconds = Math.min(productivity.seconds, remainingSeconds);
+    remainingSeconds -= targetSeconds;
+
+    // Si Piso tiene mas tiempo que Odoo, la diferencia se asigna al ultimo
+    // tramo productivo sin alterar los registros de bloqueo.
+    if (index === 0 && remainingSeconds > 0) {
+      targetSeconds += remainingSeconds;
+      remainingSeconds = 0;
+    }
+
+    if (targetSeconds === productivity.seconds && productivity.date_end) continue;
+
+    const targetStart = new Date(productivity.end.getTime() - targetSeconds * 1000);
+    const updateResponse: any = await writeOdooData(
+      'mrp.workcenter.productivity',
+      [productivity.id],
+      { date_start: toOdooDate(targetStart), date_end: toOdooDate(productivity.end) },
+      user.company_id
+    );
+    if (!updateResponse?.status) {
+      return { status: false, message: getOdooError(updateResponse, 'No se pudo sincronizar el tiempo productivo en Odoo.') };
+    }
+  }
+
+  console.log('Tiempo OT sincronizado Piso/Odoo', {
+    workorder_id: workOrderId,
+    elapsed_seconds: elapsedSeconds,
+    productive_records: productiveRecords.length,
+  });
+  return { status: true };
+}
+
+async function saveAndSynchronizePausedTimer(user: any, workOrder: any, elapsedSeconds: any) {
+  const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false);
+  const synchronization = await synchronizeWorkOrderDurationToOdoo(
+    user,
+    Number(workOrder?.id),
+    Number(snapshot.elapsed_seconds) || 0
+  );
+
+  if (!synchronization.status) {
+    throw new Error(synchronization.message);
+  }
+
+  return snapshot;
 }
 
 function getOdooError(data: any, fallback: string) {
@@ -398,14 +494,14 @@ export async function updateOrder(
       case 'stop_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
         }
         break;
       case 'finish_work_order':
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
         }
         if (!response?.status) {
           const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
@@ -416,7 +512,7 @@ export async function updateOrder(
             }
             const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
             if (paused) {
-              await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+              await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
             }
             const message = getQualityPauseMessage(errorMsg, paused);
             return {
@@ -456,7 +552,7 @@ export async function updateOrder(
         {
           const blockResponse = await createProductivityBlock(work_order, block_reason, user);
           if (blockResponse?.status) {
-            await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+            await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
           }
           return blockResponse;
         }
@@ -464,7 +560,7 @@ export async function updateOrder(
         {
           const releaseResponse = await releaseFailedQualityChecks(work_order.id, user);
           if (releaseResponse?.status) {
-            await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+            await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
           }
           return releaseResponse;
         }
