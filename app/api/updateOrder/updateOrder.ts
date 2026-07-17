@@ -2,7 +2,7 @@
 
 import { createOdooData, executeOdooMethod, getOdooData, setOdooData } from '@/app/api/odoo/odooService';
 import { getDefaultOdooUserId } from '@/app/api/odoo/defaultOdooUser';
-import { isWorkOrderLocallyBlocked, markWorkOrderBlocked, markWorkOrderUnblocked } from '@/app/api/workOrderBlocks/workOrderBlocks';
+import { getActiveWorkOrderBlocks, isWorkOrderLocallyBlocked, markWorkOrderBlocked, markWorkOrderUnblocked } from '@/app/api/workOrderBlocks/workOrderBlocks';
 import { saveWorkOrderTimerSnapshot } from '@/app/api/workOrderTimers/workOrderTimers';
 
 const WORK_ORDER_FIELDS = ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'];
@@ -384,7 +384,7 @@ async function closeActiveProductivityBlocks(workOrderId: number, companyId: str
     companyId
   );
   const ids = (activeBlocks?.data || []).map((record: any) => record.id).filter(Boolean);
-  if (!ids.length) return { status: true };
+  if (!ids.length) return { status: true, closed_count: 0 };
 
   const result: any = await writeOdooData(
     'mrp.workcenter.productivity',
@@ -397,10 +397,36 @@ async function closeActiveProductivityBlocks(workOrderId: number, companyId: str
     return { status: false, message: getOdooError(result, 'No se pudo cerrar el registro de bloqueo en Odoo.') };
   }
 
+  return { status: true, closed_count: ids.length };
+}
+
+async function createClosedProductivityBlock(workOrder: any, block: any, user: any) {
+  const reasonId = Number(block?.reason_id);
+  const blockedAt = block?.blocked_at ? new Date(block.blocked_at) : null;
+  if (!reasonId || !blockedAt || Number.isNaN(blockedAt.getTime())) {
+    return { status: false, message: 'No se encontraron los datos del bloqueo para registrar su seguimiento en Odoo.' };
+  }
+
+  const values = {
+    workorder_id: workOrder.id,
+    workcenter_id: getMany2OneId(workOrder.workcenter_id),
+    company_id: getMany2OneId(workOrder.company_id) || 1,
+    user_id: await getOdooExecutionUserId(user),
+    loss_id: reasonId,
+    description: `Bloqueo: ${block.reason_name || reasonId}`,
+    date_start: toOdooDate(blockedAt),
+    date_end: nowUtcString(),
+  };
+
+  const created: any = await createOdooRecord('mrp.workcenter.productivity', values, user.company_id);
+  if (!created?.status) {
+    return { status: false, message: getOdooError(created, 'No se pudo registrar el seguimiento del bloqueo en Odoo.') };
+  }
+
   return { status: true };
 }
 
-async function createProductivityBlock(workOrder: any, blockReason: any, user: any) {
+async function blockWorkOrder(workOrder: any, blockReason: any, user: any) {
   const reasonId = parseInt(blockReason);
   if (!reasonId) {
     return { status: false, message: 'Debe seleccionar un motivo de bloqueo.' };
@@ -417,32 +443,16 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     return { status: false, message: 'No se encontro el motivo de bloqueo en Odoo.' };
   }
 
-  // Primero se detiene el tiempo productivo de Odoo. El registro de bloqueo queda
-  // separado para trazabilidad y no se agrega a la duracion real de la OT.
+  // Primero se detiene el tiempo productivo de Odoo. El intervalo de bloqueo se
+  // conserva en Piso y se envia cerrado a Odoo cuando el Jefe desbloquea.
   const pauseResponse = await pauseWorkOrderIfRunning(workOrder, user);
   if (!pauseResponse?.status) {
     return { status: false, message: `No se pudo pausar la OT antes de bloquearla: ${pauseResponse.message}` };
   }
 
-  const executionUserId = await getOdooExecutionUserId(user);
-  const values = {
-    workorder_id: workOrder.id,
-    workcenter_id: Array.isArray(workOrder.workcenter_id) ? workOrder.workcenter_id[0] : workOrder.workcenter_id,
-    company_id: Array.isArray(workOrder.company_id) ? workOrder.company_id[0] : 1,
-    user_id: executionUserId,
-    loss_id: reasonId,
-    description: `Bloqueo: ${loss.name}`,
-    date_start: nowUtcString(),
-  };
-
-  const created: any = await createOdooRecord('mrp.workcenter.productivity', values, user.company_id);
-  if (!created?.status) {
-    return { status: false, message: getOdooError(created, 'No se pudo bloquear la orden de trabajo en Odoo.') };
-  }
-
   const localBlock = await markWorkOrderBlocked(user, workOrder, loss);
   if (!localBlock?.status) {
-    return { status: false, message: 'Se registro el bloqueo en Odoo, pero no se pudo bloquear la OT en Piso.' };
+    return { status: false, message: 'No se pudo bloquear la orden de trabajo en Piso.' };
   }
 
   return { status: true, message: 'Orden de trabajo bloqueada.' };
@@ -599,31 +609,42 @@ export async function updateOrder(
         }
         break;
       case 'unblock_work_order':
-        if (work_order.working_state === 'blocked') {
-          response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
-          if (!response?.status) {
-            const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
-            return { status: false, message: errorMsg, faultString: errorMsg };
-          }
-        }
         {
-          const pauseResponse = await pauseWorkOrderIfRunning(work_order, user);
-          if (!pauseResponse?.status) {
-            return { status: false, message: `La orden fue desbloqueada, pero no se pudo pausar la OT: ${pauseResponse.message}` };
+          const activeBlocks = await getActiveWorkOrderBlocks(user, [work_order.id]);
+          const activeBlock = activeBlocks.get(Number(work_order.id));
+
+          if (work_order.working_state === 'blocked') {
+            response = await callOdooMethod('mrp.workorder', 'button_unblock', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
+            if (!response?.status) {
+              const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
+              return { status: false, message: errorMsg, faultString: errorMsg };
+            }
           }
-        }
-        {
-          const closeBlockResponse = await closeActiveProductivityBlocks(work_order.id, user.company_id);
-          if (!closeBlockResponse?.status) {
-            return { status: false, message: closeBlockResponse.message };
+          {
+            const pauseResponse = await pauseWorkOrderIfRunning(work_order, user);
+            if (!pauseResponse?.status) {
+              return { status: false, message: `La orden fue desbloqueada, pero no se pudo pausar la OT: ${pauseResponse.message}` };
+            }
           }
+          {
+            const closeBlockResponse = await closeActiveProductivityBlocks(work_order.id, user.company_id);
+            if (!closeBlockResponse?.status) {
+              return { status: false, message: closeBlockResponse.message };
+            }
+            if (!Number((closeBlockResponse as any).closed_count) && activeBlock) {
+              const trackingResponse = await createClosedProductivityBlock(work_order, activeBlock, user);
+              if (!trackingResponse?.status) {
+                return { status: false, message: trackingResponse.message };
+              }
+            }
+          }
+          await markWorkOrderUnblocked(user, work_order.id);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+          return { status: true, message: 'Orden de trabajo desbloqueada. El reloj permanece detenido hasta iniciar o reanudar.' };
         }
-        await markWorkOrderUnblocked(user, work_order.id);
-        await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
-        return { status: true, message: 'Orden de trabajo desbloqueada. El reloj permanece detenido hasta iniciar o reanudar.' };
       case 'block_work_order':
         {
-          const blockResponse = await createProductivityBlock(work_order, block_reason, user);
+          const blockResponse = await blockWorkOrder(work_order, block_reason, user);
           if (blockResponse?.status) {
             await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
           }
