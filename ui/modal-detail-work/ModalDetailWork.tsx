@@ -1,9 +1,10 @@
 "use client"
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Modal } from "@/ui/modal/modal"
 import Image from 'next/image'
 import close from '@/public/close.png'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
+import { getSharedWorkOrderTimer } from '@/app/api/workOrderTimers/workOrderTimers'
 
 function isWorkOrderBlocked(workOrder: any) {
   return Boolean(workOrder?.local_blocked || workOrder?.working_state === 'blocked');
@@ -62,7 +63,8 @@ export function ModalDetailWork({
   error,
   onCloseError,
   qualityPauseMessage,
-  onCloseQualityPauseMessage
+  onCloseQualityPauseMessage,
+  onSharedTimerSync,
 }: {
   modalIsOpenJobDetail: boolean
   showDetailOrderWork?: any 
@@ -94,6 +96,7 @@ export function ModalDetailWork({
   onCloseError: () => void
   qualityPauseMessage?: string
   onCloseQualityPauseMessage?: () => void
+  onSharedTimerSync?: (timer: any) => void
 }) {
   const [valueSelect, setValueSelect] = useState('');
   const [qtyDone, setQtyDone] = useState<number>(orderProductionSelected?.product_qty || 0 );
@@ -101,6 +104,7 @@ export function ModalDetailWork({
   const [valueSelectMaterial, setvValueSelectMaterial] = useState('');
   const [valueTotalMaterial, setvValueTotalMaterial] = useState(0);
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
+  const sharedTimerSyncRef = useRef(onSharedTimerSync);
   const isWorkOrderDone = ['done', 'completed', 'cancel'].includes(showDetailOrderWork?.state);
   const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && !isWorkOrderBlocked(showDetailOrderWork) && !isWorkOrderDone);
   const normalizedRealDurationSeconds = Number(showDetailOrderWork?.piso_real_duration_seconds);
@@ -122,6 +126,10 @@ export function ModalDetailWork({
   const canEditDoneQuantity = isRole(user, 'Jefe') || isRole(user, 'Lider');
 
   useEffect(() => {
+    sharedTimerSyncRef.current = onSharedTimerSync;
+  }, [onSharedTimerSync]);
+
+  useEffect(() => {
     setElapsedSeconds(baseElapsedSeconds);
   }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.piso_duration_calculated_at, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
 
@@ -140,6 +148,27 @@ export function ModalDetailWork({
 
     return () => window.clearInterval(timer);
   }, [isTimerRunning, showDetailOrderWork?.id]);
+
+  useEffect(() => {
+    const workOrderId = Number(showDetailOrderWork?.id);
+    if (!modalIsOpenJobDetail || !workOrderId) return;
+
+    let active = true;
+    const syncSharedTimer = async () => {
+      const timer = await getSharedWorkOrderTimer(user, workOrderId);
+      if (!active || !timer?.status) return;
+
+      sharedTimerSyncRef.current?.(timer);
+      setElapsedSeconds(Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0)));
+    };
+
+    void syncSharedTimer();
+    const interval = window.setInterval(() => void syncSharedTimer(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, user]);
 
   const formatElapsedTime = (totalSeconds: number) => {
     const seconds = Math.max(0, Math.floor(totalSeconds));

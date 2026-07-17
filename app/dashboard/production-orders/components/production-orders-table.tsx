@@ -137,6 +137,28 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     setModalIsOpenInstructions(!modalIsOpenInstructions)
   }
 
+  const syncSharedTimer = (timer: any) => {
+    const applyTimer = (order: any) => {
+      if (!order?.id || Number(order.id) !== Number(orderWorkSelected?.id)) return order;
+      const canRun = Boolean(timer?.is_running) && !order.local_blocked && !order.quality_failed && !['done', 'completed', 'cancel'].includes(order.state);
+      return {
+        ...order,
+        duration: Number(timer.elapsed_seconds || 0) / 60,
+        piso_real_duration_seconds: Number(timer.elapsed_seconds || 0),
+        piso_duration_calculated_at: timer.calculated_at,
+        is_user_working: canRun,
+      };
+    };
+
+    seOrderWorkSelected((current: any) => applyTimer(current));
+    setShowDetailOrderWork((current: any) => applyTimer(current));
+    setOrderWorkDetail((current: any[]) => current.map((order: any) => applyTimer(order)));
+    setOrdersWork((current: any) => current?.data
+      ? { ...current, data: current.data.map((order: any) => applyTimer(order)) }
+      : current
+    );
+  }
+
   const isQualityControlError = (message: string) => {
     const normalizedMessage = (message || '').toLowerCase();
     return normalizedMessage.includes('calidad') || normalizedMessage.includes('quality');
@@ -335,6 +357,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          onCloseError={() => setError('')}
          qualityPauseMessage={qualityPauseMessage}
          onCloseQualityPauseMessage={() => setQualityPauseMessage('')}
+         onSharedTimerSync={syncSharedTimer}
         />
       }
       <div className="mb-4 flex gap-2">

@@ -41,16 +41,16 @@ function normalizeElapsedSeconds(value: any, fallbackMinutes = 0) {
   return Math.max(0, Math.round(Number(fallbackMinutes || 0) * 60));
 }
 
-async function saveTimerSnapshotSafely(user: any, workOrder: any, elapsedSeconds: any, isRunning: boolean) {
-  try {
-    await saveWorkOrderTimerSnapshot(
-      user,
-      Number(workOrder?.id),
-      normalizeElapsedSeconds(elapsedSeconds, workOrder?.duration),
-      isRunning
-    );
-  } catch (error) {
-    console.error('No se pudo guardar snapshot local de tiempo de OT:', error);
+async function saveTimerSnapshot(user: any, workOrder: any, elapsedSeconds: any, isRunning: boolean) {
+  const result = await saveWorkOrderTimerSnapshot(
+    user,
+    Number(workOrder?.id),
+    normalizeElapsedSeconds(elapsedSeconds, workOrder?.duration),
+    isRunning
+  );
+
+  if (!result?.status) {
+    throw new Error('No se pudo guardar el tiempo compartido de la orden de trabajo en Piso.');
   }
 }
 
@@ -210,7 +210,35 @@ async function pauseWorkOrderIfRunning(workOrder: any, user: any) {
   return { status: true, paused: true };
 }
 
-async function createProductivityBlock(workOrder: any, blockReason: any, user: any, elapsedSeconds?: number) {
+async function closeActiveProductivityBlocks(workOrderId: number, companyId: string) {
+  const activeBlocks: any = await getOdooRecord(
+    'mrp.workcenter.productivity',
+    [
+      ['workorder_id', '=', workOrderId],
+      ['description', 'ilike', 'Bloqueo:'],
+      ['date_end', '=', false],
+    ],
+    ['id'],
+    companyId
+  );
+  const ids = (activeBlocks?.data || []).map((record: any) => record.id).filter(Boolean);
+  if (!ids.length) return { status: true };
+
+  const result: any = await writeOdooData(
+    'mrp.workcenter.productivity',
+    ids,
+    { date_end: nowUtcString() },
+    companyId
+  );
+
+  if (!result?.status) {
+    return { status: false, message: getOdooError(result, 'No se pudo cerrar el registro de bloqueo en Odoo.') };
+  }
+
+  return { status: true };
+}
+
+async function createProductivityBlock(workOrder: any, blockReason: any, user: any) {
   const reasonId = parseInt(blockReason);
   if (!reasonId) {
     return { status: false, message: 'Debe seleccionar un motivo de bloqueo.' };
@@ -225,6 +253,13 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
   const loss = lossData?.data?.[0];
   if (!loss) {
     return { status: false, message: 'No se encontro el motivo de bloqueo en Odoo.' };
+  }
+
+  // Primero se detiene el tiempo productivo de Odoo. El registro de bloqueo queda
+  // separado para trazabilidad y no se agrega a la duracion real de la OT.
+  const pauseResponse = await pauseWorkOrderIfRunning(workOrder, user);
+  if (!pauseResponse?.status) {
+    return { status: false, message: `No se pudo pausar la OT antes de bloquearla: ${pauseResponse.message}` };
   }
 
   const executionUserId = await getOdooExecutionUserId(user);
@@ -243,17 +278,10 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     return { status: false, message: getOdooError(created, 'No se pudo bloquear la orden de trabajo en Odoo.') };
   }
 
-  const pauseResponse = await pauseWorkOrderIfRunning(workOrder, user);
-  if (!pauseResponse?.status) {
-    return { status: false, message: `Se registro el bloqueo, pero no se pudo pausar la OT: ${pauseResponse.message}` };
-  }
-
   const localBlock = await markWorkOrderBlocked(user, workOrder, loss);
   if (!localBlock?.status) {
     return { status: false, message: 'Se registro el bloqueo en Odoo, pero no se pudo bloquear la OT en Piso.' };
   }
-
-  await saveTimerSnapshotSafely(user, workOrder, elapsedSeconds, false);
 
   return { status: true, message: 'Orden de trabajo bloqueada.' };
 }
@@ -364,20 +392,20 @@ export async function updateOrder(
       case 'start_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, true);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, true);
         }
         break;
       case 'stop_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
         }
         break;
       case 'finish_work_order':
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
         }
         if (!response?.status) {
           const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
@@ -388,7 +416,7 @@ export async function updateOrder(
             }
             const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
             if (paused) {
-              await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
+              await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
             }
             const message = getQualityPauseMessage(errorMsg, paused);
             return {
@@ -415,16 +443,28 @@ export async function updateOrder(
             return { status: false, message: `La orden fue desbloqueada, pero no se pudo pausar la OT: ${pauseResponse.message}` };
           }
         }
+        {
+          const closeBlockResponse = await closeActiveProductivityBlocks(work_order.id, user.company_id);
+          if (!closeBlockResponse?.status) {
+            return { status: false, message: closeBlockResponse.message };
+          }
+        }
         await markWorkOrderUnblocked(user, work_order.id);
-        await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
+        await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
         return { status: true, message: 'Orden de trabajo desbloqueada. El reloj permanece detenido hasta iniciar o reanudar.' };
       case 'block_work_order':
-        return createProductivityBlock(work_order, block_reason, user, elapsedSeconds);
+        {
+          const blockResponse = await createProductivityBlock(work_order, block_reason, user);
+          if (blockResponse?.status) {
+            await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+          }
+          return blockResponse;
+        }
       case 'release_quality_failure':
         {
           const releaseResponse = await releaseFailedQualityChecks(work_order.id, user);
           if (releaseResponse?.status) {
-            await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
+            await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
           }
           return releaseResponse;
         }

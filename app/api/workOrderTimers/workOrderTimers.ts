@@ -86,7 +86,7 @@ export async function saveWorkOrderTimerSnapshot(
   const elapsed = normalizeElapsedSeconds(elapsedSeconds);
 
   return withPool(async (client) => {
-    await client.query(
+    const response = await client.query(
       `
       INSERT INTO work_order_time_snapshots (
         id_company,
@@ -100,11 +100,30 @@ export async function saveWorkOrderTimerSnapshot(
       VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN NOW() ELSE NULL END, $5, NOW())
       ON CONFLICT (id_company, workorder_id)
       DO UPDATE SET
-        elapsed_seconds = EXCLUDED.elapsed_seconds,
+        -- El reloj pertenece a Piso y es compartido por todas las sesiones.
+        -- Nunca se permite que una pantalla con datos antiguos retroceda el tiempo.
+        elapsed_seconds = GREATEST(
+          work_order_time_snapshots.elapsed_seconds + CASE
+            WHEN work_order_time_snapshots.is_running
+              AND work_order_time_snapshots.active_since IS NOT NULL
+            THEN GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - work_order_time_snapshots.active_since))))::INTEGER
+            ELSE 0
+          END,
+          EXCLUDED.elapsed_seconds
+        ),
         is_running = EXCLUDED.is_running,
-        active_since = EXCLUDED.active_since,
+        active_since = CASE
+          WHEN EXCLUDED.is_running THEN CASE
+            WHEN work_order_time_snapshots.is_running
+              AND work_order_time_snapshots.active_since IS NOT NULL
+            THEN work_order_time_snapshots.active_since
+            ELSE NOW()
+          END
+          ELSE NULL
+        END,
         updated_by = EXCLUDED.updated_by,
         updated_at = NOW()
+      RETURNING elapsed_seconds, is_running, active_since
       `,
       [
         companyId,
@@ -115,7 +134,12 @@ export async function saveWorkOrderTimerSnapshot(
       ] as any[]
     );
 
-    return { status: true, elapsed_seconds: elapsed, is_running: Boolean(isRunning) };
+    const snapshot = response.rows?.[0];
+    return {
+      status: true,
+      elapsed_seconds: normalizeElapsedSeconds(snapshot?.elapsed_seconds, elapsed),
+      is_running: Boolean(snapshot?.is_running),
+    };
   });
 }
 
@@ -143,6 +167,27 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
     console.error('No se pudieron consultar tiempos locales de OT:', error);
     return new Map<number, any>();
   }
+}
+
+export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
+  const id = Number(workOrderId);
+  if (!id) return { status: false };
+
+  const snapshot = (await getWorkOrderTimerSnapshots(user, [id])).get(id);
+  if (!snapshot) return { status: false };
+
+  const now = Date.now();
+  const isRunning = Boolean(snapshot.is_running);
+  const elapsedSeconds = normalizeElapsedSeconds(snapshot.elapsed_seconds) + (
+    isRunning ? getSecondsSince(snapshot.active_since, now) : 0
+  );
+
+  return {
+    status: true,
+    elapsed_seconds: elapsedSeconds,
+    is_running: isRunning,
+    calculated_at: new Date(now).toISOString(),
+  };
 }
 
 export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[]) {

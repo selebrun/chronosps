@@ -186,7 +186,7 @@ function parseOdooDate(dateValue: string) {
 function isWorkOrderActivelyWorking(workOrder: any) {
   if (!workOrder?.is_user_working) return false;
   if (['done', 'completed', 'cancel'].includes(workOrder?.state)) return false;
-  if (['paused', 'blocked', 'done'].includes(workOrder?.working_state)) return false;
+  if (['paused', 'blocked'].includes(workOrder?.working_state)) return false;
   return true;
 }
 
@@ -217,7 +217,7 @@ async function addWorkOrderDurationsFromProductivity(user: any, workOrders: any[
   const productivityData: any[] = await getOdooRecords(
     'mrp.workcenter.productivity',
     [['workorder_id', 'in', workOrderIds]],
-    ['id', 'workorder_id', 'date_start', 'date_end', 'duration'],
+    ['id', 'workorder_id', 'date_start', 'date_end', 'duration', 'loss_id'],
     user.company_id
   );
 
@@ -227,6 +227,9 @@ async function addWorkOrderDurationsFromProductivity(user: any, workOrders: any[
   const workOrderById = new Map((workOrders || []).map((workOrder: any) => [Number(workOrder.id), workOrder]));
 
   (productivityData || []).forEach((productivity: any) => {
+    // Los registros de perdida (bloqueos/pausas) no forman parte del tiempo real de produccion.
+    if (asOdooId(productivity?.loss_id)) return;
+
     const workOrderId = Number(Array.isArray(productivity?.workorder_id) ? productivity.workorder_id[0] : productivity?.workorder_id);
     if (!workOrderId) return;
     const workOrder = workOrderById.get(workOrderId);
