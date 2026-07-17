@@ -227,17 +227,31 @@ async function synchronizeWorkOrderDurationToOdoo(user: any, workOrderId: number
 
 async function saveAndSynchronizePausedTimer(user: any, workOrder: any, elapsedSeconds: any) {
   const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false);
-  const synchronization = await synchronizeWorkOrderDurationToOdoo(
-    user,
-    Number(workOrder?.id),
-    Number(snapshot.elapsed_seconds) || 0
-  );
+  try {
+    const synchronization = await synchronizeWorkOrderDurationToOdoo(
+      user,
+      Number(workOrder?.id),
+      Number(snapshot.elapsed_seconds) || 0
+    );
 
-  if (!synchronization.status) {
-    throw new Error(synchronization.message);
+    if (!synchronization.status) {
+      console.error('No se pudo conciliar el tiempo de Piso en Odoo', {
+        workorder_id: workOrder?.id,
+        piso_elapsed_seconds: snapshot.elapsed_seconds,
+        message: synchronization.message,
+      });
+      return { ...snapshot, synchronized: false, synchronization_message: synchronization.message };
+    }
+  } catch (error) {
+    console.error('Error conciliando el tiempo de Piso en Odoo', {
+      workorder_id: workOrder?.id,
+      piso_elapsed_seconds: snapshot.elapsed_seconds,
+      error,
+    });
+    return { ...snapshot, synchronized: false, synchronization_message: error instanceof Error ? error.message : 'Error inesperado de sincronizacion.' };
   }
 
-  return snapshot;
+  return { ...snapshot, synchronized: true };
 }
 
 function getOdooError(data: any, fallback: string) {
@@ -512,7 +526,13 @@ export async function updateOrder(
             }
             const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
             if (paused) {
-              await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
+              try {
+                await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
+              } catch (timerError) {
+                // El bloqueo funcional de Calidad no puede ocultarse si falla
+                // una sincronizacion secundaria de tiempo.
+                console.error('No se pudo congelar el reloj de Piso tras el bloqueo de Calidad:', timerError);
+              }
             }
             const message = getQualityPauseMessage(errorMsg, paused);
             return {
@@ -575,7 +595,13 @@ export async function updateOrder(
 
     return { status: true, message: 'Accion realizada con exito.' };
   } catch (error) {
-    console.error('Error en la funcion updateOrder:', error);
-    throw new Error('Hubo un error al procesar la orden.');
+    const message = error instanceof Error ? error.message : 'Hubo un error al procesar la orden.';
+    console.error('Error en la funcion updateOrder:', {
+      action,
+      workorder_id: workorder?.id,
+      message,
+      error,
+    });
+    return { status: false, message, faultString: message };
   }
 }
