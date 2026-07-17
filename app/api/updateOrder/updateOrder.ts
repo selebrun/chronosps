@@ -191,15 +191,39 @@ function getProductivitySeconds(productivity: any, fallbackEnd: Date) {
 }
 
 async function synchronizeWorkOrderDurationToOdoo(user: any, workOrderId: number, elapsedSeconds: number) {
+  const targetElapsedSeconds = Math.max(0, Math.round(Number(elapsedSeconds) || 0));
+  const directWrite: any = await writeOdooData(
+    'mrp.workorder',
+    [workOrderId],
+    { duration: targetElapsedSeconds / 60 },
+    user.company_id
+  );
+
+  if (directWrite?.status) {
+    const refreshedWorkOrder = await getFreshWorkOrder(workOrderId, user.company_id);
+    const odooElapsedSeconds = Math.max(0, Math.round(Number(refreshedWorkOrder?.duration || 0) * 60));
+    if (Math.abs(odooElapsedSeconds - targetElapsedSeconds) <= 1) {
+      console.log('Tiempo OT sincronizado Piso/Odoo', {
+        workorder_id: workOrderId,
+        elapsed_seconds: targetElapsedSeconds,
+        strategy: 'mrp.workorder.duration',
+      });
+      return { status: true };
+    }
+  }
+
+  // Algunas versiones de Odoo calculan duration desde las lineas de
+  // productividad. En ese caso se ajustan como respaldo, excluyendo solamente
+  // los registros que Piso creo explicitamente para un bloqueo.
   const productivityResponse: any = await getOdooRecord(
     'mrp.workcenter.productivity',
     [['workorder_id', '=', workOrderId]],
-    ['id', 'date_start', 'date_end', 'duration', 'loss_id'],
+    ['id', 'date_start', 'date_end', 'duration', 'description'],
     user.company_id
   );
   const synchronizedAt = new Date();
   const productiveRecords = (productivityResponse?.data || [])
-    .filter((record: any) => !getMany2OneId(record?.loss_id))
+    .filter((record: any) => !String(record?.description || '').trim().toLowerCase().startsWith('bloqueo:'))
     .map((record: any) => ({
       ...record,
       seconds: getProductivitySeconds(record, synchronizedAt),
@@ -208,10 +232,16 @@ async function synchronizeWorkOrderDurationToOdoo(user: any, workOrderId: number
     .sort((left: any, right: any) => right.end.getTime() - left.end.getTime());
 
   if (!productiveRecords.length) {
-    return { status: false, message: 'Odoo no devolvio registros productivos para sincronizar el tiempo de la OT.' };
+    return {
+      status: false,
+      message: getOdooError(
+        directWrite,
+        'Odoo no permitio actualizar la duracion de la OT ni devolvio registros de tiempo para ajustarla.'
+      ),
+    };
   }
 
-  let remainingSeconds = Math.max(0, Math.round(Number(elapsedSeconds) || 0));
+  let remainingSeconds = targetElapsedSeconds;
   for (let index = 0; index < productiveRecords.length; index += 1) {
     const productivity = productiveRecords[index];
     let targetSeconds = Math.min(productivity.seconds, remainingSeconds);
@@ -240,8 +270,9 @@ async function synchronizeWorkOrderDurationToOdoo(user: any, workOrderId: number
 
   console.log('Tiempo OT sincronizado Piso/Odoo', {
     workorder_id: workOrderId,
-    elapsed_seconds: elapsedSeconds,
+    elapsed_seconds: targetElapsedSeconds,
     productive_records: productiveRecords.length,
+    strategy: 'mrp.workcenter.productivity',
   });
   return { status: true };
 }
