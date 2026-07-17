@@ -41,12 +41,19 @@ function normalizeElapsedSeconds(value: any, fallbackMinutes = 0) {
   return Math.max(0, Math.round(Number(fallbackMinutes || 0) * 60));
 }
 
-async function saveTimerSnapshot(user: any, workOrder: any, elapsedSeconds: any, isRunning: boolean) {
+async function saveTimerSnapshot(
+  user: any,
+  workOrder: any,
+  elapsedSeconds: any,
+  isRunning: boolean,
+  activeSince?: string | null
+) {
   const result = await saveWorkOrderTimerSnapshot(
     user,
     Number(workOrder?.id),
     normalizeElapsedSeconds(elapsedSeconds, workOrder?.duration),
-    isRunning
+    isRunning,
+    activeSince
   );
 
   if (!result?.status) {
@@ -54,6 +61,20 @@ async function saveTimerSnapshot(user: any, workOrder: any, elapsedSeconds: any,
   }
 
   return { elapsed_seconds: Number((result as any).elapsed_seconds) || 0 };
+}
+
+async function getCurrentOdooProductivityStart(workOrderId: number, companyId: string) {
+  const productivityResponse: any = await getOdooRecord(
+    'mrp.workcenter.productivity',
+    [['workorder_id', '=', workOrderId], ['date_end', '=', false]],
+    ['id', 'date_start', 'loss_id'],
+    companyId
+  );
+
+  return (productivityResponse?.data || [])
+    .filter((record: any) => !getMany2OneId(record?.loss_id))
+    .sort((left: any, right: any) => String(right?.date_start || '').localeCompare(String(left?.date_start || '')))[0]
+    ?.date_start || null;
 }
 
 function getWorkOrderSequence(workOrder: any) {
@@ -502,7 +523,8 @@ export async function updateOrder(
       case 'start_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveTimerSnapshot(user, work_order, elapsedSeconds, true);
+          const odooProductivityStart = await getCurrentOdooProductivityStart(work_order.id, user.company_id);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, true, odooProductivityStart);
         }
         break;
       case 'stop_work_order':

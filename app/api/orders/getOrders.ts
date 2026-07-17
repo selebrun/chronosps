@@ -195,7 +195,7 @@ function getProductivityDurationSeconds(productivity: any, now: number, countOpe
   const dateEnd = parseOdooDate(productivity?.date_end);
 
   if (countOpenUntilNow && dateStart && !Number.isNaN(dateStart.getTime()) && (!productivity?.date_end || productivity.date_end === false)) {
-    return Math.max(0, Math.floor((now - dateStart.getTime()) / 1000));
+    return Math.max(0, Math.round((now - dateStart.getTime()) / 1000));
   }
 
   const durationMinutes = Number(productivity?.duration);

@@ -29,7 +29,7 @@ function getSecondsSince(value: any) {
   if (!value) return 0;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 0;
-  return Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  return Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
 }
 
 

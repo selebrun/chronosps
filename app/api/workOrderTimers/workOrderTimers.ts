@@ -59,7 +59,7 @@ function parseDbDate(value: any) {
 function getSecondsSince(value: any, now = Date.now()) {
   const date = parseDbDate(value);
   if (!date) return 0;
-  return Math.max(0, Math.floor((now - date.getTime()) / 1000));
+  return Math.max(0, Math.round((now - date.getTime()) / 1000));
 }
 
 function isWorkOrderDone(workOrder: any) {
@@ -77,7 +77,8 @@ export async function saveWorkOrderTimerSnapshot(
   user: any,
   workOrderId: number,
   elapsedSeconds: any,
-  isRunning: boolean
+  isRunning: boolean,
+  activeSince?: string | null
 ) {
   const companyId = String(user?.company_id || '').trim();
   const id = Number(workOrderId);
@@ -97,7 +98,7 @@ export async function saveWorkOrderTimerSnapshot(
         updated_by,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN NOW() ELSE NULL END, $5, NOW())
+      VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN COALESCE($6::timestamp, NOW()) ELSE NULL END, $5, NOW())
       ON CONFLICT (id_company, workorder_id)
       DO UPDATE SET
         -- El reloj pertenece a Piso y es compartido por todas las sesiones.
@@ -106,7 +107,7 @@ export async function saveWorkOrderTimerSnapshot(
           work_order_time_snapshots.elapsed_seconds + CASE
             WHEN work_order_time_snapshots.is_running
               AND work_order_time_snapshots.active_since IS NOT NULL
-            THEN GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (NOW() - work_order_time_snapshots.active_since))))::INTEGER
+            THEN GREATEST(0, ROUND(EXTRACT(EPOCH FROM (NOW() - work_order_time_snapshots.active_since)))::INTEGER)
             ELSE 0
           END,
           EXCLUDED.elapsed_seconds
@@ -117,7 +118,7 @@ export async function saveWorkOrderTimerSnapshot(
             WHEN work_order_time_snapshots.is_running
               AND work_order_time_snapshots.active_since IS NOT NULL
             THEN work_order_time_snapshots.active_since
-            ELSE NOW()
+            ELSE COALESCE(EXCLUDED.active_since, NOW())
           END
           ELSE NULL
         END,
@@ -131,6 +132,7 @@ export async function saveWorkOrderTimerSnapshot(
         elapsed,
         Boolean(isRunning),
         String(user?.code || user?.email || ''),
+        activeSince || null,
       ] as any[]
     );
 
