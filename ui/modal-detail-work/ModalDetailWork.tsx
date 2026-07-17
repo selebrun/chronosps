@@ -107,11 +107,6 @@ export function ModalDetailWork({
       : Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
   }, [normalizedRealDurationSeconds, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds]);
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
-  const timerAnchorRef = useRef({
-    elapsedSeconds: baseElapsedSeconds,
-    localReferenceMs: Date.now(),
-    isRunning: isTimerRunning,
-  });
   const expectedSeconds = Number.isFinite(normalizedExpectedSeconds)
     ? Math.max(0, Math.round(normalizedExpectedSeconds))
     : Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
@@ -125,11 +120,6 @@ export function ModalDetailWork({
   }, [onSharedTimerSync]);
 
   useEffect(() => {
-    timerAnchorRef.current = {
-      elapsedSeconds: baseElapsedSeconds,
-      localReferenceMs: Date.now(),
-      isRunning: isTimerRunning,
-    };
     setElapsedSeconds(baseElapsedSeconds);
   }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.piso_duration_calculated_at, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
 
@@ -140,30 +130,6 @@ export function ModalDetailWork({
   }, [modalIsOpenCompleteOrder, defaultDoneQuantity]);
 
   useEffect(() => {
-    if (!isTimerRunning) return;
-
-    const updateVisibleTimer = () => {
-      const anchor = timerAnchorRef.current;
-      const calculatedSeconds = anchor.elapsedSeconds + (
-        anchor.isRunning
-          ? Math.max(0, Math.round((Date.now() - anchor.localReferenceMs) / 1000))
-          : 0
-      );
-
-      // Nunca retrocede. Si una pestaña se adelanto, espera a que el reloj
-      // compartido la alcance antes de volver a avanzar.
-      setElapsedSeconds((current) => Math.max(current, calculatedSeconds));
-    };
-
-    updateVisibleTimer();
-    const timer = window.setInterval(() => {
-      updateVisibleTimer();
-    }, 250);
-
-    return () => window.clearInterval(timer);
-  }, [isTimerRunning, showDetailOrderWork?.id]);
-
-  useEffect(() => {
     const workOrderId = Number(showDetailOrderWork?.id);
     if (!modalIsOpenJobDetail || !workOrderId) return;
 
@@ -172,7 +138,6 @@ export function ModalDetailWork({
     const syncSharedTimer = async () => {
       if (requestInFlight) return;
       requestInFlight = true;
-      const requestedAt = Date.now();
       let timer: any;
       try {
         timer = await getSharedWorkOrderTimer(user, workOrderId);
@@ -182,31 +147,14 @@ export function ModalDetailWork({
       } finally {
         requestInFlight = false;
       }
-      const receivedAt = Date.now();
       if (!active || !timer?.status) return;
 
-      const halfRoundTripSeconds = timer.is_running
-        ? Math.max(0, Math.round((receivedAt - requestedAt) / 2000))
-        : 0;
-      const sharedElapsedSeconds = Math.max(
-        0,
-        Math.round(Number(timer.elapsed_seconds) || 0) + halfRoundTripSeconds
-      );
+      const sharedElapsedSeconds = Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
       const sharedTimerChanged = Boolean(timer.is_running) !== isTimerRunning;
 
-      timerAnchorRef.current = {
-        elapsedSeconds: sharedElapsedSeconds,
-        localReferenceMs: receivedAt,
-        isRunning: Boolean(timer.is_running),
-      };
-
-      // Mientras ambos relojes siguen activos, el contador visual conserva su
-      // avance lineal. La consulta compartida solo puede adelantarlo, nunca
-      // devolverlo a una lectura anterior.
-      setElapsedSeconds((current) => {
-        if (sharedTimerChanged || !timer.is_running) return sharedElapsedSeconds;
-        return Math.max(current, sharedElapsedSeconds);
-      });
+      // El valor visible sale siempre del reloj central de Piso. Ninguna sesion
+      // mantiene un contador independiente en memoria.
+      setElapsedSeconds(sharedElapsedSeconds);
 
       // Solo se propaga al padre un cambio de estado remoto. Antes se hacia en
       // cada sondeo y eso reiniciaba el contador local cada tres segundos.
@@ -216,7 +164,7 @@ export function ModalDetailWork({
     };
 
     void syncSharedTimer();
-    const interval = window.setInterval(() => void syncSharedTimer(), 1000);
+    const interval = window.setInterval(() => void syncSharedTimer(), 500);
     return () => {
       active = false;
       window.clearInterval(interval);
