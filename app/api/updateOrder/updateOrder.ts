@@ -41,6 +41,19 @@ function normalizeElapsedSeconds(value: any, fallbackMinutes = 0) {
   return Math.max(0, Math.round(Number(fallbackMinutes || 0) * 60));
 }
 
+async function saveTimerSnapshotSafely(user: any, workOrder: any, elapsedSeconds: any, isRunning: boolean) {
+  try {
+    await saveWorkOrderTimerSnapshot(
+      user,
+      Number(workOrder?.id),
+      normalizeElapsedSeconds(elapsedSeconds, workOrder?.duration),
+      isRunning
+    );
+  } catch (error) {
+    console.error('No se pudo guardar snapshot local de tiempo de OT:', error);
+  }
+}
+
 function getWorkOrderSequence(workOrder: any) {
   const sequence = Number(workOrder?.sequence);
   return Number.isFinite(sequence) ? sequence : Number(workOrder?.id) || 0;
@@ -240,7 +253,7 @@ async function createProductivityBlock(workOrder: any, blockReason: any, user: a
     return { status: false, message: 'Se registro el bloqueo en Odoo, pero no se pudo bloquear la OT en Piso.' };
   }
 
-  await saveWorkOrderTimerSnapshot(user, workOrder.id, normalizeElapsedSeconds(elapsedSeconds, workOrder.duration), false);
+  await saveTimerSnapshotSafely(user, workOrder, elapsedSeconds, false);
 
   return { status: true, message: 'Orden de trabajo bloqueada.' };
 }
@@ -351,20 +364,20 @@ export async function updateOrder(
       case 'start_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveWorkOrderTimerSnapshot(user, work_order.id, normalizeElapsedSeconds(elapsedSeconds, work_order.duration), true);
+          await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, true);
         }
         break;
       case 'stop_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveWorkOrderTimerSnapshot(user, work_order.id, normalizeElapsedSeconds(elapsedSeconds, work_order.duration), false);
+          await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
         }
         break;
       case 'finish_work_order':
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveWorkOrderTimerSnapshot(user, work_order.id, normalizeElapsedSeconds(elapsedSeconds, work_order.duration), false);
+          await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
         }
         if (!response?.status) {
           const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
@@ -375,7 +388,7 @@ export async function updateOrder(
             }
             const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
             if (paused) {
-              await saveWorkOrderTimerSnapshot(user, work_order.id, normalizeElapsedSeconds(elapsedSeconds, work_order.duration), false);
+              await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
             }
             const message = getQualityPauseMessage(errorMsg, paused);
             return {
@@ -403,7 +416,7 @@ export async function updateOrder(
           }
         }
         await markWorkOrderUnblocked(user, work_order.id);
-        await saveWorkOrderTimerSnapshot(user, work_order.id, normalizeElapsedSeconds(elapsedSeconds, work_order.duration), false);
+        await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
         return { status: true, message: 'Orden de trabajo desbloqueada. El reloj permanece detenido hasta iniciar o reanudar.' };
       case 'block_work_order':
         return createProductivityBlock(work_order, block_reason, user, elapsedSeconds);
@@ -411,7 +424,7 @@ export async function updateOrder(
         {
           const releaseResponse = await releaseFailedQualityChecks(work_order.id, user);
           if (releaseResponse?.status) {
-            await saveWorkOrderTimerSnapshot(user, work_order.id, normalizeElapsedSeconds(elapsedSeconds, work_order.duration), false);
+            await saveTimerSnapshotSafely(user, work_order, elapsedSeconds, false);
           }
           return releaseResponse;
         }

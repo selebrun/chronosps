@@ -69,7 +69,7 @@ function isWorkOrderDone(workOrder: any) {
 function isTimerAllowedToRun(workOrder: any) {
   if (isWorkOrderDone(workOrder)) return false;
   if (workOrder?.local_blocked || workOrder?.quality_failed) return false;
-  if (['paused', 'blocked', 'done'].includes(workOrder?.working_state)) return false;
+  if (workOrder?.working_state === 'blocked') return false;
   return true;
 }
 
