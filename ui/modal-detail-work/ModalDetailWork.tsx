@@ -25,14 +25,6 @@ function getDefaultDoneQuantity(orderProductionSelected: any, showDetailOrderWor
   return Number.isFinite(quantity) ? quantity : 0;
 }
 
-function getSecondsSince(value: any) {
-  if (!value) return 0;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 0;
-  return Math.max(0, Math.round((Date.now() - date.getTime()) / 1000));
-}
-
-
 export function ModalDetailWork({ 
   modalIsOpenJobDetail, 
   showDetailOrderWork, 
@@ -110,13 +102,16 @@ export function ModalDetailWork({
   const normalizedRealDurationSeconds = Number(showDetailOrderWork?.piso_real_duration_seconds);
   const normalizedExpectedSeconds = Number(showDetailOrderWork?.piso_expected_duration_seconds);
   const baseElapsedSeconds = useMemo(() => {
-    const snapshotElapsedSeconds = isTimerRunning ? getSecondsSince(showDetailOrderWork?.piso_duration_calculated_at) : 0;
-
     return Number.isFinite(normalizedRealDurationSeconds)
-      ? Math.max(0, Math.round(normalizedRealDurationSeconds) + snapshotElapsedSeconds)
+      ? Math.max(0, Math.round(normalizedRealDurationSeconds))
       : Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
-  }, [isTimerRunning, normalizedRealDurationSeconds, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.piso_duration_calculated_at]);
+  }, [normalizedRealDurationSeconds, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds]);
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
+  const timerAnchorRef = useRef({
+    elapsedSeconds: baseElapsedSeconds,
+    localReferenceMs: Date.now(),
+    isRunning: isTimerRunning,
+  });
   const expectedSeconds = Number.isFinite(normalizedExpectedSeconds)
     ? Math.max(0, Math.round(normalizedExpectedSeconds))
     : Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
@@ -130,6 +125,11 @@ export function ModalDetailWork({
   }, [onSharedTimerSync]);
 
   useEffect(() => {
+    timerAnchorRef.current = {
+      elapsedSeconds: baseElapsedSeconds,
+      localReferenceMs: Date.now(),
+      isRunning: isTimerRunning,
+    };
     setElapsedSeconds(baseElapsedSeconds);
   }, [showDetailOrderWork?.id, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds, showDetailOrderWork?.piso_duration_calculated_at, showDetailOrderWork?.is_user_working, showDetailOrderWork?.working_state, showDetailOrderWork?.state, baseElapsedSeconds]);
 
@@ -142,9 +142,23 @@ export function ModalDetailWork({
   useEffect(() => {
     if (!isTimerRunning) return;
 
+    const updateVisibleTimer = () => {
+      const anchor = timerAnchorRef.current;
+      const calculatedSeconds = anchor.elapsedSeconds + (
+        anchor.isRunning
+          ? Math.max(0, Math.round((Date.now() - anchor.localReferenceMs) / 1000))
+          : 0
+      );
+
+      // Nunca retrocede. Si una pestaña se adelanto, espera a que el reloj
+      // compartido la alcance antes de volver a avanzar.
+      setElapsedSeconds((current) => Math.max(current, calculatedSeconds));
+    };
+
+    updateVisibleTimer();
     const timer = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1);
-    }, 1000);
+      updateVisibleTimer();
+    }, 250);
 
     return () => window.clearInterval(timer);
   }, [isTimerRunning, showDetailOrderWork?.id]);
@@ -154,12 +168,37 @@ export function ModalDetailWork({
     if (!modalIsOpenJobDetail || !workOrderId) return;
 
     let active = true;
+    let requestInFlight = false;
     const syncSharedTimer = async () => {
-      const timer = await getSharedWorkOrderTimer(user, workOrderId);
+      if (requestInFlight) return;
+      requestInFlight = true;
+      const requestedAt = Date.now();
+      let timer: any;
+      try {
+        timer = await getSharedWorkOrderTimer(user, workOrderId);
+      } catch (error) {
+        console.error('No se pudo actualizar el reloj compartido de la OT:', error);
+        return;
+      } finally {
+        requestInFlight = false;
+      }
+      const receivedAt = Date.now();
       if (!active || !timer?.status) return;
 
-      const sharedElapsedSeconds = Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
+      const halfRoundTripSeconds = timer.is_running
+        ? Math.max(0, Math.round((receivedAt - requestedAt) / 2000))
+        : 0;
+      const sharedElapsedSeconds = Math.max(
+        0,
+        Math.round(Number(timer.elapsed_seconds) || 0) + halfRoundTripSeconds
+      );
       const sharedTimerChanged = Boolean(timer.is_running) !== isTimerRunning;
+
+      timerAnchorRef.current = {
+        elapsedSeconds: sharedElapsedSeconds,
+        localReferenceMs: receivedAt,
+        isRunning: Boolean(timer.is_running),
+      };
 
       // Mientras ambos relojes siguen activos, el contador visual conserva su
       // avance lineal. La consulta compartida solo puede adelantarlo, nunca
@@ -177,7 +216,7 @@ export function ModalDetailWork({
     };
 
     void syncSharedTimer();
-    const interval = window.setInterval(() => void syncSharedTimer(), 3000);
+    const interval = window.setInterval(() => void syncSharedTimer(), 1000);
     return () => {
       active = false;
       window.clearInterval(interval);
