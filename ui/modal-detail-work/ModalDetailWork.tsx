@@ -158,8 +158,22 @@ export function ModalDetailWork({
       const timer = await getSharedWorkOrderTimer(user, workOrderId);
       if (!active || !timer?.status) return;
 
-      sharedTimerSyncRef.current?.(timer);
-      setElapsedSeconds(Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0)));
+      const sharedElapsedSeconds = Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
+      const sharedTimerChanged = Boolean(timer.is_running) !== isTimerRunning;
+
+      // Mientras ambos relojes siguen activos, el contador visual conserva su
+      // avance lineal. La consulta compartida solo puede adelantarlo, nunca
+      // devolverlo a una lectura anterior.
+      setElapsedSeconds((current) => {
+        if (sharedTimerChanged || !timer.is_running) return sharedElapsedSeconds;
+        return Math.max(current, sharedElapsedSeconds);
+      });
+
+      // Solo se propaga al padre un cambio de estado remoto. Antes se hacia en
+      // cada sondeo y eso reiniciaba el contador local cada tres segundos.
+      if (sharedTimerChanged) {
+        sharedTimerSyncRef.current?.(timer);
+      }
     };
 
     void syncSharedTimer();
@@ -168,7 +182,7 @@ export function ModalDetailWork({
       active = false;
       window.clearInterval(interval);
     };
-  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, user]);
+  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, user, isTimerRunning]);
 
   const formatElapsedTime = (totalSeconds: number) => {
     const seconds = Math.max(0, Math.floor(totalSeconds));
