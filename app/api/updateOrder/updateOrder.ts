@@ -402,8 +402,8 @@ async function closeActiveProductivityBlocks(workOrderId: number, companyId: str
 
 async function createClosedProductivityBlock(workOrder: any, block: any, user: any) {
   const reasonId = Number(block?.reason_id);
-  const blockedAt = block?.blocked_at ? new Date(block.blocked_at) : null;
-  if (!reasonId || !blockedAt || Number.isNaN(blockedAt.getTime())) {
+  const blockedAt = String(block?.blocked_at || '').trim().replace('T', ' ').replace(/Z$/, '').slice(0, 19);
+  if (!reasonId || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(blockedAt)) {
     return { status: false, message: 'No se encontraron los datos del bloqueo para registrar su seguimiento en Odoo.' };
   }
 
@@ -414,7 +414,7 @@ async function createClosedProductivityBlock(workOrder: any, block: any, user: a
     user_id: await getOdooExecutionUserId(user),
     loss_id: reasonId,
     description: `Bloqueo: ${block.reason_name || reasonId}`,
-    date_start: toOdooDate(blockedAt),
+    date_start: blockedAt,
     date_end: nowUtcString(),
   };
 

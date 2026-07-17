@@ -30,11 +30,16 @@ async function ensureWorkOrderBlocksTable(client: any) {
       reason_name TEXT,
       blocked_by CHARACTER(40),
       blocked_by_role CHARACTER(40),
-      blocked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      blocked_at TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'UTC'),
       unblocked_by CHARACTER(40),
       unblocked_at TIMESTAMP,
       active BOOLEAN NOT NULL DEFAULT TRUE
     )
+  `);
+
+  await client.query(`
+    ALTER TABLE work_order_blocks
+    ALTER COLUMN blocked_at SET DEFAULT (NOW() AT TIME ZONE 'UTC')
   `);
 
   await client.query(`
@@ -68,7 +73,7 @@ export async function markWorkOrderBlocked(user: any, workOrder: any, reason: an
       UPDATE work_order_blocks
       SET active = FALSE,
           unblocked_by = $3,
-          unblocked_at = NOW()
+          unblocked_at = NOW() AT TIME ZONE 'UTC'
       WHERE id_company = $1
         AND workorder_id = $2
         AND active = TRUE
@@ -85,9 +90,10 @@ export async function markWorkOrderBlocked(user: any, workOrder: any, reason: an
         reason_id,
         reason_name,
         blocked_by,
-        blocked_by_role
+        blocked_by_role,
+        blocked_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NOW() AT TIME ZONE 'UTC')
       `,
       [
         String(user.company_id),
@@ -111,7 +117,7 @@ export async function markWorkOrderUnblocked(user: any, workOrderId: number) {
       UPDATE work_order_blocks
       SET active = FALSE,
           unblocked_by = $3,
-          unblocked_at = NOW()
+          unblocked_at = NOW() AT TIME ZONE 'UTC'
       WHERE id_company = $1
         AND workorder_id = $2
         AND active = TRUE
@@ -131,7 +137,13 @@ export async function getActiveWorkOrderBlocks(user: any, workOrderIds: number[]
     const rows = await withPool(async (client) => {
       const response = await client.query(
         `
-        SELECT workorder_id, reason_id, reason_name, blocked_by, blocked_by_role, blocked_at
+        SELECT
+          workorder_id,
+          reason_id,
+          reason_name,
+          blocked_by,
+          blocked_by_role,
+          to_char(blocked_at, 'YYYY-MM-DD HH24:MI:SS') AS blocked_at
         FROM work_order_blocks
         WHERE id_company = $1
           AND workorder_id = ANY($2::int[])
