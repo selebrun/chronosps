@@ -50,18 +50,6 @@ function normalizeElapsedSeconds(value: any, fallback = 0) {
   return Math.max(0, Math.round(Number(fallback) || 0));
 }
 
-function parseDbDate(value: any) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function getSecondsSince(value: any, now = Date.now()) {
-  const date = parseDbDate(value);
-  if (!date) return 0;
-  return Math.max(0, Math.round((now - date.getTime()) / 1000));
-}
-
 function isWorkOrderDone(workOrder: any) {
   return ['done', 'completed', 'cancel'].includes(workOrder?.state);
 }
@@ -98,7 +86,15 @@ export async function saveWorkOrderTimerSnapshot(
         updated_by,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, CASE WHEN $4 THEN COALESCE($6::timestamp, NOW()) ELSE NULL END, $5, NOW())
+      VALUES (
+        $1,
+        $2,
+        $3,
+        $4,
+        CASE WHEN $4 THEN COALESCE($6::timestamp, NOW() AT TIME ZONE 'UTC') ELSE NULL END,
+        $5,
+        NOW()
+      )
       ON CONFLICT (id_company, workorder_id)
       DO UPDATE SET
         -- El reloj pertenece a Piso y es compartido por todas las sesiones.
@@ -107,7 +103,10 @@ export async function saveWorkOrderTimerSnapshot(
           work_order_time_snapshots.elapsed_seconds + CASE
             WHEN work_order_time_snapshots.is_running
               AND work_order_time_snapshots.active_since IS NOT NULL
-            THEN GREATEST(0, ROUND(EXTRACT(EPOCH FROM (NOW() - work_order_time_snapshots.active_since)))::INTEGER)
+            THEN GREATEST(
+              0,
+              ROUND(EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - work_order_time_snapshots.active_since)))::INTEGER
+            )
             ELSE 0
           END,
           EXCLUDED.elapsed_seconds
@@ -118,7 +117,7 @@ export async function saveWorkOrderTimerSnapshot(
             WHEN work_order_time_snapshots.is_running
               AND work_order_time_snapshots.active_since IS NOT NULL
             THEN work_order_time_snapshots.active_since
-            ELSE COALESCE(EXCLUDED.active_since, NOW())
+            ELSE COALESCE(EXCLUDED.active_since, NOW() AT TIME ZONE 'UTC')
           END
           ELSE NULL
         END,
@@ -153,7 +152,19 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
     const rows = await withPool(async (client) => {
       const response = await client.query(
         `
-        SELECT workorder_id, elapsed_seconds, is_running, active_since, updated_at
+        SELECT
+          workorder_id,
+          elapsed_seconds,
+          elapsed_seconds + CASE
+            WHEN is_running AND active_since IS NOT NULL THEN GREATEST(
+              0,
+              ROUND(EXTRACT(EPOCH FROM ((NOW() AT TIME ZONE 'UTC') - active_since)))::INTEGER
+            )
+            ELSE 0
+          END AS current_elapsed_seconds,
+          is_running,
+          active_since,
+          updated_at
         FROM work_order_time_snapshots
         WHERE id_company = $1
           AND workorder_id = ANY($2::int[])
@@ -178,17 +189,17 @@ export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
   const snapshot = (await getWorkOrderTimerSnapshots(user, [id])).get(id);
   if (!snapshot) return { status: false };
 
-  const now = Date.now();
   const isRunning = Boolean(snapshot.is_running);
-  const elapsedSeconds = normalizeElapsedSeconds(snapshot.elapsed_seconds) + (
-    isRunning ? getSecondsSince(snapshot.active_since, now) : 0
+  const elapsedSeconds = normalizeElapsedSeconds(
+    snapshot.current_elapsed_seconds,
+    snapshot.elapsed_seconds
   );
 
   return {
     status: true,
     elapsed_seconds: elapsedSeconds,
     is_running: isRunning,
-    calculated_at: new Date(now).toISOString(),
+    calculated_at: new Date().toISOString(),
   };
 }
 
@@ -205,10 +216,9 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
     if (!snapshot) return workOrder;
 
     const snapshotElapsed = normalizeElapsedSeconds(snapshot.elapsed_seconds);
+    const currentElapsed = normalizeElapsedSeconds(snapshot.current_elapsed_seconds, snapshotElapsed);
     const canRun = Boolean(snapshot.is_running) && isTimerAllowedToRun(workOrder);
-    const realDurationSeconds = canRun
-      ? snapshotElapsed + getSecondsSince(snapshot.active_since, now)
-      : snapshotElapsed;
+    const realDurationSeconds = canRun ? currentElapsed : snapshotElapsed;
     const expectedDurationSource = workOrder?.piso_expected_duration_seconds ?? (Number(workOrder?.duration_expected || 0) * 60);
     const expectedDurationSeconds = Math.max(0, Math.round(Number(expectedDurationSource) || 0));
 
