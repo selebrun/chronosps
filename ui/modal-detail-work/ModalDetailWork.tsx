@@ -98,7 +98,8 @@ export function ModalDetailWork({
   const [disabledBtnAddMaterials, setDisabledBtnAddMaterials] = useState(true);
   const sharedTimerSyncRef = useRef(onSharedTimerSync);
   const isWorkOrderDone = ['done', 'completed', 'cancel'].includes(showDetailOrderWork?.state);
-  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && !isWorkOrderBlocked(showDetailOrderWork) && !isWorkOrderDone);
+  const isBlocked = isWorkOrderBlocked(showDetailOrderWork);
+  const isTimerRunning = Boolean(showDetailOrderWork?.is_user_working && !isBlocked && !isWorkOrderDone);
   const normalizedRealDurationSeconds = Number(showDetailOrderWork?.piso_real_duration_seconds);
   const normalizedExpectedSeconds = Number(showDetailOrderWork?.piso_expected_duration_seconds);
   const baseElapsedSeconds = useMemo(() => {
@@ -149,16 +150,19 @@ export function ModalDetailWork({
       }
       if (!active || !timer?.status) return;
 
-      const sharedElapsedSeconds = Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
       const sharedTimerChanged = Boolean(timer.is_running) !== isTimerRunning;
+      const sharedBlockChanged = Boolean(timer.local_blocked) !== isBlocked;
 
       // El valor visible sale siempre del reloj central de Piso. Ninguna sesion
       // mantiene un contador independiente en memoria.
-      setElapsedSeconds(sharedElapsedSeconds);
+      if (timer.has_timer_snapshot !== false) {
+        const sharedElapsedSeconds = Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
+        setElapsedSeconds(sharedElapsedSeconds);
+      }
 
-      // Solo se propaga al padre un cambio de estado remoto. Antes se hacia en
-      // cada sondeo y eso reiniciaba el contador local cada tres segundos.
-      if (sharedTimerChanged) {
+      // Solo se propagan al padre los cambios remotos de ejecucion o bloqueo.
+      // El sondeo del tiempo no reconstruye el detalle en cada ciclo.
+      if (sharedTimerChanged || sharedBlockChanged) {
         sharedTimerSyncRef.current?.(timer);
       }
     };
@@ -169,7 +173,7 @@ export function ModalDetailWork({
       active = false;
       window.clearInterval(interval);
     };
-  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, user, isTimerRunning]);
+  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, user, isTimerRunning, isBlocked]);
 
   const formatElapsedTime = (totalSeconds: number) => {
     const seconds = Math.max(0, Math.floor(totalSeconds));

@@ -123,12 +123,24 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const syncSharedTimer = (timer: any) => {
     const applyTimer = (order: any) => {
       if (!order?.id || Number(order.id) !== Number(orderSelected?.id)) return order;
-      const canRun = Boolean(timer?.is_running) && !order.local_blocked && !order.quality_failed && !['done', 'completed', 'cancel'].includes(order.state);
+      const isBlocked = Boolean(timer?.local_blocked);
+      const canRun = Boolean(timer?.is_running) && !isBlocked && !order.quality_failed && !['done', 'completed', 'cancel'].includes(order.state);
+      const elapsedSeconds = timer?.has_timer_snapshot === false
+        ? Number(order.piso_real_duration_seconds || Number(order.duration || 0) * 60)
+        : Number(timer.elapsed_seconds || 0);
       return {
         ...order,
-        duration: Number(timer.elapsed_seconds || 0) / 60,
-        piso_real_duration_seconds: Number(timer.elapsed_seconds || 0),
+        duration: elapsedSeconds / 60,
+        piso_real_duration_seconds: elapsedSeconds,
         piso_duration_calculated_at: timer.calculated_at,
+        local_blocked: isBlocked,
+        local_block_reason_id: timer.local_block_reason_id ?? null,
+        local_block_reason_name: timer.local_block_reason_name || '',
+        local_blocked_by: timer.local_blocked_by || '',
+        local_blocked_at: timer.local_blocked_at || null,
+        working_state: isBlocked
+          ? 'blocked'
+          : order.working_state === 'blocked' ? 'paused' : order.working_state,
         is_user_working: canRun,
       };
     };

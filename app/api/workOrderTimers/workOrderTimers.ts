@@ -1,6 +1,7 @@
 'use server'
 
 import { Pool } from 'pg';
+import { getActiveWorkOrderBlocks } from '@/app/api/workOrderBlocks/workOrderBlocks';
 
 const dbConfig = {
   user: process.env.CHRONOS_DB_USER || '',
@@ -186,20 +187,30 @@ export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
   const id = Number(workOrderId);
   if (!id) return { status: false };
 
-  const snapshot = (await getWorkOrderTimerSnapshots(user, [id])).get(id);
-  if (!snapshot) return { status: false };
+  const [snapshots, activeBlocks] = await Promise.all([
+    getWorkOrderTimerSnapshots(user, [id]),
+    getActiveWorkOrderBlocks(user, [id]),
+  ]);
+  const snapshot = snapshots.get(id);
+  const activeBlock = activeBlocks.get(id);
+  if (!snapshot && !activeBlock) return { status: false };
 
-  const isRunning = Boolean(snapshot.is_running);
-  const elapsedSeconds = normalizeElapsedSeconds(
-    snapshot.current_elapsed_seconds,
-    snapshot.elapsed_seconds
-  );
+  const isRunning = Boolean(snapshot?.is_running) && !activeBlock;
+  const elapsedSeconds = snapshot
+    ? normalizeElapsedSeconds(snapshot.current_elapsed_seconds, snapshot.elapsed_seconds)
+    : null;
 
   return {
     status: true,
+    has_timer_snapshot: Boolean(snapshot),
     elapsed_seconds: elapsedSeconds,
     is_running: isRunning,
     calculated_at: new Date().toISOString(),
+    local_blocked: Boolean(activeBlock),
+    local_block_reason_id: activeBlock?.reason_id ?? null,
+    local_block_reason_name: activeBlock?.reason_name || '',
+    local_blocked_by: activeBlock?.blocked_by || '',
+    local_blocked_at: activeBlock?.blocked_at || null,
   };
 }
 
