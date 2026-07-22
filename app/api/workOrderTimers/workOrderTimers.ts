@@ -30,6 +30,31 @@ async function ensureWorkOrderTimersTable(client: any) {
       PRIMARY KEY (id_company, workorder_id)
     )
   `);
+
+  await client.query(`
+    ALTER TABLE work_order_time_snapshots
+      ADD COLUMN IF NOT EXISTS active_since TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS updated_by CHARACTER(40),
+      ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  `);
+
+  await client.query(`
+    UPDATE work_order_time_snapshots
+    SET active_since = NOW() AT TIME ZONE 'UTC',
+        updated_at = NOW()
+    WHERE is_running = TRUE
+      AND (
+        active_since IS NULL
+        OR active_since > (NOW() AT TIME ZONE 'UTC') + INTERVAL '10 seconds'
+      )
+  `);
+
+  await client.query(`
+    UPDATE work_order_time_snapshots
+    SET active_since = NULL
+    WHERE is_running = FALSE
+      AND active_since IS NOT NULL
+  `);
 }
 
 async function withPool<T>(callback: (client: any) => Promise<T>) {
@@ -92,7 +117,14 @@ export async function saveWorkOrderTimerSnapshot(
         $2,
         $3,
         $4,
-        CASE WHEN $4 THEN COALESCE($6::timestamp, NOW() AT TIME ZONE 'UTC') ELSE NULL END,
+        CASE
+          WHEN NOT $4 THEN NULL
+          WHEN $6::timestamp BETWEEN
+            (NOW() AT TIME ZONE 'UTC') - INTERVAL '5 minutes'
+            AND (NOW() AT TIME ZONE 'UTC') + INTERVAL '10 seconds'
+          THEN $6::timestamp
+          ELSE NOW() AT TIME ZONE 'UTC'
+        END,
         $5,
         NOW()
       )
@@ -117,6 +149,7 @@ export async function saveWorkOrderTimerSnapshot(
           WHEN EXCLUDED.is_running THEN CASE
             WHEN work_order_time_snapshots.is_running
               AND work_order_time_snapshots.active_since IS NOT NULL
+              AND work_order_time_snapshots.active_since <= (NOW() AT TIME ZONE 'UTC') + INTERVAL '10 seconds'
             THEN work_order_time_snapshots.active_since
             ELSE COALESCE(EXCLUDED.active_since, NOW() AT TIME ZONE 'UTC')
           END
@@ -211,6 +244,7 @@ export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
     local_block_reason_name: activeBlock?.reason_name || '',
     local_blocked_by: activeBlock?.blocked_by || '',
     local_blocked_at: activeBlock?.blocked_at || null,
+    active_since: snapshot?.active_since || null,
   };
 }
 
