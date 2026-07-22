@@ -42,6 +42,12 @@ function getMany2OneId(value: any) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function getMany2OneName(value: any, fallback = 'N/A') {
+  if (Array.isArray(value)) return value[1] || fallback;
+  if (typeof value === 'string' && value.trim()) return value;
+  return fallback;
+}
+
 function getWorkOrderSequence(order: any) {
   const sequence = Number(order?.workorder_sequence);
   return Number.isFinite(sequence) ? sequence : Number.MAX_SAFE_INTEGER;
@@ -86,13 +92,14 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
+    const qualityChecks = Array.isArray(odooOrders?.data) ? odooOrders.data : [];
+    const productions = Array.isArray(odooOrders?.production_data) ? odooOrders.production_data : [];
     const productionIdsInQuality = new Set(
-      (odooOrders?.data ?? []).map((work: any) => work?.production_id?.[0])
+      qualityChecks.map((work: any) => Number(getMany2OneId(work?.production_id))).filter(Boolean)
     )
 
-    const qualityChecks = odooOrders?.data ?? [];
-    const orders = (odooOrders?.production_data ?? []).filter(
-      (production: any) => productionIdsInQuality.has(production?.id)
+    const orders = productions.filter(
+      (production: any) => productionIdsInQuality.has(Number(production?.id))
     ).sort(sortProductionsByQualityPriority(qualityChecks))
 
     setOrdersQualityControl(orders)
@@ -110,7 +117,8 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   }
 
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = odooOrders?.data
+    const qualityChecks = Array.isArray(odooOrders?.data) ? odooOrders.data : [];
+    const dateilOrden = qualityChecks
       .filter((orden:any) => getMany2OneId(orden.production_id) === order.id)
       .sort(sortQualityControlsAsc)
     setOrderQualityDetail(dateilOrden)
@@ -234,16 +242,16 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
                   <StatusBadge status={order.state} />
                 </td>
                 <td className="px-3 py-2">
-                  {order.product_id[1]}
+                  {getMany2OneName(order.product_id)}
                 </td>
                 <td className="px-3 py-2">
                   {order.qty_producing}/{order.product_qty}
                 </td>
                 <td className="px-3 py-2">
-                  {order.lot_producing_id[1]}
+                  {getMany2OneName(order.lot_producing_id, 'Sin lote')}
                 </td>
                 <td className="px-3 py-2">
-                  {order.user_id[1]}
+                  {getMany2OneName(order.user_id, 'Sin responsable')}
                 </td>
                 <td className="px-3 py-2">
                   {order.date_planned_start}

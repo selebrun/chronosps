@@ -18,7 +18,12 @@ export default async function Page() {
   return (
     <div className="prose prose-sm prose-invert max-w-none">
       <h1 className="mb-4 text-xl font-bold text-gray-900">Controles de calidad</h1>
-      {odooOrders?.production_data?.length ? (
+      {!odooOrders?.status ? (
+        <div className="block rounded-lg border border-red-300 bg-red-50 p-6 text-center text-red-800">
+          <h5 className="mb-2 text-xl font-bold">No se pudo cargar Calidad</h5>
+          <p className="mb-0 font-normal">{odooOrders?.message || 'No se pudieron consultar los controles de calidad.'}</p>
+        </div>
+      ) : odooOrders?.production_data?.length ? (
          <QualityOrdersTable odooOrders={odooOrders} user={user} />
       ) : (
       <div className="text-center block p-6 bg-white border border-gray-200 rounded-lg shadow bg-gray-100">

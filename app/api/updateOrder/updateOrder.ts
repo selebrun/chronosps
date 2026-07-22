@@ -6,6 +6,8 @@ import { getActiveWorkOrderBlocks, isWorkOrderLocallyBlocked, markWorkOrderBlock
 import { saveWorkOrderTimerSnapshot } from '@/app/api/workOrderTimers/workOrderTimers';
 
 const WORK_ORDER_FIELDS = ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'];
+const WORK_ORDER_REQUIRED_FIELDS = WORK_ORDER_FIELDS.filter((field) => field !== 'operation_note');
+const workOrderFieldsByCompany = new Map<string, string[]>();
 
 function getOdooRecord(model: string, domain: any[], fields: string[], companyId: string): Promise<any> {
   return new Promise((resolve) => {
@@ -17,6 +19,29 @@ function callOdooMethod(model: string, method: string, args: any[], companyId: s
   return new Promise((resolve) => {
     executeOdooMethod(model, method, args, companyId, (data: any) => resolve(data), kwargs);
   });
+}
+
+async function getCompatibleWorkOrderFields(companyId: string) {
+  const cacheKey = String(companyId || '').trim();
+  const cachedFields = workOrderFieldsByCompany.get(cacheKey);
+  if (cachedFields) return cachedFields;
+
+  const fieldsResponse = await callOdooMethod(
+    'mrp.workorder',
+    'fields_get',
+    [],
+    companyId,
+    { attributes: ['type'] }
+  );
+  const availableFields = fieldsResponse?.status && fieldsResponse?.data
+    ? new Set(Object.keys(fieldsResponse.data))
+    : null;
+  const compatibleFields = availableFields
+    ? WORK_ORDER_FIELDS.filter((field) => availableFields.has(field))
+    : WORK_ORDER_REQUIRED_FIELDS;
+
+  workOrderFieldsByCompany.set(cacheKey, compatibleFields);
+  return compatibleFields;
 }
 
 function writeOdooData(model: string, ids: any[], values: any, companyId: string): Promise<any> {
@@ -345,10 +370,11 @@ async function getOdooExecutionUserId(user: any) {
 }
 
 async function getFreshWorkOrder(workOrderId: number, companyId: string) {
+  const fields = await getCompatibleWorkOrderFields(companyId);
   const workOrders: any = await getOdooRecord(
     'mrp.workorder',
     [['id', '=', workOrderId]],
-    WORK_ORDER_FIELDS,
+    fields,
     companyId
   );
 
@@ -467,10 +493,11 @@ export async function updateOrder(
   elapsedSeconds?: number
 ): Promise<any> {
   try {
+    const workOrderFields = await getCompatibleWorkOrderFields(user.company_id);
     const workorders: any = await getOdooRecord(
       'mrp.workorder',
       [['id', '=', workorder.id]],
-      WORK_ORDER_FIELDS,
+      workOrderFields,
       user.company_id
     );
     const work_order = workorders?.data?.[0];

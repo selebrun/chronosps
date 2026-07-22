@@ -23,6 +23,12 @@ function getQualityPointName(order: any) {
   return pointName ? `${order.name} - ${pointName}` : order?.name || 'N/A';
 }
 
+function getMany2OneName(value: any, fallback = 'N/A') {
+  if (Array.isArray(value)) return value[1] || fallback;
+  if (typeof value === 'string' && value.trim()) return value;
+  return fallback;
+}
+
 
 export function ModalOrderQuality({ 
   selectedQualityDetails,
@@ -110,7 +116,7 @@ export function ModalOrderQuality({
                         <StatusBadge status={order.quality_state} />
                       </td>
                       <td className="px-3 py-2">
-                        {order.product_id[1]}
+                        {getMany2OneName(order.product_id)}
                       </td>
                       <td className="px-3 py-2">
                         <button

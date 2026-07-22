@@ -51,6 +51,34 @@ function getOdooRecords(
   });
 }
 
+function getOdooResponse(
+  model: string,
+  domain: any[],
+  fields: string[],
+  companyId: string,
+  order: any = false,
+): Promise<any> {
+  return new Promise((resolve) => {
+    getOdooData(
+      model,
+      domain,
+      fields,
+      false,
+      order,
+      companyId,
+      (response: any) => resolve(response),
+      false
+    ).catch((error: any) => resolve({ status: false, message: error }));
+  });
+}
+
+function getOdooErrorMessage(response: any, fallback: string) {
+  const message = response?.message?.faultString
+    || response?.message?.message
+    || response?.message;
+  return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
 // ─── Resolución de usuario Líder ─────────────────────────────────────────────
 
 function getLeaderOdooUserId(user: any) {
@@ -627,60 +655,59 @@ export async function getWorkOrders(user: any) {
 // ─── Control de Calidad ───────────────────────────────────────────────────────
 
 export async function getQualityControl(user: any) {
-  switch(user.role) {
-    case 'Lider':
-    case 'Jefe':
-    case 'Calidad':
-      return new Promise(async (resolve) => {
-        getOdooData(
-          'mrp.production',
-          [['state','in',['confirmed','progress']]],
-          [],
-          false,
-          'name asc',
-          user.company_id,
-          async (productions: any) => {
-            if (!productions || !productions.data) {
-              resolve({ status: true, message: '', data: [], production_data: [] });
-              return;
-            }
+  const role = String(user?.role || '').trim();
+  if (!['Lider', 'Jefe', 'Calidad'].includes(role)) {
+    return { status: false, message: 'Usted no tiene definido un tipo de usuario.', data: [], production_data: [] };
+  }
 
-            const productionOrders = productions.data.map((p: any) => p.id);
-            if (!productionOrders.length) {
-              resolve({ status: true, message: '', data: [], production_data: [] });
-              return;
-            }
+  const productionsResponse = await getOdooResponse(
+    'mrp.production',
+    [['state', 'in', ['confirmed', 'progress']]],
+    [],
+    user.company_id,
+    'name asc'
+  );
+  if (!productionsResponse?.status) {
+    return {
+      status: false,
+      message: getOdooErrorMessage(productionsResponse, 'No se pudieron consultar las ordenes de produccion en Odoo.'),
+      data: [],
+      production_data: [],
+    };
+  }
 
-            getOdooData(
-              'quality.check',
-              [['production_id','in',productionOrders]],
-              [],
-              false,
-              false,
-              user.company_id,
-              async (qualityChecksResponse: any) => {
-                if (!qualityChecksResponse || !qualityChecksResponse.data) {
-                  resolve({ status: true, message: '', data: [], production_data: productions.data });
-                  return;
-                }
+  const productions = Array.isArray(productionsResponse.data) ? productionsResponse.data : [];
+  const productionOrders = productions.map((production: any) => Number(production?.id)).filter(Boolean);
+  if (!productionOrders.length) {
+    return { status: true, message: '', data: [], production_data: [] };
+  }
 
-                const visibleQualityChecks = user.role === 'Calidad'
-                  ? qualityChecksResponse.data.filter((check: any) => !['pass', 'fail'].includes(check.quality_state))
-                  : qualityChecksResponse.data;
-                const qualityChecks = await addWorkOrderSequenceToQualityChecks(visibleQualityChecks, user.company_id);
-                resolve({ status: true, message: '', data: qualityChecks, production_data: productions.data });
-              },
-              false
-            );
-          },
-          false
-        )
-      });
-    default:
-      return new Promise(async (resolve, reject) => {
-        reject({ status: false, message: "Usted no tiene definido un tipo de usuario." });
-      })
+  const qualityChecksResponse = await getOdooResponse(
+    'quality.check',
+    [['production_id', 'in', productionOrders]],
+    [],
+    user.company_id
+  );
+  if (!qualityChecksResponse?.status) {
+    return {
+      status: false,
+      message: getOdooErrorMessage(qualityChecksResponse, 'No se pudieron consultar los controles de calidad en Odoo.'),
+      data: [],
+      production_data: [],
+    };
+  }
 
+  const allQualityChecks = Array.isArray(qualityChecksResponse.data) ? qualityChecksResponse.data : [];
+  const visibleQualityChecks = role === 'Calidad'
+    ? allQualityChecks.filter((check: any) => !['pass', 'fail'].includes(check?.quality_state))
+    : allQualityChecks;
+
+  try {
+    const qualityChecks = await addWorkOrderSequenceToQualityChecks(visibleQualityChecks, user.company_id);
+    return { status: true, message: '', data: qualityChecks, production_data: productions };
+  } catch (error) {
+    console.error('Error enriqueciendo controles de calidad con sus OT:', error);
+    return { status: true, message: '', data: visibleQualityChecks, production_data: productions };
   }
 }
 
@@ -714,30 +741,36 @@ async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], company
 
   if (!workorderIds.length) return qualityChecks;
 
-  return new Promise<any[]>((resolve) => {
-    getOdooData(
-      'mrp.workorder',
-      [['id', 'in', workorderIds]],
-      ['id', 'sequence', 'name'],
-      false,
-      false,
-      companyId,
-      async (workorders: any) => {
-        const workorderById = new Map<number, any>((workorders?.data || []).map((workorder: any) => [workorder.id, workorder]));
-
-        resolve(qualityChecks.map((qualityCheck: any) => {
-          const workorderId = Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[0] : qualityCheck?.workorder_id;
-          const workorder = workorderById.get(workorderId);
-
-          return {
-            ...qualityCheck,
-            workorder_sequence: workorder?.sequence ?? null,
-            workorder_name: workorder?.name || (Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[1] : qualityCheck?.workorder_id),
-          };
-        }));
-      },
-      false
+  const workordersResponse = await getOdooResponse(
+    'mrp.workorder',
+    [['id', 'in', workorderIds]],
+    ['id', 'sequence', 'name'],
+    companyId
+  );
+  if (!workordersResponse?.status) {
+    console.error(
+      'No se pudieron consultar las OT de los controles de calidad:',
+      getOdooErrorMessage(workordersResponse, 'Error desconocido consultando mrp.workorder.')
     );
+    return qualityChecks;
+  }
+
+  const workorders = Array.isArray(workordersResponse.data) ? workordersResponse.data : [];
+  const workorderById = new Map<number, any>(
+    workorders.map((workorder: any) => [Number(workorder.id), workorder])
+  );
+
+  return qualityChecks.map((qualityCheck: any) => {
+    const workorderId = Array.isArray(qualityCheck?.workorder_id)
+      ? qualityCheck.workorder_id[0]
+      : qualityCheck?.workorder_id;
+    const workorder = workorderById.get(Number(workorderId));
+
+    return {
+      ...qualityCheck,
+      workorder_sequence: workorder?.sequence ?? null,
+      workorder_name: workorder?.name || (Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[1] : qualityCheck?.workorder_id),
+    };
   });
 }
 

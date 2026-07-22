@@ -1,12 +1,22 @@
 import { NextResponse } from 'next/server';
 import { navItems } from '@/config/nav-links';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+async function getActiveBuildId() {
+  try {
+    return (await readFile(path.join(process.cwd(), '.next', 'BUILD_ID'), 'utf8')).trim();
+  } catch {
+    return process.env.NEXT_PUBLIC_APP_VERSION || 'development';
+  }
+}
+
 export async function GET() {
-  return NextResponse.json({
-    build: 'nav-sales-notes-2026-06-17',
+  const response = NextResponse.json({
+    build: await getActiveBuildId(),
     generated_at: new Date().toISOString(),
     nav_items: navItems.flatMap((section) =>
       section.items.map((item) => ({
@@ -16,4 +26,6 @@ export async function GET() {
       }))
     ),
   });
+  response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  return response;
 }

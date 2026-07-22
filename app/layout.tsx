@@ -40,6 +40,7 @@ export default async function RootLayout({
             __html: `
           (function () {
             var storageKey = 'chronosps:chunk-reload-at';
+            var buildStorageKey = 'chronosps:build-id';
             var reloadDelayMs = 10000;
 
             function reloadOnce() {
@@ -52,14 +53,14 @@ export default async function RootLayout({
               window.location.reload();
             }
 
-            function isChunkErrorMessage(message) {
-              return /ChunkLoadError|Loading chunk|failed to fetch dynamically imported module/i.test(String(message || ''));
+            function isDeploymentErrorMessage(message) {
+              return /ChunkLoadError|Loading chunk|failed to fetch dynamically imported module|Failed to find Server Action|older or newer deployment/i.test(String(message || ''));
             }
 
             window.addEventListener('error', function (event) {
               var target = event && event.target;
               var src = target && target.src;
-              if ((src && src.indexOf('/_next/static/chunks/') !== -1) || isChunkErrorMessage(event && event.message)) {
+              if ((src && src.indexOf('/_next/static/chunks/') !== -1) || isDeploymentErrorMessage(event && event.message)) {
                 reloadOnce();
               }
             }, true);
@@ -67,10 +68,47 @@ export default async function RootLayout({
             window.addEventListener('unhandledrejection', function (event) {
               var reason = event && event.reason;
               var message = reason && (reason.message || reason.toString && reason.toString());
-              if (isChunkErrorMessage(message)) {
+              if (isDeploymentErrorMessage(message)) {
                 reloadOnce();
               }
             });
+
+            async function checkBuildVersion() {
+              try {
+                var response = await fetch('/api/app-version?ts=' + Date.now(), {
+                  cache: 'no-store',
+                  credentials: 'same-origin'
+                });
+                if (!response.ok) return;
+
+                var data = await response.json();
+                var currentBuild = String(data && data.build || '');
+                if (!currentBuild) return;
+
+                var previousBuild = sessionStorage.getItem(buildStorageKey);
+                if (previousBuild && previousBuild !== currentBuild) {
+                  sessionStorage.setItem(buildStorageKey, currentBuild);
+                  reloadOnce();
+                  return;
+                }
+                sessionStorage.setItem(buildStorageKey, currentBuild);
+              } catch (error) {}
+            }
+
+            function startBuildChecks() {
+              checkBuildVersion();
+              window.setInterval(checkBuildVersion, 15000);
+              window.addEventListener('focus', checkBuildVersion);
+              document.addEventListener('visibilitychange', function () {
+                if (document.visibilityState === 'visible') checkBuildVersion();
+              });
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', startBuildChecks, { once: true });
+            } else {
+              startBuildChecks();
+            }
           })();
         `,
           }}
