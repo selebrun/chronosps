@@ -13,6 +13,20 @@ import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 
+function asArray(value: any) {
+  return Array.isArray(value) ? value : [];
+}
+
+function getOdooId(value: any) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function getOdooName(value: any, fallback = 'N/A') {
+  if (Array.isArray(value)) return value[1] || fallback;
+  if (typeof value === 'string' && value.trim()) return value;
+  return fallback;
+}
+
 function normalizeSearchText(value: any) {
   return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -25,11 +39,11 @@ function productionMatchesSearch(order: any, term: string) {
     order?.name,
     order?.state,
     getStatusLabel(order?.state),
-    order?.product_id?.[1],
+    getOdooName(order?.product_id, ''),
     order?.origin,
     order?.x_studio_po,
-    order?.lot_producing_id?.[1],
-    order?.user_id?.[1],
+    getOdooName(order?.lot_producing_id, ''),
+    getOdooName(order?.user_id, ''),
     order?.date_planned_start,
   ].map(normalizeSearchText).join(' ');
 
@@ -89,7 +103,12 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const getDetailOrderWork = (orderId: string) => {
-    const dateilOrden = workoOrder?.data.find((orden:any) => orden.id === parseInt(orderId))
+    const dateilOrden = asArray(workoOrder?.data).find((orden:any) => Number(orden?.id) === Number(orderId))
+    if (!dateilOrden) {
+      setError('La orden de trabajo seleccionada ya no esta disponible. Actualice el listado e intente nuevamente.')
+      setModalIsOpenJobDetail(false)
+      return
+    }
     let duration_expected = ""
     let duration = ""
     let minutes = dateilOrden?.duration_expected
@@ -115,14 +134,16 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
     if(minutes >= 1) duration += Math.floor(minutes) + "Minutos"
 
-    dateilOrden.theoretical_duration = duration_expected
-    dateilOrden.real_duration = duration
-    setShowDetailOrderWork(dateilOrden)
+    setShowDetailOrderWork({
+      ...dateilOrden,
+      theoretical_duration: duration_expected,
+      real_duration: duration,
+    })
   }
 
   const onSaveOrderId = (order: any) => {
-    const dateilOrden = workoOrder?.data
-      .filter((orden:any) => orden.production_id[0] === parseInt(order.id))
+    const dateilOrden = asArray(workoOrder?.data)
+      .filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(order?.id))
       .sort((a: any, b: any) => {
         const sequenceA = Number(a.sequence ?? a.x_studio_nro_ot ?? 0);
         const sequenceB = Number(b.sequence ?? b.x_studio_nro_ot ?? 0);
@@ -164,7 +185,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
     seOrderWorkSelected((current: any) => applyTimer(current));
     setShowDetailOrderWork((current: any) => applyTimer(current));
-    setOrderWorkDetail((current: any[]) => current.map((order: any) => applyTimer(order)));
+    setOrderWorkDetail((current: any[]) => asArray(current).map((order: any) => applyTimer(order)));
     setOrdersWork((current: any) => current?.data
       ? { ...current, data: current.data.map((order: any) => applyTimer(order)) }
       : current
@@ -208,10 +229,16 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     const update = await updateOrder(user, currentWorkOrder, action, block_reason, qtyDone, elapsedSeconds).then( res => res).catch((err) => console.log(err))
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
-      const dateilOrden = odooOrdersWork?.data.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
+      if (!odooOrdersWork?.status) {
+        setError(odooOrdersWork?.message || 'La accion fue realizada, pero no se pudo actualizar el listado de OT.')
+        setLoadigAction(false)
+        return
+      }
+      const refreshedWorkOrders = asArray(odooOrdersWork?.data)
+      const dateilOrden = refreshedWorkOrders.filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(orderProductionSelected?.id))
 
       let orderWorkSelected1 = currentWorkOrder;
-      const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id)
+      const refreshedOrder = refreshedWorkOrders.find((item: any) => Number(item?.id) === Number(currentWorkOrder?.id))
       if (action === 'finish_work_order') {
         orderWorkSelected1 = refreshedOrder || {...currentWorkOrder, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
       } else {
@@ -227,8 +254,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
       if (action === 'finish_work_order' && isQualityControlError(message)) {
         const odooOrdersWork: any = await getWorkOrders(user).then(res => res).catch((err) => console.log(err))
-        const dateilOrden = odooOrdersWork?.data?.filter((orden:any) => orden.production_id[0] === parseInt(orderProductionSelected.id))
-        const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === currentWorkOrder.id)
+        const refreshedWorkOrders = asArray(odooOrdersWork?.data)
+        const dateilOrden = refreshedWorkOrders.filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(orderProductionSelected?.id))
+        const refreshedOrder = refreshedWorkOrders.find((item: any) => Number(item?.id) === Number(currentWorkOrder?.id))
         if (refreshedOrder) {
           seOrderWorkSelected(refreshedOrder)
           setShowDetailOrderWork(refreshedOrder)
@@ -257,6 +285,10 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const onAddMaterial = async (material: any, total: number) => { 
     const objeto = { material: material }; 
     const materialSelected = materials.find((material: any) => material.id === parseInt(objeto.material))
+    if (!materialSelected) {
+      setError('No se encontro el material seleccionado.')
+      return
+    }
     materialSelected.additional_quantity = Number(total)
     setOrderMaterialsSelected(materialSelected)
     setDisabledBtnSaveMaterial(false)
@@ -266,18 +298,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     setLoadigSaveMaterials(true)
     try {
       const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
+      const productId = Number(getOdooId(orderMaterialsSelected?.product_id));
+      const uomId = Number(getOdooId(orderMaterialsSelected?.product_uom));
+      const locationId = Number(getOdooId(orderMaterialsSelected?.location_id));
+      const locationDestId = Number(getOdooId(orderMaterialsSelected?.location_dest_id));
+      const companyId = Number(getOdooId(orderMaterialsSelected?.company_id));
+      if (!currentWorkOrder?.id || !orderProductionSelected?.id || !productId || !uomId || !locationId || !locationDestId || !companyId) {
+        throw new Error('El material seleccionado no tiene todos los datos requeridos por Odoo.');
+      }
       const data = await saveMaterialsOrder(
         user,
         currentWorkOrder.id,
         orderProductionSelected.id,
-        orderMaterialsSelected.product_id[0],
-        orderMaterialsSelected.product_uom[0],
+        productId,
+        uomId,
         orderMaterialsSelected.additional_quantity,
-        orderMaterialsSelected.location_id[0],
-        orderMaterialsSelected.location_dest_id[0],
-        orderMaterialsSelected.company_id[0],
-        orderMaterialsSelected.product_id[1],
-        orderMaterialsSelected.operation_id?.[0]
+        locationId,
+        locationDestId,
+        companyId,
+        getOdooName(orderMaterialsSelected.product_id, ''),
+        getOdooId(orderMaterialsSelected.operation_id)
       )
 
       if (data?.status) {
@@ -296,9 +336,9 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
   const progress = getWorkOrderProgress(showDetailOrderWork);
   const productionIdsWithWorkOrders = new Set(
-    (workoOrder?.data || []).map((workOrder: any) => Number(workOrder?.production_id?.[0])).filter(Boolean)
+    asArray(workoOrder?.data).map((workOrder: any) => Number(getOdooId(workOrder?.production_id))).filter(Boolean)
   );
-  const productionOrders = [...(odooOrders?.data || [])].sort((a: any, b: any) => {
+  const productionOrders = [...asArray(odooOrders?.data)].sort((a: any, b: any) => {
     const nameOrder = String(a.name || '').localeCompare(String(b.name || ''), 'es', { numeric: true });
     if (nameOrder !== 0) return nameOrder;
     const dateA = String(a.date_planned_start || '');
@@ -427,22 +467,22 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                   <StatusBadge status={order.state} />
                 </td>
                 <td className="px-3 py-2">
-                  {order.product_id[1]}
+                  {getOdooName(order.product_id, 'Sin producto')}
                 </td>
                 <td className="px-3 py-2">
-                 {order?.x_studio_po || order?.origin }
+                 {order?.x_studio_po || order?.origin || 'Sin origen'}
                 </td>
                 <td className="px-3 py-2">
                   {order.qty_producing}/{order.product_qty}
                 </td>
                 <td className="px-3 py-2">
-                  {order.lot_producing_id[1]}
+                  {getOdooName(order.lot_producing_id, 'Sin lote')}
                 </td>
                 <td className="px-3 py-2">
-                  {order.user_id[1]}
+                  {getOdooName(order.user_id, 'Sin responsable')}
                 </td>
                 <td className="px-3 py-2">
-                  {order.date_planned_start}
+                  {order.date_planned_start || 'Sin fecha'}
                 </td>
                 <td className="px-3 py-2">
                   <button onClick={() => { 

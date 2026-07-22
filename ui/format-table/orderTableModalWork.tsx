@@ -13,6 +13,12 @@ function getWorkOrderNumber(order: any) {
   return order?.sequence ?? order?.x_studio_nro_ot ?? order?.id ?? '';
 }
 
+function getOdooName(value: any, fallback = 'N/A') {
+  if (Array.isArray(value)) return value[1] || fallback;
+  if (typeof value === 'string' && value.trim()) return value;
+  return fallback;
+}
+
 export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct, openJobDetail }: {
     orderDetail: any,
     thOrder: string,
@@ -50,7 +56,7 @@ export const OrderTableModalWork = ({ orderDetail, thOrder, thStatus, thProduct,
               <StatusBadge status={getWorkOrderDisplayStatus(order)} />
             </td>
             <td className="px-3 py-2">
-              {order?.workcenter_id[1]}
+              {getOdooName(order?.workcenter_id, 'Sin centro de trabajo')}
             </td>
             <td className="py-2">
               <button onClick={() => openJobDetail(order)}>

@@ -4,10 +4,15 @@ import { Modal } from "@/ui/modal/modal"
 import Image from 'next/image'
 import close from '@/public/close.png'
 import { StatusBadge } from '@/ui/status-badge/status-badge'
-import { getSharedWorkOrderTimer } from '@/app/api/workOrderTimers/workOrderTimers'
 
 function isWorkOrderBlocked(workOrder: any) {
   return Boolean(workOrder?.local_blocked || workOrder?.working_state === 'blocked');
+}
+
+function getOdooName(value: any, fallback = 'N/A') {
+  if (Array.isArray(value)) return value[1] || fallback;
+  if (typeof value === 'string' && value.trim()) return value;
+  return fallback;
 }
 
 function isRole(user: any, role: string) {
@@ -141,7 +146,18 @@ export function ModalDetailWork({
       requestInFlight = true;
       let timer: any;
       try {
-        timer = await getSharedWorkOrderTimer(user, workOrderId);
+        const response = await fetch(`/api/work-order-timers/${workOrderId}`, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
+        if (response.status === 401) {
+          window.location.assign('/login');
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(`Error HTTP ${response.status} consultando el reloj compartido.`);
+        }
+        timer = await response.json();
       } catch (error) {
         console.error('No se pudo actualizar el reloj compartido de la OT:', error);
         return;
@@ -173,7 +189,7 @@ export function ModalDetailWork({
       active = false;
       window.clearInterval(interval);
     };
-  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, user, isTimerRunning, isBlocked]);
+  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, isTimerRunning, isBlocked]);
 
   const formatElapsedTime = (totalSeconds: number) => {
     const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -400,7 +416,7 @@ export function ModalDetailWork({
                     </div>
                     <div className=''>
                         <div className='font-bold text-center dark:text-gray-100'>Centro de trabajo</div>
-                        <div className='bg-whiteInput dark:bg-gray-700 dark:text-gray-100 shadow-md p-2 rounded-md text-center'>{showDetailOrderWork?.workcenter_id[1]}</div>
+                        <div className='bg-whiteInput dark:bg-gray-700 dark:text-gray-100 shadow-md p-2 rounded-md text-center'>{getOdooName(showDetailOrderWork?.workcenter_id, 'Sin centro de trabajo')}</div>
                     </div>
                     <div className=''>
                         <div className='font-bold text-center dark:text-gray-100'>Cantidad</div>
@@ -571,11 +587,11 @@ export function ModalDetailWork({
                 {materials?.map((material: any) => (
                   <tr key={`production-order-${material.id}`} className="border-b-8 border-white dark:border-gray-700 bg-lightCyan dark:bg-gray-600 text-black dark:text-gray-100">
                       <td className="px-3 py-2">
-                        {material?.product_id[1]}
+                        {getOdooName(material?.product_id, 'Sin producto')}
                       </td>
                       <td className="px-3 py-2">{ Math.floor(material?.product_uom_qty || 0)}</td>
-                      <td className="px-3 py-2">{material?.product_uom[1]}</td>
-                      <td className="px-3 py-2">{material?.location_id[1]}</td>
+                      <td className="px-3 py-2">{getOdooName(material?.product_uom, 'Sin unidad')}</td>
+                      <td className="px-3 py-2">{getOdooName(material?.location_id, 'Sin ubicacion')}</td>
                       
                   </tr>
                   ))}
@@ -622,7 +638,7 @@ export function ModalDetailWork({
           value={''}
           >{'Seleccione producto'}</option>
             {materials?.map((material: any) =>
-              <option value={material.id} key={material.id}>{material?.product_id[1]}</option>
+              <option value={material.id} key={material.id}>{getOdooName(material?.product_id, 'Sin producto')}</option>
             )}
           </select>
           <div>
