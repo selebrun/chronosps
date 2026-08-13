@@ -222,6 +222,7 @@ const OPERATION_INSTRUCTION_FIELDS = [
   'id',
   'note',
   'operation_note',
+  'quality_point_ids',
   'worksheet',
   'worksheet_type',
   'worksheet_google_slide',
@@ -279,6 +280,9 @@ async function addOperationInstructionsToWorkOrders(user: any, workOrders: any[]
       operation_note: normalizeText(workOrder?.operation_note)
         || normalizeText(operation?.operation_note)
         || normalizeText(operation?.note),
+      quality_point_ids: Array.isArray(workOrder?.quality_point_ids) && workOrder.quality_point_ids.length
+        ? workOrder.quality_point_ids
+        : operation?.quality_point_ids || [],
       worksheet: workOrder?.worksheet || operation?.worksheet || false,
       worksheet_type: workOrder?.worksheet_type || operation?.worksheet_type || false,
       worksheet_google_slide: workOrder?.worksheet_google_slide || operation?.worksheet_google_slide || false,
@@ -310,6 +314,9 @@ const QUALITY_POINT_INSTRUCTION_FIELDS = [
   'note',
   'test_type',
   'test_type_id',
+  'workorder_operation_ids',
+  'workorder_operation_id',
+  'operation_id',
   'worksheet',
   'worksheet_type',
   'worksheet_google_slide',
@@ -317,6 +324,7 @@ const QUALITY_POINT_INSTRUCTION_FIELDS = [
   'worksheet_url',
 ];
 const qualityInstructionFieldsByModel = new Map<string, string[]>();
+const qualityInstructionDefinitionsByModel = new Map<string, Record<string, any>>();
 
 async function getCompatibleQualityInstructionFields(
   model: 'quality.check' | 'quality.point',
@@ -345,6 +353,9 @@ async function getCompatibleQualityInstructionFields(
     : fallbackFields;
 
   qualityInstructionFieldsByModel.set(cacheKey, compatibleFields);
+  qualityInstructionDefinitionsByModel.set(cacheKey, fieldsResponse?.status && fieldsResponse?.data
+    ? fieldsResponse.data
+    : {});
   return compatibleFields;
 }
 
@@ -380,36 +391,87 @@ function getInstructionDocument(source: any, field: string) {
   return value === undefined || value === null || value === false ? false : value;
 }
 
+function asOdooIds(value: any) {
+  if (!Array.isArray(value)) return Number(value) ? [Number(value)] : [];
+  if (value.length === 2 && Number(value[0]) && typeof value[1] === 'string') {
+    return [Number(value[0])];
+  }
+  return value.map(Number).filter(Boolean);
+}
+
+function buildQualityInstruction(qualityCheck: any, qualityPoint: any) {
+  return {
+    note: normalizeText(qualityCheck?.note) || normalizeText(qualityPoint?.note),
+    worksheet: getInstructionDocument(qualityCheck, 'worksheet') || getInstructionDocument(qualityPoint, 'worksheet'),
+    worksheet_type: getInstructionDocument(qualityCheck, 'worksheet_type') || getInstructionDocument(qualityPoint, 'worksheet_type'),
+    worksheet_google_slide: getInstructionDocument(qualityCheck, 'worksheet_google_slide') || getInstructionDocument(qualityPoint, 'worksheet_google_slide'),
+    worksheet_document: getInstructionDocument(qualityCheck, 'worksheet_document') || getInstructionDocument(qualityPoint, 'worksheet_document'),
+    worksheet_url: getInstructionDocument(qualityCheck, 'worksheet_url') || getInstructionDocument(qualityPoint, 'worksheet_url'),
+  };
+}
+
 async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) {
   const workOrderIds = (workOrders || []).map((workOrder: any) => Number(workOrder?.id)).filter(Boolean);
   if (!workOrderIds.length) return workOrders || [];
 
-  const qualityCheckFields = await getCompatibleQualityInstructionFields(
-    'quality.check',
-    user.company_id,
-    QUALITY_CHECK_INSTRUCTION_FIELDS
-  );
-  const qualityChecks = await getOdooRecords(
-    'quality.check',
-    [['workorder_id', 'in', workOrderIds]],
-    qualityCheckFields,
-    user.company_id,
-    'id asc'
-  );
-  if (!qualityChecks.length) return workOrders || [];
-
-  const qualityPointIds = Array.from(new Set<number>(
-    qualityChecks.map((qualityCheck: any) => Number(asOdooId(qualityCheck?.point_id))).filter(Boolean)
+  const operationIds = Array.from(new Set<number>(
+    (workOrders || [])
+      .map((workOrder: any) => Number(asOdooId(workOrder?.operation_id)))
+      .filter(Boolean)
   ));
-  const qualityPointFields = await getCompatibleQualityInstructionFields(
-    'quality.point',
-    user.company_id,
-    QUALITY_POINT_INSTRUCTION_FIELDS
-  );
-  const qualityPoints = qualityPointIds.length
+
+  const [qualityCheckFields, qualityPointFields] = await Promise.all([
+    getCompatibleQualityInstructionFields(
+      'quality.check',
+      user.company_id,
+      QUALITY_CHECK_INSTRUCTION_FIELDS
+    ),
+    getCompatibleQualityInstructionFields(
+      'quality.point',
+      user.company_id,
+      QUALITY_POINT_INSTRUCTION_FIELDS
+    ),
+  ]);
+  const qualityChecks = qualityCheckFields.includes('workorder_id')
+    ? await getOdooRecords(
+      'quality.check',
+      [['workorder_id', 'in', workOrderIds]],
+      qualityCheckFields,
+      user.company_id,
+      'id asc'
+    )
+    : [];
+
+  const qualityPointIds = Array.from(new Set<number>([
+    ...qualityChecks.map((qualityCheck: any) => Number(asOdooId(qualityCheck?.point_id))).filter(Boolean),
+    ...(workOrders || []).flatMap((workOrder: any) => asOdooIds(workOrder?.quality_point_ids)),
+  ]));
+  const qualityPointDefinitions = qualityInstructionDefinitionsByModel.get(
+    `${String(user.company_id || '').trim()}:quality.point`
+  ) || {};
+  const operationRelationField = [
+    'workorder_operation_ids',
+    'workorder_operation_id',
+    'operation_id',
+  ].find((field) => (
+    qualityPointFields.includes(field)
+    && (
+      qualityPointDefinitions[field]?.relation === 'mrp.routing.workcenter'
+      || field.startsWith('workorder_operation')
+    )
+  ));
+  const qualityPointConditions: any[] = [];
+  if (qualityPointIds.length) qualityPointConditions.push(['id', 'in', qualityPointIds]);
+  if (operationRelationField && operationIds.length) {
+    qualityPointConditions.push([operationRelationField, 'in', operationIds]);
+  }
+  const qualityPointDomain = qualityPointConditions.length > 1
+    ? ['|', ...qualityPointConditions]
+    : qualityPointConditions;
+  const qualityPoints = qualityPointDomain.length
     ? await getOdooRecords(
       'quality.point',
-      [['id', 'in', qualityPointIds]],
+      qualityPointDomain,
       qualityPointFields,
       user.company_id
     )
@@ -418,26 +480,68 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
     qualityPoints.map((qualityPoint: any) => [Number(qualityPoint.id), qualityPoint])
   );
   const instructionsByWorkOrder = new Map<number, any[]>();
+  const workOrderIdsByOperation = new Map<number, number[]>();
+  const workOrderIdsByQualityPoint = new Map<number, number[]>();
+
+  (workOrders || []).forEach((workOrder: any) => {
+    const operationId = Number(asOdooId(workOrder?.operation_id));
+    const workOrderId = Number(workOrder?.id);
+    if (!workOrderId) return;
+
+    asOdooIds(workOrder?.quality_point_ids).forEach((qualityPointId) => {
+      const pointWorkOrderIds = workOrderIdsByQualityPoint.get(qualityPointId) || [];
+      pointWorkOrderIds.push(workOrderId);
+      workOrderIdsByQualityPoint.set(qualityPointId, pointWorkOrderIds);
+    });
+
+    if (!operationId) return;
+    const ids = workOrderIdsByOperation.get(operationId) || [];
+    ids.push(workOrderId);
+    workOrderIdsByOperation.set(operationId, ids);
+  });
+
+  const appendInstruction = (workOrderId: number, instruction: any) => {
+    if (!workOrderId || (!instruction.note && !instruction.worksheet && !instruction.worksheet_google_slide && !instruction.worksheet_url)) return;
+    const instructions = instructionsByWorkOrder.get(workOrderId) || [];
+    instructions.push(instruction);
+    instructionsByWorkOrder.set(workOrderId, instructions);
+  };
 
   qualityChecks.forEach((qualityCheck: any) => {
     const workOrderId = Number(asOdooId(qualityCheck?.workorder_id));
     const qualityPoint = qualityPointById.get(Number(asOdooId(qualityCheck?.point_id)));
     if (!workOrderId || !isInstructionQualityCheck(qualityCheck, qualityPoint)) return;
-
-    const instruction = {
-      note: normalizeText(qualityCheck?.note) || normalizeText(qualityPoint?.note),
-      worksheet: getInstructionDocument(qualityCheck, 'worksheet') || getInstructionDocument(qualityPoint, 'worksheet'),
-      worksheet_type: getInstructionDocument(qualityCheck, 'worksheet_type') || getInstructionDocument(qualityPoint, 'worksheet_type'),
-      worksheet_google_slide: getInstructionDocument(qualityCheck, 'worksheet_google_slide') || getInstructionDocument(qualityPoint, 'worksheet_google_slide'),
-      worksheet_document: getInstructionDocument(qualityCheck, 'worksheet_document') || getInstructionDocument(qualityPoint, 'worksheet_document'),
-      worksheet_url: getInstructionDocument(qualityCheck, 'worksheet_url') || getInstructionDocument(qualityPoint, 'worksheet_url'),
-    };
-    if (!instruction.note && !instruction.worksheet && !instruction.worksheet_google_slide && !instruction.worksheet_url) return;
-
-    const instructions = instructionsByWorkOrder.get(workOrderId) || [];
-    instructions.push(instruction);
-    instructionsByWorkOrder.set(workOrderId, instructions);
+    appendInstruction(workOrderId, buildQualityInstruction(qualityCheck, qualityPoint));
   });
+
+  qualityPoints.forEach((qualityPoint: any) => {
+    if (!isInstructionQualityCheck(null, qualityPoint)) return;
+    const instruction = buildQualityInstruction(null, qualityPoint);
+
+    (workOrderIdsByQualityPoint.get(Number(qualityPoint?.id)) || []).forEach((workOrderId) => {
+      appendInstruction(workOrderId, instruction);
+    });
+
+    if (operationRelationField) {
+      asOdooIds(qualityPoint?.[operationRelationField]).forEach((operationId) => {
+        (workOrderIdsByOperation.get(operationId) || []).forEach((workOrderId) => {
+          appendInstruction(workOrderId, instruction);
+        });
+      });
+    }
+  });
+
+  if (!instructionsByWorkOrder.size) {
+    console.log('Consulta instrucciones OT Odoo 19', {
+      workorder_count: workOrderIds.length,
+      operation_count: operationIds.length,
+      quality_check_count: qualityChecks.length,
+      quality_point_count: qualityPoints.length,
+      operation_relation_field: operationRelationField || null,
+      quality_check_fields: qualityCheckFields,
+      quality_point_fields: qualityPointFields,
+    });
+  }
 
   return (workOrders || []).map((workOrder: any) => {
     const instructions = instructionsByWorkOrder.get(Number(workOrder?.id)) || [];
@@ -668,11 +772,11 @@ async function enrichWorkOrders(user: any, workOrders: any[]) {
   if (!workOrders.length) return workOrders;
 
   const workOrderIds = workOrders.map((wo: any) => wo.id).filter(Boolean);
-  const [blocksMap, withOperationInstructions, withQualityInstructions] = await Promise.all([
+  const [blocksMap, withOperationInstructions] = await Promise.all([
     getActiveWorkOrderBlocks(user, workOrderIds),
     addOperationInstructionsToWorkOrders(user, workOrders),
-    addQualityInstructionsToWorkOrders(user, workOrders),
   ]);
+  const withQualityInstructions = await addQualityInstructionsToWorkOrders(user, withOperationInstructions);
   const qualityInstructionsById = new Map<number, any>(
     withQualityInstructions.map((workOrder: any) => [Number(workOrder.id), workOrder])
   );
