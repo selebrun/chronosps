@@ -239,9 +239,9 @@ async function getCompatibleOperationInstructionFields(companyId: string) {
   const fieldsResponse = await callOdooMethod(
     'mrp.routing.workcenter',
     'fields_get',
-    [],
+    [OPERATION_INSTRUCTION_FIELDS],
     companyId,
-    { attributes: ['type'] }
+    { attributes: ['type', 'relation'] }
   );
   const availableFields = fieldsResponse?.status && fieldsResponse?.data
     ? new Set(Object.keys(fieldsResponse.data))
@@ -275,14 +275,19 @@ async function addOperationInstructionsToWorkOrders(user: any, workOrders: any[]
     const operation = operationById.get(Number(asOdooId(workOrder?.operation_id)));
     if (!operation) return workOrder;
 
+    // Odoo 19 may instantiate only quality controls on the work order while
+    // keeping operator instructions exclusively on the master operation.
+    const qualityPointIds = Array.from(new Set<number>([
+      ...asOdooIds(workOrder?.quality_point_ids),
+      ...asOdooIds(operation?.quality_point_ids),
+    ]));
+
     return {
       ...workOrder,
       operation_note: normalizeText(workOrder?.operation_note)
         || normalizeText(operation?.operation_note)
         || normalizeText(operation?.note),
-      quality_point_ids: Array.isArray(workOrder?.quality_point_ids) && workOrder.quality_point_ids.length
-        ? workOrder.quality_point_ids
-        : operation?.quality_point_ids || [],
+      quality_point_ids: qualityPointIds,
       worksheet: workOrder?.worksheet || operation?.worksheet || false,
       worksheet_type: workOrder?.worksheet_type || operation?.worksheet_type || false,
       worksheet_google_slide: workOrder?.worksheet_google_slide || operation?.worksheet_google_slide || false,
@@ -295,6 +300,7 @@ async function addOperationInstructionsToWorkOrders(user: any, workOrders: any[]
 const QUALITY_CHECK_INSTRUCTION_FIELDS = [
   'id',
   'name',
+  'display_name',
   'title',
   'note',
   'workorder_id',
@@ -310,10 +316,13 @@ const QUALITY_CHECK_INSTRUCTION_FIELDS = [
 const QUALITY_POINT_INSTRUCTION_FIELDS = [
   'id',
   'name',
+  'display_name',
   'title',
   'note',
   'test_type',
   'test_type_id',
+  'sequence',
+  'is_workorder_step',
   'workorder_operation_ids',
   'workorder_operation_id',
   'operation_ids',
@@ -393,16 +402,17 @@ function isInstructionQualityCheck(
   ].map(normalizeInstructionDescriptor).filter(Boolean);
   if (typeDescriptors.some(isInstructionDescriptor)) return true;
 
-  const nameMatches = [qualityCheck?.name, qualityCheck?.title, qualityPoint?.name, qualityPoint?.title]
+  const nameMatches = [
+    qualityCheck?.name,
+    qualityCheck?.display_name,
+    qualityCheck?.title,
+    qualityPoint?.name,
+    qualityPoint?.display_name,
+    qualityPoint?.title,
+  ]
     .map(normalizeInstructionDescriptor)
     .some(isInstructionDescriptor);
   if (nameMatches) return true;
-
-  // A note on a check/point explicitly linked to the OT is an instruction for
-  // the operator, even when the control itself is pass/fail or a measurement.
-  if (allowNoteFallback && (normalizeText(qualityCheck?.note) || normalizeText(qualityPoint?.note))) {
-    return true;
-  }
 
   const hasReadableNonInstructionType = typeDescriptors.some((descriptor) => !/^\d+$/.test(descriptor));
   if (hasReadableNonInstructionType) return false;
@@ -511,7 +521,8 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
       'quality.point',
       qualityPointDomain,
       qualityPointFields,
-      user.company_id
+      user.company_id,
+      qualityPointFields.includes('sequence') ? 'sequence asc, id asc' : 'id asc'
     )
     : [];
   const qualityPointById = new Map<number, any>(
