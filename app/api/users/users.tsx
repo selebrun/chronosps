@@ -219,12 +219,20 @@ export async function getUserByCompanyAndCode(companyId: string, code: string) {
   }
 }
 
-export async function getUsersByID(id: string) {
+export async function getUsersByID(id: string, companyId?: string) {
   const client = new Client(dbConfig);
 
   try {
     await client.connect();
-    const res = await client.query('SELECT * FROM "users" WHERE code = $1', [id]);
+    const res = companyId
+      ? await client.query(
+          `SELECT * FROM users
+           WHERE TRIM(code) = TRIM($1)
+             AND TRIM(id_company) = TRIM($2)
+           LIMIT 1`,
+          [id, companyId]
+        )
+      : await client.query('SELECT * FROM "users" WHERE code = $1 LIMIT 1', [id]);
 
     if (!res.rows[0]) throw new Error(`User with code ${id} not found`);
     return res.rows[0];
