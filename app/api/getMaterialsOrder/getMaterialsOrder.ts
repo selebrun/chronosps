@@ -161,10 +161,22 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any, workorder?
 
   const freshWorkOrder = workOrderResponse?.data?.[0] || workorder || {};
   const workOrderMoveIds = getOdooIds(freshWorkOrder?.move_raw_ids);
-  const productionMoveIds = getOdooIds(move_raw_ids);
-  const candidateMoveIds = Array.from(new Set([...workOrderMoveIds, ...productionMoveIds]));
   const workOrderOperationId = Number(getMany2OneId(freshWorkOrder?.operation_id || workorder?.operation_id)) || 0;
   const productionId = Number(getMany2OneId(freshWorkOrder?.production_id || workorder?.production_id)) || 0;
+  const productionResponse = productionId
+    ? await getOdooResponse(
+      'mrp.production',
+      [['id', '=', productionId]],
+      ['id', 'move_raw_ids'],
+      companyId,
+      1
+    )
+    : null;
+  const productionMoveIds = Array.from(new Set([
+    ...getOdooIds(move_raw_ids),
+    ...getOdooIds(productionResponse?.data?.[0]?.move_raw_ids),
+  ]));
+  const candidateMoveIds = Array.from(new Set([...workOrderMoveIds, ...productionMoveIds]));
 
   const conditions: any[][] = [];
   if (candidateMoveIds.length) conditions.push(['id', 'in', candidateMoveIds]);
@@ -204,11 +216,21 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any, workorder?
     ? moves.filter((move: any) => Number(getMany2OneId(move?.operation_id)) === workOrderOperationId)
     : [];
 
-  let selectedMoves = workOrderProducts.length ? workOrderProducts : operationProducts;
-  const workOrderHasRawMoveField = Array.isArray(freshWorkOrder?.move_raw_ids);
-  if (!selectedMoves.length && !workOrderOperationId && !workOrderHasRawMoveField) {
-    selectedMoves = moves;
-  }
+  const productionProducts = productionId
+    ? moves.filter((move: any) => Number(getMany2OneId(move?.raw_material_production_id)) === productionId)
+    : moves;
+  const selectedMoves = workOrderProducts.length
+    ? workOrderProducts
+    : operationProducts.length
+      ? operationProducts
+      : productionProducts.length
+        ? productionProducts
+        : moves;
+  const selectionScope = workOrderProducts.length
+    ? 'workorder'
+    : operationProducts.length
+      ? 'operation'
+      : 'production';
 
   console.log('Consulta materiales OT', {
     workorder_id: workOrderId,
@@ -217,12 +239,16 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any, workorder?
     workorder_move_count: workOrderMoveIds.length,
     production_move_count: productionMoveIds.length,
     selected_move_count: selectedMoves.length,
+    selection_scope: selectionScope,
   });
 
   return {
     status: true,
-    message: selectedMoves.length ? '' : 'No hay componentes vinculados directamente a esta orden de trabajo.',
+    message: '',
     data: selectedMoves.map(normalizeMaterialMove),
+    notice: selectedMoves.length && selectionScope === 'production'
+      ? 'Esta OT no tiene componentes asignados directamente. Se muestran los materiales de la orden de produccion.'
+      : '',
   };
 }
 

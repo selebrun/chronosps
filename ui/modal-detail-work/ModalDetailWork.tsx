@@ -37,6 +37,7 @@ export function ModalDetailWork({
   progress, 
   setModalIsOpenJobDetail,
   modalIsOpenInstructions, 
+  instructionsLoading,
   openModalInstructions,
   executeWorkOrderAction,
   loadigAction,
@@ -51,6 +52,7 @@ export function ModalDetailWork({
   materials,
   materialsLoading,
   materialsError,
+  materialsNotice,
   setModalIsAddMaterials,
   modalIsAddMaterials,
   onAddMaterial,
@@ -71,7 +73,8 @@ export function ModalDetailWork({
   progress?: number
   setModalIsOpenJobDetail: any
   modalIsOpenInstructions: boolean
-  openModalInstructions: () => void
+  instructionsLoading: boolean
+  openModalInstructions: () => void | Promise<void>
   executeWorkOrderAction: (action:string, block_reason?: any | undefined, qtyDone?: number | undefined, elapsedSeconds?: number | undefined ) => void
   loadigAction: boolean
   modalIsOpenBlocks: boolean 
@@ -85,6 +88,7 @@ export function ModalDetailWork({
   materials: any
   materialsLoading: boolean
   materialsError: string
+  materialsNotice: string
   setModalIsAddMaterials: any
   modalIsAddMaterials: boolean
   onAddMaterial: (material:any, total: number) => void
@@ -405,13 +409,15 @@ export function ModalDetailWork({
             />
           </button>
         </div>
-        {instructionNote &&
+        {instructionsLoading &&
+        <div className="py-8 text-center font-medium">Consultando instrucciones en Odoo...</div>}
+        {!instructionsLoading && instructionNote &&
         <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: instructionNote }} />}
-        {!hasInstructions &&
+        {!instructionsLoading && !hasInstructions &&
         <div className="font-bold text-center" >No posee instrucciones</div>}
-        {showDetailOrderWork?.worksheet && 
+        {!instructionsLoading && showDetailOrderWork?.worksheet &&
         <div ><iframe width={'100%'} height="600px"  src={`data:application/pdf;base64,${showDetailOrderWork?.worksheet}`} ></iframe></div>}
-        {instructionUrl &&
+        {!instructionsLoading && instructionUrl &&
         <div className="mt-4">
           <a className="font-bold text-blue-700 underline" href={instructionUrl} target="_blank" rel="noreferrer">Abrir documento de instrucciones</a>
         </div>}
@@ -614,6 +620,10 @@ export function ModalDetailWork({
           <div className="mb-5 rounded-md border border-red-400 bg-red-50 p-4 text-center text-red-800">
             <div className="mb-3 font-medium">{materialsError}</div>
             <button type="button" onClick={() => getMaterials()} className="rounded-md bg-[#1D4C92] px-4 py-2 font-bold text-white">Reintentar</button>
+          </div>}
+        {!materialsLoading && !materialsError && materialsNotice &&
+          <div className="mb-5 rounded-md border border-blue-300 bg-blue-50 p-4 text-center text-blue-900">
+            {materialsNotice}
           </div>}
         {!materialsLoading && !materialsError && materials.length === 0 &&
           <div className="mb-5 rounded-md bg-gray-100 p-4 text-center font-medium text-gray-700">

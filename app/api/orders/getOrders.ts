@@ -316,6 +316,7 @@ const QUALITY_POINT_INSTRUCTION_FIELDS = [
   'test_type_id',
   'workorder_operation_ids',
   'workorder_operation_id',
+  'operation_ids',
   'operation_id',
   'worksheet',
   'worksheet_type',
@@ -341,7 +342,7 @@ async function getCompatibleQualityInstructionFields(
     'fields_get',
     [],
     companyId,
-    { attributes: ['type'] }
+    { attributes: ['type', 'relation', 'string'] }
   );
   const availableFields = fieldsResponse?.status && fieldsResponse?.data
     ? new Set(Object.keys(fieldsResponse.data))
@@ -396,6 +397,12 @@ function isInstructionQualityCheck(
     .map(normalizeInstructionDescriptor)
     .some(isInstructionDescriptor);
   if (nameMatches) return true;
+
+  // A note on a check/point explicitly linked to the OT is an instruction for
+  // the operator, even when the control itself is pass/fail or a measurement.
+  if (allowNoteFallback && (normalizeText(qualityCheck?.note) || normalizeText(qualityPoint?.note))) {
+    return true;
+  }
 
   const hasReadableNonInstructionType = typeDescriptors.some((descriptor) => !/^\d+$/.test(descriptor));
   if (hasReadableNonInstructionType) return false;
@@ -479,24 +486,25 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
   const qualityPointDefinitions = qualityInstructionDefinitionsByModel.get(
     `${String(user.company_id || '').trim()}:quality.point`
   ) || {};
-  const operationRelationField = [
+  const operationRelationFields = [
     'workorder_operation_ids',
     'workorder_operation_id',
+    'operation_ids',
     'operation_id',
-  ].find((field) => (
+  ].filter((field) => (
     qualityPointFields.includes(field)
     && (
       qualityPointDefinitions[field]?.relation === 'mrp.routing.workcenter'
-      || field.startsWith('workorder_operation')
+      || field.includes('operation')
     )
   ));
   const qualityPointConditions: any[] = [];
   if (qualityPointIds.length) qualityPointConditions.push(['id', 'in', qualityPointIds]);
-  if (operationRelationField && operationIds.length) {
-    qualityPointConditions.push([operationRelationField, 'in', operationIds]);
-  }
+  operationRelationFields.forEach((field) => {
+    if (operationIds.length) qualityPointConditions.push([field, 'in', operationIds]);
+  });
   const qualityPointDomain = qualityPointConditions.length > 1
-    ? ['|', ...qualityPointConditions]
+    ? [...Array(qualityPointConditions.length - 1).fill('|'), ...qualityPointConditions]
     : qualityPointConditions;
   const qualityPoints = qualityPointDomain.length
     ? await getOdooRecords(
@@ -579,20 +587,16 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
 
   qualityPoints.forEach((qualityPoint: any) => {
     const pointWorkOrderIds = workOrderIdsByQualityPoint.get(Number(qualityPoint?.id)) || [];
-    if (!isInstructionQualityCheck(null, qualityPoint, testTypeById, pointWorkOrderIds.length > 0)) return;
+    const operationWorkOrderIds = operationRelationFields.flatMap((field) => (
+      asOdooIds(qualityPoint?.[field]).flatMap((operationId) => workOrderIdsByOperation.get(operationId) || [])
+    ));
+    const linkedWorkOrderIds = Array.from(new Set([...pointWorkOrderIds, ...operationWorkOrderIds]));
+    if (!isInstructionQualityCheck(null, qualityPoint, testTypeById, linkedWorkOrderIds.length > 0)) return;
     const instruction = buildQualityInstruction(null, qualityPoint);
 
-    pointWorkOrderIds.forEach((workOrderId) => {
+    linkedWorkOrderIds.forEach((workOrderId) => {
       appendInstruction(workOrderId, instruction);
     });
-
-    if (operationRelationField) {
-      asOdooIds(qualityPoint?.[operationRelationField]).forEach((operationId) => {
-        (workOrderIdsByOperation.get(operationId) || []).forEach((workOrderId) => {
-          appendInstruction(workOrderId, instruction);
-        });
-      });
-    }
   });
 
   if (!instructionsByWorkOrder.size) {
@@ -603,7 +607,7 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
       check_id_count: checkIds.length,
       quality_point_count: qualityPoints.length,
       test_type_count: qualityTestTypes.length,
-      operation_relation_field: operationRelationField || null,
+      operation_relation_fields: operationRelationFields,
       quality_check_fields: qualityCheckFields,
       quality_point_fields: qualityPointFields,
     });
@@ -631,6 +635,46 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
       worksheet_url: firstDocument.worksheet_url || false,
     };
   });
+}
+
+export async function getWorkOrderInstructions(user: any, workOrder: any) {
+  const workOrderId = Number(workOrder?.id);
+  if (!workOrderId || !user?.company_id) {
+    return { status: false, message: 'No se pudo identificar la orden de trabajo.', data: null };
+  }
+
+  const response = await getOdooResponse(
+    'mrp.workorder',
+    [['id', '=', workOrderId]],
+    ['id', 'name', 'operation_id', 'check_ids', 'quality_point_ids'],
+    user.company_id
+  );
+  if (!response?.status) {
+    return {
+      status: false,
+      message: getOdooErrorMessage(response, 'No se pudieron consultar las instrucciones en Odoo.'),
+      data: null,
+    };
+  }
+
+  const freshWorkOrder = { ...workOrder, ...(response?.data?.[0] || {}) };
+  const withOperationInstructions = await addOperationInstructionsToWorkOrders(user, [freshWorkOrder]);
+  const withQualityInstructions = await addQualityInstructionsToWorkOrders(user, withOperationInstructions);
+  const enrichedWorkOrder = mergeWorkOrderInstructions(
+    withOperationInstructions[0] || freshWorkOrder,
+    withQualityInstructions[0] || freshWorkOrder
+  );
+
+  if (!normalizeText(enrichedWorkOrder?.operation_note) && !normalizeText(enrichedWorkOrder?.quality_instruction_note)) {
+    console.log('Instrucciones no encontradas para OT', {
+      workorder_id: workOrderId,
+      operation_id: asOdooId(enrichedWorkOrder?.operation_id) || null,
+      check_ids: asOdooIds(enrichedWorkOrder?.check_ids),
+      quality_point_ids: asOdooIds(enrichedWorkOrder?.quality_point_ids),
+    });
+  }
+
+  return { status: true, message: '', data: enrichedWorkOrder };
 }
 
 function mergeWorkOrderInstructions(operationWorkOrder: any, qualityWorkOrder: any) {

@@ -8,7 +8,7 @@ import { getStatusLabel, StatusBadge } from '@/ui/status-badge/status-badge'
 import { ModalDetailWork } from '@/ui/modal-detail-work/ModalDetailWork'
 import { StatusHelpButton } from '@/ui/status-help-button/StatusHelpButton'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
-import { getWorkOrders } from '@/app/api/orders/getOrders'
+import { getWorkOrderInstructions, getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 import { applySharedWorkOrderTimer } from '@/helper/applySharedWorkOrderTimer'
 
@@ -89,6 +89,7 @@ function getWorkOrderProgress(workOrder: any) {
 export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders: any, user: any, blockReasons: any}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalIsOpenInstructions, setModalIsOpenInstructions] = useState(false);
+  const [instructionsLoading, setInstructionsLoading] = useState(false);
   const [orderProduction, setOrderProduction] = useState<any>({});
   const [showDetailOrderWork, setShowDetailOrderWork] = useState<any>({});
   const [workoOrder, setOrdersWork] = useState<any>(odooOrders);
@@ -100,6 +101,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const [materials, setMaterials] = useState<any>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
   const [materialsError, setMaterialsError] = useState('');
+  const [materialsNotice, setMaterialsNotice] = useState('');
   const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
   const [loadigSaveMaterials, setLoadigSaveMaterials] = useState(false);
   const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
@@ -120,8 +122,30 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   }
 
 
-  const openModalInstructions = () => {
-    setModalIsOpenInstructions(!modalIsOpenInstructions)
+  const openModalInstructions = async () => {
+    if (modalIsOpenInstructions) {
+      setModalIsOpenInstructions(false)
+      return
+    }
+
+    setModalIsOpenInstructions(true)
+    setInstructionsLoading(true)
+    const currentWorkOrder = orderSelected?.id ? orderSelected : showDetailOrderWork
+    try {
+      const response = await getWorkOrderInstructions(user, currentWorkOrder)
+      if (!response?.status || !response?.data) {
+        setModalIsOpenInstructions(false)
+        setError(response?.message || 'No se pudieron consultar las instrucciones en Odoo.')
+        return
+      }
+      setOrderSelected((current: any) => ({ ...current, ...response.data }))
+      setShowDetailOrderWork((current: any) => ({ ...current, ...response.data }))
+    } catch (error: any) {
+      setModalIsOpenInstructions(false)
+      setError(error?.message || 'No se pudieron consultar las instrucciones en Odoo.')
+    } finally {
+      setInstructionsLoading(false)
+    }
   }
 
   const syncSharedTimers = useCallback((timers: any[]) => {
@@ -305,6 +329,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const getMaterials = async () => {
     setMaterials([])
     setMaterialsError('')
+    setMaterialsNotice('')
     setMaterialsLoading(true)
     try {
       const response: any = await Promise.race([
@@ -316,6 +341,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       ])
       if (response?.status) {
         setMaterials(Array.isArray(response.data) ? response.data : [])
+        setMaterialsNotice(response?.notice || '')
       } else {
         setMaterialsError(response?.message || 'No se pudieron consultar los materiales de la orden de trabajo.')
       }
@@ -392,6 +418,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          showDetailOrderWork={showDetailOrderWork}
          progress={progress}
          modalIsOpenInstructions={modalIsOpenInstructions}
+         instructionsLoading={instructionsLoading}
          openModalInstructions={openModalInstructions}
          executeWorkOrderAction={executeWorkOrderAction}
          loadigAction={loadigAction}
@@ -406,6 +433,7 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          materials={materials}
          materialsLoading={materialsLoading}
          materialsError={materialsError}
+         materialsNotice={materialsNotice}
          modalIsAddMaterials={modalIsAddMaterials}
          setModalIsAddMaterials={setModalIsAddMaterials}
          onAddMaterial={onAddMaterial}
