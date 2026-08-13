@@ -253,38 +253,47 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
   }
 }
 
+export async function getSharedWorkOrderTimers(user: any, workOrderIds: number[]) {
+  const ids = Array.from(new Set(workOrderIds.map(Number).filter(Boolean)));
+  if (!ids.length) return [];
+
+  const [snapshots, activeBlocks] = await Promise.all([
+    getWorkOrderTimerSnapshots(user, ids),
+    getActiveWorkOrderBlocks(user, ids),
+  ]);
+
+  return ids.flatMap((id) => {
+    const snapshot = snapshots.get(id);
+    const activeBlock = activeBlocks.get(id);
+    if (!snapshot && !activeBlock) return [];
+
+    return [{
+      status: true,
+      workorder_id: id,
+      has_timer_snapshot: Boolean(snapshot),
+      elapsed_seconds: snapshot
+        ? normalizeElapsedSeconds(snapshot.current_elapsed_seconds, snapshot.elapsed_seconds)
+        : null,
+      is_running: Boolean(snapshot?.is_running) && !activeBlock,
+      calculated_at: new Date().toISOString(),
+      local_blocked: Boolean(activeBlock),
+      local_block_reason_id: activeBlock?.reason_id ?? null,
+      local_block_reason_name: activeBlock?.reason_name || '',
+      local_blocked_by: activeBlock?.blocked_by || '',
+      local_blocked_at: activeBlock?.blocked_at || null,
+      active_since: snapshot?.active_since || null,
+      expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds),
+      workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state),
+    }];
+  });
+}
+
 export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
   const id = Number(workOrderId);
   if (!id) return { status: false };
 
-  const [snapshots, activeBlocks] = await Promise.all([
-    getWorkOrderTimerSnapshots(user, [id]),
-    getActiveWorkOrderBlocks(user, [id]),
-  ]);
-  const snapshot = snapshots.get(id);
-  const activeBlock = activeBlocks.get(id);
-  if (!snapshot && !activeBlock) return { status: false };
-
-  const isRunning = Boolean(snapshot?.is_running) && !activeBlock;
-  const elapsedSeconds = snapshot
-    ? normalizeElapsedSeconds(snapshot.current_elapsed_seconds, snapshot.elapsed_seconds)
-    : null;
-
-  return {
-    status: true,
-    has_timer_snapshot: Boolean(snapshot),
-    elapsed_seconds: elapsedSeconds,
-    is_running: isRunning,
-    calculated_at: new Date().toISOString(),
-    local_blocked: Boolean(activeBlock),
-    local_block_reason_id: activeBlock?.reason_id ?? null,
-    local_block_reason_name: activeBlock?.reason_name || '',
-    local_blocked_by: activeBlock?.blocked_by || '',
-    local_blocked_at: activeBlock?.blocked_at || null,
-    active_since: snapshot?.active_since || null,
-    expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds),
-    workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state),
-  };
+  const timers = await getSharedWorkOrderTimers(user, [id]);
+  return timers[0] || { status: false };
 }
 
 export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[]) {

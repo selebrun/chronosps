@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 import close from '@/public/close.png'
@@ -12,6 +12,7 @@ import { StatusHelpButton } from '@/ui/status-help-button/StatusHelpButton'
 import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
+import { applySharedWorkOrderTimer } from '@/helper/applySharedWorkOrderTimer'
 
 function asArray(value: any) {
   return Array.isArray(value) ? value : [];
@@ -160,57 +161,71 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     setModalIsOpenInstructions(!modalIsOpenInstructions)
   }
 
-  const syncSharedTimer = (timer: any) => {
-    const applyTimer = (order: any) => {
-      if (!order?.id || Number(order.id) !== Number(orderWorkSelected?.id)) return order;
-      const isBlocked = Boolean(timer?.local_blocked);
-      const sharedState = timer?.workorder_state?.toString?.().trim?.().toLowerCase?.() || '';
-      const sharedDone = sharedState === 'done';
-      const canRun = Boolean(timer?.is_running) && !sharedDone && !isBlocked && !order.quality_failed && !['done', 'completed', 'cancel'].includes(order.state);
-      const elapsedSeconds = timer?.has_timer_snapshot === false
-        ? Number(order.piso_real_duration_seconds || Number(order.duration || 0) * 60)
-        : Number(timer.elapsed_seconds || 0);
-      const expectedSeconds = Number(timer?.expected_duration_seconds);
-      const isDone = ['done', 'completed', 'cancel'].includes(order.state);
-      const sharedWorkingState = isBlocked
-        ? 'blocked'
-        : sharedDone
-          ? 'done'
-        : canRun
-          ? 'progress'
-          : !isDone && timer?.has_timer_snapshot !== false
-            ? 'paused'
-            : order.working_state === 'blocked' ? 'paused' : order.working_state;
-      return {
-        ...order,
-        state: sharedDone ? 'done' : order.state,
-        quality_failed: sharedDone ? false : order.quality_failed,
-        quality_failed_count: sharedDone ? 0 : order.quality_failed_count,
-        quality_failed_points: sharedDone ? [] : order.quality_failed_points,
-        duration: elapsedSeconds / 60,
-        piso_real_duration_seconds: elapsedSeconds,
-        piso_expected_duration_seconds: Number.isFinite(expectedSeconds) && expectedSeconds > 0
-          ? expectedSeconds
-          : order.piso_expected_duration_seconds,
-        piso_duration_calculated_at: timer.calculated_at,
-        local_blocked: isBlocked,
-        local_block_reason_id: timer.local_block_reason_id ?? null,
-        local_block_reason_name: timer.local_block_reason_name || '',
-        local_blocked_by: timer.local_blocked_by || '',
-        local_blocked_at: timer.local_blocked_at || null,
-        working_state: sharedWorkingState,
-        is_user_working: canRun,
-      };
+  const syncSharedTimers = useCallback((timers: any[]) => {
+    const timersByWorkOrderId = new Map<number, any>(
+      timers.map((timer: any) => [Number(timer?.workorder_id), timer])
+    );
+    const applyTimers = (order: any) => {
+      const timer = timersByWorkOrderId.get(Number(order?.id));
+      return timer ? applySharedWorkOrderTimer(order, timer) : order;
     };
 
-    seOrderWorkSelected((current: any) => applyTimer(current));
-    setShowDetailOrderWork((current: any) => applyTimer(current));
-    setOrderWorkDetail((current: any[]) => asArray(current).map((order: any) => applyTimer(order)));
+    seOrderWorkSelected((current: any) => applyTimers(current));
+    setShowDetailOrderWork((current: any) => applyTimers(current));
+    setOrderWorkDetail((current: any[]) => asArray(current).map((order: any) => applyTimers(order)));
     setOrdersWork((current: any) => current?.data
-      ? { ...current, data: current.data.map((order: any) => applyTimer(order)) }
+      ? { ...current, data: current.data.map((order: any) => applyTimers(order)) }
       : current
     );
-  }
+  }, []);
+
+  const syncSharedTimer = useCallback((timer: any) => {
+    syncSharedTimers([timer]);
+  }, [syncSharedTimers]);
+
+  const timerWorkOrderIds = asArray(workoOrder?.data)
+    .map((order: any) => Number(order?.id))
+    .filter(Boolean)
+    .sort((left: number, right: number) => left - right)
+    .join(',');
+
+  useEffect(() => {
+    if (!timerWorkOrderIds) return;
+
+    let active = true;
+    let requestInFlight = false;
+    const synchronizeList = async () => {
+      if (requestInFlight) return;
+      requestInFlight = true;
+      try {
+        const response = await fetch(`/api/work-order-timers?ids=${timerWorkOrderIds}`, {
+          cache: 'no-store',
+          credentials: 'same-origin',
+        });
+        if (response.status === 401) {
+          window.location.assign('/login');
+          return;
+        }
+        if (!response.ok) return;
+
+        const payload = await response.json();
+        if (active && payload?.status && Array.isArray(payload.data) && payload.data.length) {
+          syncSharedTimers(payload.data);
+        }
+      } catch (error) {
+        console.error('No se pudieron actualizar los estados compartidos de las OT:', error);
+      } finally {
+        requestInFlight = false;
+      }
+    };
+
+    void synchronizeList();
+    const interval = window.setInterval(() => void synchronizeList(), 1000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [timerWorkOrderIds, syncSharedTimers]);
 
   const isQualityControlError = (message: string) => {
     const normalizedMessage = (message || '').toLowerCase();
