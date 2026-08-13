@@ -323,11 +323,12 @@ const QUALITY_POINT_INSTRUCTION_FIELDS = [
   'worksheet_document',
   'worksheet_url',
 ];
+const QUALITY_TEST_TYPE_FIELDS = ['id', 'name', 'technical_name', 'code'];
 const qualityInstructionFieldsByModel = new Map<string, string[]>();
 const qualityInstructionDefinitionsByModel = new Map<string, Record<string, any>>();
 
 async function getCompatibleQualityInstructionFields(
-  model: 'quality.check' | 'quality.point',
+  model: 'quality.check' | 'quality.point' | 'quality.point.test_type',
   companyId: string,
   candidates: string[]
 ) {
@@ -347,7 +348,9 @@ async function getCompatibleQualityInstructionFields(
     : null;
   const fallbackFields = model === 'quality.check'
     ? ['id', 'name', 'note', 'workorder_id', 'point_id']
-    : ['id', 'name', 'note'];
+    : model === 'quality.point'
+      ? ['id', 'name', 'note']
+      : ['id', 'name'];
   const compatibleFields = availableFields
     ? candidates.filter((field) => availableFields.has(field))
     : fallbackFields;
@@ -370,20 +373,36 @@ function isInstructionDescriptor(value: string) {
   return value.includes('instruction') || value.includes('instruccion');
 }
 
-function isInstructionQualityCheck(qualityCheck: any, qualityPoint: any) {
+function isInstructionQualityCheck(
+  qualityCheck: any,
+  qualityPoint: any,
+  testTypeById: Map<number, any>,
+  allowNoteFallback = false
+) {
+  const testTypeId = Number(asOdooId(qualityCheck?.test_type_id || qualityPoint?.test_type_id));
+  const testType = testTypeById.get(testTypeId);
   const typeDescriptors = [
     qualityCheck?.test_type,
     qualityCheck?.test_type_id,
     qualityPoint?.test_type,
     qualityPoint?.test_type_id,
+    testType?.name,
+    testType?.technical_name,
+    testType?.code,
   ].map(normalizeInstructionDescriptor).filter(Boolean);
   if (typeDescriptors.some(isInstructionDescriptor)) return true;
 
-  // Respaldo para versiones que no exponen el tipo en quality.check.
-  if (typeDescriptors.length) return false;
-  return [qualityCheck?.name, qualityCheck?.title, qualityPoint?.name, qualityPoint?.title]
+  const nameMatches = [qualityCheck?.name, qualityCheck?.title, qualityPoint?.name, qualityPoint?.title]
     .map(normalizeInstructionDescriptor)
     .some(isInstructionDescriptor);
+  if (nameMatches) return true;
+
+  const hasReadableNonInstructionType = typeDescriptors.some((descriptor) => !/^\d+$/.test(descriptor));
+  if (hasReadableNonInstructionType) return false;
+
+  // En algunas migraciones a v19 el tipo no queda expuesto por XML-RPC,
+  // pero check_ids/quality_point_ids siguen siendo relaciones confiables.
+  return allowNoteFallback && Boolean(normalizeText(qualityCheck?.note) || normalizeText(qualityPoint?.note));
 }
 
 function getInstructionDocument(source: any, field: string) {
@@ -432,10 +451,21 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
       QUALITY_POINT_INSTRUCTION_FIELDS
     ),
   ]);
-  const qualityChecks = qualityCheckFields.includes('workorder_id')
+  const checkIds = Array.from(new Set<number>(
+    (workOrders || []).flatMap((workOrder: any) => asOdooIds(workOrder?.check_ids))
+  ));
+  const qualityCheckConditions: any[] = [];
+  if (checkIds.length) qualityCheckConditions.push(['id', 'in', checkIds]);
+  if (qualityCheckFields.includes('workorder_id')) {
+    qualityCheckConditions.push(['workorder_id', 'in', workOrderIds]);
+  }
+  const qualityCheckDomain = qualityCheckConditions.length > 1
+    ? ['|', ...qualityCheckConditions]
+    : qualityCheckConditions;
+  const qualityChecks = qualityCheckDomain.length
     ? await getOdooRecords(
       'quality.check',
-      [['workorder_id', 'in', workOrderIds]],
+      qualityCheckDomain,
       qualityCheckFields,
       user.company_id,
       'id asc'
@@ -479,9 +509,32 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
   const qualityPointById = new Map<number, any>(
     qualityPoints.map((qualityPoint: any) => [Number(qualityPoint.id), qualityPoint])
   );
+  const testTypeIds = Array.from(new Set<number>([
+    ...qualityChecks.map((qualityCheck: any) => Number(asOdooId(qualityCheck?.test_type_id))).filter(Boolean),
+    ...qualityPoints.map((qualityPoint: any) => Number(asOdooId(qualityPoint?.test_type_id))).filter(Boolean),
+  ]));
+  const qualityTestTypeFields = testTypeIds.length
+    ? await getCompatibleQualityInstructionFields(
+      'quality.point.test_type',
+      user.company_id,
+      QUALITY_TEST_TYPE_FIELDS
+    )
+    : [];
+  const qualityTestTypes = testTypeIds.length
+    ? await getOdooRecords(
+      'quality.point.test_type',
+      [['id', 'in', testTypeIds]],
+      qualityTestTypeFields,
+      user.company_id
+    )
+    : [];
+  const testTypeById = new Map<number, any>(
+    qualityTestTypes.map((testType: any) => [Number(testType.id), testType])
+  );
   const instructionsByWorkOrder = new Map<number, any[]>();
   const workOrderIdsByOperation = new Map<number, number[]>();
   const workOrderIdsByQualityPoint = new Map<number, number[]>();
+  const workOrderIdsByCheck = new Map<number, number[]>();
 
   (workOrders || []).forEach((workOrder: any) => {
     const operationId = Number(asOdooId(workOrder?.operation_id));
@@ -492,6 +545,12 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
       const pointWorkOrderIds = workOrderIdsByQualityPoint.get(qualityPointId) || [];
       pointWorkOrderIds.push(workOrderId);
       workOrderIdsByQualityPoint.set(qualityPointId, pointWorkOrderIds);
+    });
+
+    asOdooIds(workOrder?.check_ids).forEach((checkId) => {
+      const checkWorkOrderIds = workOrderIdsByCheck.get(checkId) || [];
+      checkWorkOrderIds.push(workOrderId);
+      workOrderIdsByCheck.set(checkId, checkWorkOrderIds);
     });
 
     if (!operationId) return;
@@ -508,17 +567,22 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
   };
 
   qualityChecks.forEach((qualityCheck: any) => {
-    const workOrderId = Number(asOdooId(qualityCheck?.workorder_id));
     const qualityPoint = qualityPointById.get(Number(asOdooId(qualityCheck?.point_id)));
-    if (!workOrderId || !isInstructionQualityCheck(qualityCheck, qualityPoint)) return;
-    appendInstruction(workOrderId, buildQualityInstruction(qualityCheck, qualityPoint));
+    const linkedWorkOrderIds = Array.from(new Set<number>([
+      Number(asOdooId(qualityCheck?.workorder_id)),
+      ...(workOrderIdsByCheck.get(Number(qualityCheck?.id)) || []),
+    ].filter(Boolean)));
+    if (!linkedWorkOrderIds.length || !isInstructionQualityCheck(qualityCheck, qualityPoint, testTypeById, true)) return;
+    const instruction = buildQualityInstruction(qualityCheck, qualityPoint);
+    linkedWorkOrderIds.forEach((workOrderId) => appendInstruction(workOrderId, instruction));
   });
 
   qualityPoints.forEach((qualityPoint: any) => {
-    if (!isInstructionQualityCheck(null, qualityPoint)) return;
+    const pointWorkOrderIds = workOrderIdsByQualityPoint.get(Number(qualityPoint?.id)) || [];
+    if (!isInstructionQualityCheck(null, qualityPoint, testTypeById, pointWorkOrderIds.length > 0)) return;
     const instruction = buildQualityInstruction(null, qualityPoint);
 
-    (workOrderIdsByQualityPoint.get(Number(qualityPoint?.id)) || []).forEach((workOrderId) => {
+    pointWorkOrderIds.forEach((workOrderId) => {
       appendInstruction(workOrderId, instruction);
     });
 
@@ -536,7 +600,9 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
       workorder_count: workOrderIds.length,
       operation_count: operationIds.length,
       quality_check_count: qualityChecks.length,
+      check_id_count: checkIds.length,
       quality_point_count: qualityPoints.length,
+      test_type_count: qualityTestTypes.length,
       operation_relation_field: operationRelationField || null,
       quality_check_fields: qualityCheckFields,
       quality_point_fields: qualityPointFields,
@@ -556,6 +622,7 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
 
     return {
       ...workOrder,
+      quality_instruction_note: instructionNotes.join('<hr />'),
       operation_note: instructionNotes.join('<hr />'),
       worksheet: firstDocument.worksheet || false,
       worksheet_type: firstDocument.worksheet_type || false,
@@ -568,12 +635,13 @@ async function addQualityInstructionsToWorkOrders(user: any, workOrders: any[]) 
 
 function mergeWorkOrderInstructions(operationWorkOrder: any, qualityWorkOrder: any) {
   const notes = Array.from(new Set([
+    normalizeText(qualityWorkOrder?.quality_instruction_note),
     normalizeText(operationWorkOrder?.operation_note),
-    normalizeText(qualityWorkOrder?.operation_note),
   ].filter(Boolean)));
 
   return {
     ...operationWorkOrder,
+    quality_instruction_note: normalizeText(qualityWorkOrder?.quality_instruction_note),
     operation_note: notes.join('<hr />'),
     worksheet: operationWorkOrder?.worksheet || qualityWorkOrder?.worksheet || false,
     worksheet_type: operationWorkOrder?.worksheet_type || qualityWorkOrder?.worksheet_type || false,

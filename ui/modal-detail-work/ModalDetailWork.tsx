@@ -352,7 +352,7 @@ export function ModalDetailWork({
     setvValueTotalMaterial(e)
   }
 
-  const instructionNote = showDetailOrderWork?.operation_note || showDetailOrderWork?.note || '';
+  const instructionNote = showDetailOrderWork?.quality_instruction_note || showDetailOrderWork?.operation_note || showDetailOrderWork?.note || '';
   const instructionUrlCandidate = showDetailOrderWork?.worksheet_google_slide || showDetailOrderWork?.worksheet_url || '';
   const instructionUrl = typeof instructionUrlCandidate === 'string' && /^https?:\/\//i.test(instructionUrlCandidate)
     ? instructionUrlCandidate
