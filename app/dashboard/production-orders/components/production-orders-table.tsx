@@ -334,14 +334,17 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const onAddMaterial = async (material: any, total: number) => { 
-    const objeto = { material: material }; 
-    const materialSelected = materials.find((material: any) => material.id === parseInt(objeto.material))
+    const quantity = Number(total)
+    const materialSelected = materials.find((item: any) => Number(item.id) === Number(material))
     if (!materialSelected) {
       setError('No se encontro el material seleccionado.')
       return
     }
-    materialSelected.additional_quantity = Number(total)
-    setOrderMaterialsSelected(materialSelected)
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setError('Ingrese una cantidad de material mayor que cero.')
+      return
+    }
+    setOrderMaterialsSelected({ ...materialSelected, additional_quantity: quantity })
     setDisabledBtnSaveMaterial(false)
   }
 
@@ -354,7 +357,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       const locationId = Number(getOdooId(orderMaterialsSelected?.location_id));
       const locationDestId = Number(getOdooId(orderMaterialsSelected?.location_dest_id));
       const companyId = Number(getOdooId(orderMaterialsSelected?.company_id));
-      if (!currentWorkOrder?.id || !orderProductionSelected?.id || !productId || !uomId || !locationId || !locationDestId || !companyId) {
+      const quantity = Number(orderMaterialsSelected?.additional_quantity);
+      if (!currentWorkOrder?.id || !orderProductionSelected?.id || !productId || !uomId || !locationId || !locationDestId || !companyId || !Number.isFinite(quantity) || quantity <= 0) {
         throw new Error('El material seleccionado no tiene todos los datos requeridos por Odoo.');
       }
       const data = await saveMaterialsOrder(
@@ -363,18 +367,19 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
         orderProductionSelected.id,
         productId,
         uomId,
-        orderMaterialsSelected.additional_quantity,
+        quantity,
         locationId,
         locationDestId,
         companyId,
         getOdooName(orderMaterialsSelected.product_id, ''),
-        getOdooId(orderMaterialsSelected.operation_id)
+        getOdooId(currentWorkOrder?.operation_id) || getOdooId(orderMaterialsSelected.operation_id)
       )
 
       if (data?.status) {
         setDisabledBtnSaveMaterial(true)
         setModalIsMaterials(false)
         setOrderMaterialsSelected({})
+        if (data?.warning) setError(data.warning)
       } else {
         setError(data?.message || 'No se pudo agregar el material.')
       }

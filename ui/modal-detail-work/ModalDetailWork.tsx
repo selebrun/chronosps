@@ -645,7 +645,7 @@ export function ModalDetailWork({
                       <td className="px-3 py-2">
                         {getOdooName(material?.product_id, 'Sin producto')}
                       </td>
-                      <td className="px-3 py-2">{ Math.floor(material?.product_uom_qty || 0)}</td>
+                      <td className="px-3 py-2">{Number(material?.product_uom_qty || 0).toLocaleString('es-CL', { maximumFractionDigits: 4 })}</td>
                       <td className="px-3 py-2">{getOdooName(material?.product_uom, 'Sin unidad')}</td>
                       <td className="px-3 py-2">{getOdooName(material?.location_id, 'Sin ubicacion')}</td>
                       
@@ -657,7 +657,7 @@ export function ModalDetailWork({
         {materials.length > 0 && 
           <div className="mb-3 mt-5 text-center flex justify-center ">
             <div>
-              <button disabled={disabledBtnSaveMaterial}  onClick={() => onSaveMaterialsOrder()} className='disabled:opacity-50 bg-[#2FD28E] font-bold p-2 rounded-md mr-4'>Guardar Material</button>
+              <button disabled={disabledBtnSaveMaterial || loadigSaveMaterials} onClick={() => onSaveMaterialsOrder()} className='disabled:opacity-50 bg-[#2FD28E] font-bold p-2 rounded-md mr-4'>Guardar Material</button>
             </div>
             <div>
             <button disabled={!user.materiales} onClick={() => { setModalIsAddMaterials(true)}}  className='disabled:opacity-50 bg-[#020630] font-bold text-[#FEC400] p-2 rounded-md mr-4'>Agregar Material</button>
@@ -678,6 +678,9 @@ export function ModalDetailWork({
             type="button"
             onClick={() => {
               setModalIsAddMaterials(false)
+              setDisabledBtnAddMaterials(true)
+              setvValueSelectMaterial('')
+              setvValueTotalMaterial(0)
             }}
           >
             <Image
@@ -701,8 +704,9 @@ export function ModalDetailWork({
             <input
               type="number"
               className="w-full border border-solid border-gray-400 rounded-full mt-5 p-2"
-              placeholder="Ingrese la medida"
-              min="0"
+              placeholder="Cantidad adicional"
+              min="0.0001"
+              step="any"
               disabled={disabledBtnAddMaterials}
               onChange={(e) => onChangeTotalMaterial(e.target.value)}
               value={valueTotalMaterial}
@@ -710,13 +714,13 @@ export function ModalDetailWork({
           </div>
           <div className="mb-3 mt-5 text-center">
             <button 
-            disabled={(disabledBtnAddMaterials || Number(valueTotalMaterial) === 0)}
+            disabled={disabledBtnAddMaterials || !Number.isFinite(Number(valueTotalMaterial)) || Number(valueTotalMaterial) <= 0}
             onClick={() =>  {
               onAddMaterial(valueSelectMaterial, valueTotalMaterial)
               setModalIsAddMaterials(false)
               setvValueTotalMaterial(0)
               setvValueSelectMaterial('')
-              }} key="block" className='text-white font-bold bg-[#020630] p-3 rounded-md w-[400] disabled:opacity-50'>Guardar</button>
+              }} key="block" className='w-full text-white font-bold bg-[#020630] p-3 rounded-md disabled:opacity-50'>Guardar</button>
           </div>
       </Modal>
     </>
