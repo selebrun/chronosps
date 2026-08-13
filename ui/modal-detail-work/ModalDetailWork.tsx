@@ -182,8 +182,11 @@ export function ModalDetailWork({
       const sharedElapsedSeconds = timer.has_timer_snapshot === false
         ? baseElapsedSeconds
         : Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
+      const sharedWorkOrderState = timer?.workorder_state?.toString?.().trim?.().toLowerCase?.() || '';
+      const sharedDone = sharedWorkOrderState === 'done';
       const shouldBePaused = Boolean(
         !timer.is_running
+        && !sharedDone
         && !timer.local_blocked
         && !showDetailOrderWork?.quality_failed
         && !isWorkOrderDone
@@ -191,7 +194,9 @@ export function ModalDetailWork({
       );
       const sharedStatusChanged = timer.is_running
         ? showDetailOrderWork?.working_state !== 'progress' || !showDetailOrderWork?.is_user_working
-        : shouldBePaused && showDetailOrderWork?.working_state !== 'paused';
+        : sharedDone
+          ? !['done', 'completed'].includes(showDetailOrderWork?.state)
+          : shouldBePaused && showDetailOrderWork?.working_state !== 'paused';
       const timerExpectedSeconds = Number(timer.expected_duration_seconds);
       const sharedExpectedChanged = Number.isFinite(timerExpectedSeconds)
         && timerExpectedSeconds > 0

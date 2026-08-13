@@ -24,6 +24,7 @@ async function ensureWorkOrderTimersTable(client: any) {
       workorder_id INTEGER NOT NULL,
       elapsed_seconds INTEGER NOT NULL DEFAULT 0,
       expected_duration_seconds INTEGER,
+      workorder_state CHARACTER(20),
       is_running BOOLEAN NOT NULL DEFAULT FALSE,
       active_since TIMESTAMP,
       updated_by CHARACTER(40),
@@ -36,6 +37,7 @@ async function ensureWorkOrderTimersTable(client: any) {
     ALTER TABLE work_order_time_snapshots
       ADD COLUMN IF NOT EXISTS active_since TIMESTAMP,
       ADD COLUMN IF NOT EXISTS expected_duration_seconds INTEGER,
+      ADD COLUMN IF NOT EXISTS workorder_state CHARACTER(20),
       ADD COLUMN IF NOT EXISTS updated_by CHARACTER(40),
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   `);
@@ -83,6 +85,11 @@ function normalizeExpectedDurationSeconds(value: any) {
   return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null;
 }
 
+function normalizeSharedWorkOrderState(value: any) {
+  const state = value?.toString?.().trim?.().toLowerCase?.() || '';
+  return ['progress', 'paused', 'done'].includes(state) ? state : null;
+}
+
 function getWorkOrderExpectedDurationSeconds(workOrder: any) {
   return normalizeExpectedDurationSeconds(workOrder?.piso_expected_duration_seconds)
     ?? normalizeExpectedDurationSeconds(Number(workOrder?.duration_expected) * 60);
@@ -104,7 +111,8 @@ export async function saveWorkOrderTimerSnapshot(
   elapsedSeconds: any,
   isRunning: boolean,
   activeSince?: string | null,
-  expectedDurationSeconds?: any
+  expectedDurationSeconds?: any,
+  workOrderState?: any
 ) {
   const companyId = String(user?.company_id || '').trim();
   const id = Number(workOrderId);
@@ -112,6 +120,7 @@ export async function saveWorkOrderTimerSnapshot(
 
   const elapsed = normalizeElapsedSeconds(elapsedSeconds);
   const expectedSeconds = normalizeExpectedDurationSeconds(expectedDurationSeconds);
+  const sharedState = normalizeSharedWorkOrderState(workOrderState);
 
   return withPool(async (client) => {
     const response = await client.query(
@@ -121,6 +130,7 @@ export async function saveWorkOrderTimerSnapshot(
         workorder_id,
         elapsed_seconds,
         expected_duration_seconds,
+        workorder_state,
         is_running,
         active_since,
         updated_by,
@@ -131,6 +141,7 @@ export async function saveWorkOrderTimerSnapshot(
         $2,
         $3,
         $7,
+        $8,
         $4,
         CASE
           WHEN NOT $4 THEN NULL
@@ -163,6 +174,7 @@ export async function saveWorkOrderTimerSnapshot(
           NULLIF(work_order_time_snapshots.expected_duration_seconds, 0),
           NULLIF(EXCLUDED.expected_duration_seconds, 0)
         ),
+        workorder_state = COALESCE(EXCLUDED.workorder_state, work_order_time_snapshots.workorder_state),
         is_running = EXCLUDED.is_running,
         active_since = CASE
           WHEN EXCLUDED.is_running THEN CASE
@@ -176,7 +188,7 @@ export async function saveWorkOrderTimerSnapshot(
         END,
         updated_by = EXCLUDED.updated_by,
         updated_at = NOW()
-      RETURNING elapsed_seconds, expected_duration_seconds, is_running, active_since
+      RETURNING elapsed_seconds, expected_duration_seconds, workorder_state, is_running, active_since
       `,
       [
         companyId,
@@ -186,6 +198,7 @@ export async function saveWorkOrderTimerSnapshot(
         String(user?.code || user?.email || ''),
         activeSince || null,
         expectedSeconds,
+        sharedState,
       ] as any[]
     );
 
@@ -194,6 +207,7 @@ export async function saveWorkOrderTimerSnapshot(
       status: true,
       elapsed_seconds: normalizeElapsedSeconds(snapshot?.elapsed_seconds, elapsed),
       expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds) ?? expectedSeconds,
+      workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state) ?? sharedState,
       is_running: Boolean(snapshot?.is_running),
     };
   });
@@ -211,6 +225,7 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
           workorder_id,
           elapsed_seconds,
           expected_duration_seconds,
+          workorder_state,
           elapsed_seconds + CASE
             WHEN is_running AND active_since IS NOT NULL THEN GREATEST(
               0,
@@ -268,6 +283,7 @@ export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
     local_blocked_at: activeBlock?.blocked_at || null,
     active_since: snapshot?.active_since || null,
     expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds),
+    workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state),
   };
 }
 
@@ -326,8 +342,12 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
     const expectedDurationSeconds = normalizeExpectedDurationSeconds(snapshot.expected_duration_seconds)
       ?? getWorkOrderExpectedDurationSeconds(workOrder)
       ?? 0;
+    const sharedState = normalizeSharedWorkOrderState(snapshot.workorder_state);
+    const sharedDone = sharedState === 'done';
     const synchronizedWorkingState = workOrder?.local_blocked
       ? 'blocked'
+      : sharedDone
+        ? 'done'
       : canRun
         ? 'progress'
         : !isWorkOrderDone(workOrder)
@@ -341,6 +361,10 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
       piso_expected_duration_seconds: expectedDurationSeconds,
       piso_active_since: canRun ? snapshot.active_since : false,
       piso_duration_calculated_at: new Date(now).toISOString(),
+      state: sharedDone ? 'done' : workOrder?.state,
+      quality_failed: sharedDone ? false : workOrder?.quality_failed,
+      quality_failed_count: sharedDone ? 0 : workOrder?.quality_failed_count,
+      quality_failed_points: sharedDone ? [] : workOrder?.quality_failed_points,
       working_state: synchronizedWorkingState,
       is_user_working: canRun,
     };

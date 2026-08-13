@@ -127,7 +127,9 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
     const applyTimer = (order: any) => {
       if (!order?.id || Number(order.id) !== Number(orderSelected?.id)) return order;
       const isBlocked = Boolean(timer?.local_blocked);
-      const canRun = Boolean(timer?.is_running) && !isBlocked && !order.quality_failed && !['done', 'completed', 'cancel'].includes(order.state);
+      const sharedState = timer?.workorder_state?.toString?.().trim?.().toLowerCase?.() || '';
+      const sharedDone = sharedState === 'done';
+      const canRun = Boolean(timer?.is_running) && !sharedDone && !isBlocked && !order.quality_failed && !['done', 'completed', 'cancel'].includes(order.state);
       const elapsedSeconds = timer?.has_timer_snapshot === false
         ? Number(order.piso_real_duration_seconds || Number(order.duration || 0) * 60)
         : Number(timer.elapsed_seconds || 0);
@@ -135,6 +137,8 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       const isDone = ['done', 'completed', 'cancel'].includes(order.state);
       const sharedWorkingState = isBlocked
         ? 'blocked'
+        : sharedDone
+          ? 'done'
         : canRun
           ? 'progress'
           : !isDone && timer?.has_timer_snapshot !== false
@@ -142,6 +146,10 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
             : order.working_state === 'blocked' ? 'paused' : order.working_state;
       return {
         ...order,
+        state: sharedDone ? 'done' : order.state,
+        quality_failed: sharedDone ? false : order.quality_failed,
+        quality_failed_count: sharedDone ? 0 : order.quality_failed_count,
+        quality_failed_points: sharedDone ? [] : order.quality_failed_points,
         duration: elapsedSeconds / 60,
         piso_real_duration_seconds: elapsedSeconds,
         piso_expected_duration_seconds: Number.isFinite(expectedSeconds) && expectedSeconds > 0

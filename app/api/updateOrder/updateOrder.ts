@@ -81,7 +81,8 @@ async function saveTimerSnapshot(
   workOrder: any,
   elapsedSeconds: any,
   isRunning: boolean,
-  activeSince?: string | null
+  activeSince?: string | null,
+  sharedState?: 'progress' | 'paused' | 'done'
 ) {
   const result = await saveWorkOrderTimerSnapshot(
     user,
@@ -89,7 +90,8 @@ async function saveTimerSnapshot(
     normalizeElapsedSeconds(elapsedSeconds, workOrder?.duration),
     isRunning,
     activeSince,
-    getExpectedDurationSeconds(workOrder)
+    getExpectedDurationSeconds(workOrder),
+    sharedState
   );
 
   if (!result?.status) {
@@ -313,8 +315,13 @@ async function synchronizeWorkOrderDurationToOdoo(user: any, workOrderId: number
   return { status: true };
 }
 
-async function saveAndSynchronizePausedTimer(user: any, workOrder: any, elapsedSeconds: any) {
-  const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false);
+async function saveAndSynchronizePausedTimer(
+  user: any,
+  workOrder: any,
+  elapsedSeconds: any,
+  sharedState: 'paused' | 'done' = 'paused'
+) {
+  const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false, null, sharedState);
   try {
     const synchronization = await synchronizeWorkOrderDurationToOdoo(
       user,
@@ -603,20 +610,20 @@ export async function updateOrder(
         response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
           const odooProductivityStart = await getCurrentOdooProductivityStart(work_order.id, user.company_id);
-          await saveTimerSnapshot(user, work_order, elapsedSeconds, true, odooProductivityStart);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, true, odooProductivityStart, 'progress');
         }
         break;
       case 'stop_work_order':
         response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
+          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'paused');
         }
         break;
       case 'finish_work_order':
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
+          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'done');
         }
         if (!response?.status) {
           const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
@@ -677,7 +684,7 @@ export async function updateOrder(
             }
           }
           await markWorkOrderUnblocked(user, work_order.id);
-          await saveTimerSnapshot(user, work_order, elapsedSeconds, false);
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, false, null, 'paused');
           return { status: true, message: 'Orden de trabajo desbloqueada. El reloj permanece detenido hasta iniciar o reanudar.' };
         }
       case 'block_work_order':
