@@ -6,6 +6,7 @@ function getWorkOrderDisplayStatus(order: any) {
   if (order?.quality_failed) return 'quality_failed';
   if (order?.local_blocked) return 'blocked';
   if (order?.working_state === 'paused') return 'paused';
+  if (order?.is_user_working || order?.working_state === 'progress') return 'progress';
   return order?.state;
 }
 

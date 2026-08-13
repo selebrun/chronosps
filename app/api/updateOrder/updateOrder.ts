@@ -66,6 +66,16 @@ function normalizeElapsedSeconds(value: any, fallbackMinutes = 0) {
   return Math.max(0, Math.round(Number(fallbackMinutes || 0) * 60));
 }
 
+function getExpectedDurationSeconds(workOrder: any) {
+  const pisoSeconds = Number(workOrder?.piso_expected_duration_seconds);
+  if (Number.isFinite(pisoSeconds) && pisoSeconds > 0) return Math.round(pisoSeconds);
+
+  const expectedMinutes = Number(workOrder?.duration_expected);
+  return Number.isFinite(expectedMinutes) && expectedMinutes > 0
+    ? Math.round(expectedMinutes * 60)
+    : null;
+}
+
 async function saveTimerSnapshot(
   user: any,
   workOrder: any,
@@ -78,7 +88,8 @@ async function saveTimerSnapshot(
     Number(workOrder?.id),
     normalizeElapsedSeconds(elapsedSeconds, workOrder?.duration),
     isRunning,
-    activeSince
+    activeSince,
+    getExpectedDurationSeconds(workOrder)
   );
 
   if (!result?.status) {

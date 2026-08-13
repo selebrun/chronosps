@@ -15,6 +15,7 @@ function getWorkOrderDisplayStatus(order: any) {
   if (order?.quality_failed) return 'quality_failed';
   if (order?.local_blocked) return 'blocked';
   if (order?.working_state === 'paused') return 'paused';
+  if (order?.is_user_working || order?.working_state === 'progress') return 'progress';
   return order?.state;
 }
 
@@ -96,6 +97,8 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
   const [modalIsOpenCompleteOrder, setModalIsOpenCompleteOrder] = useState(false);
   const [modalIsMaterials, setModalIsMaterials] = useState(false);
   const [materials, setMaterials] = useState<any>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [materialsError, setMaterialsError] = useState('');
   const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
   const [loadigSaveMaterials, setLoadigSaveMaterials] = useState(false);
   const [orderMaterialsSelected, setOrderMaterialsSelected] = useState<any>({});
@@ -128,19 +131,29 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
       const elapsedSeconds = timer?.has_timer_snapshot === false
         ? Number(order.piso_real_duration_seconds || Number(order.duration || 0) * 60)
         : Number(timer.elapsed_seconds || 0);
+      const expectedSeconds = Number(timer?.expected_duration_seconds);
+      const isDone = ['done', 'completed', 'cancel'].includes(order.state);
+      const sharedWorkingState = isBlocked
+        ? 'blocked'
+        : canRun
+          ? 'progress'
+          : !isDone && timer?.has_timer_snapshot !== false
+            ? 'paused'
+            : order.working_state === 'blocked' ? 'paused' : order.working_state;
       return {
         ...order,
         duration: elapsedSeconds / 60,
         piso_real_duration_seconds: elapsedSeconds,
+        piso_expected_duration_seconds: Number.isFinite(expectedSeconds) && expectedSeconds > 0
+          ? expectedSeconds
+          : order.piso_expected_duration_seconds,
         piso_duration_calculated_at: timer.calculated_at,
         local_blocked: isBlocked,
         local_block_reason_id: timer.local_block_reason_id ?? null,
         local_block_reason_name: timer.local_block_reason_name || '',
         local_blocked_by: timer.local_blocked_by || '',
         local_blocked_at: timer.local_blocked_at || null,
-        working_state: isBlocked
-          ? 'blocked'
-          : order.working_state === 'blocked' ? 'paused' : order.working_state,
+        working_state: sharedWorkingState,
         is_user_working: canRun,
       };
     };
@@ -268,9 +281,25 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
 
   const getMaterials = async () => {
     setMaterials([])
-    const materials = await getMaterialsOrder(user, orderProduction.move_raw_ids, orderSelected).then( res => res).catch((err) => console.log(err))
-    if(materials.status) {
-      setMaterials(materials.data)
+    setMaterialsError('')
+    setMaterialsLoading(true)
+    try {
+      const response: any = await Promise.race([
+        getMaterialsOrder(user, orderProduction.move_raw_ids || [], orderSelected),
+        new Promise((resolve) => window.setTimeout(
+          () => resolve({ status: false, message: 'Odoo no respondio a tiempo al consultar los materiales.' }),
+          20000
+        )),
+      ])
+      if (response?.status) {
+        setMaterials(Array.isArray(response.data) ? response.data : [])
+      } else {
+        setMaterialsError(response?.message || 'No se pudieron consultar los materiales de la orden de trabajo.')
+      }
+    } catch (error: any) {
+      setMaterialsError(error?.message || 'No se pudieron consultar los materiales de la orden de trabajo.')
+    } finally {
+      setMaterialsLoading(false)
     }
   }
 
@@ -335,6 +364,8 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
          setModalIsMaterials={setModalIsMaterials}
          getMaterials={getMaterials}
          materials={materials}
+         materialsLoading={materialsLoading}
+         materialsError={materialsError}
          modalIsAddMaterials={modalIsAddMaterials}
          setModalIsAddMaterials={setModalIsAddMaterials}
          onAddMaterial={onAddMaterial}

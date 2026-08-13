@@ -23,6 +23,7 @@ async function ensureWorkOrderTimersTable(client: any) {
       id_company CHARACTER(40) NOT NULL,
       workorder_id INTEGER NOT NULL,
       elapsed_seconds INTEGER NOT NULL DEFAULT 0,
+      expected_duration_seconds INTEGER,
       is_running BOOLEAN NOT NULL DEFAULT FALSE,
       active_since TIMESTAMP,
       updated_by CHARACTER(40),
@@ -34,6 +35,7 @@ async function ensureWorkOrderTimersTable(client: any) {
   await client.query(`
     ALTER TABLE work_order_time_snapshots
       ADD COLUMN IF NOT EXISTS active_since TIMESTAMP,
+      ADD COLUMN IF NOT EXISTS expected_duration_seconds INTEGER,
       ADD COLUMN IF NOT EXISTS updated_by CHARACTER(40),
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   `);
@@ -76,6 +78,16 @@ function normalizeElapsedSeconds(value: any, fallback = 0) {
   return Math.max(0, Math.round(Number(fallback) || 0));
 }
 
+function normalizeExpectedDurationSeconds(value: any) {
+  const seconds = Number(value);
+  return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null;
+}
+
+function getWorkOrderExpectedDurationSeconds(workOrder: any) {
+  return normalizeExpectedDurationSeconds(workOrder?.piso_expected_duration_seconds)
+    ?? normalizeExpectedDurationSeconds(Number(workOrder?.duration_expected) * 60);
+}
+
 function isWorkOrderDone(workOrder: any) {
   return ['done', 'completed', 'cancel'].includes(workOrder?.state);
 }
@@ -83,7 +95,6 @@ function isWorkOrderDone(workOrder: any) {
 function isTimerAllowedToRun(workOrder: any) {
   if (isWorkOrderDone(workOrder)) return false;
   if (workOrder?.local_blocked || workOrder?.quality_failed) return false;
-  if (workOrder?.working_state === 'blocked') return false;
   return true;
 }
 
@@ -92,13 +103,15 @@ export async function saveWorkOrderTimerSnapshot(
   workOrderId: number,
   elapsedSeconds: any,
   isRunning: boolean,
-  activeSince?: string | null
+  activeSince?: string | null,
+  expectedDurationSeconds?: any
 ) {
   const companyId = String(user?.company_id || '').trim();
   const id = Number(workOrderId);
   if (!companyId || !id) return { status: false };
 
   const elapsed = normalizeElapsedSeconds(elapsedSeconds);
+  const expectedSeconds = normalizeExpectedDurationSeconds(expectedDurationSeconds);
 
   return withPool(async (client) => {
     const response = await client.query(
@@ -107,6 +120,7 @@ export async function saveWorkOrderTimerSnapshot(
         id_company,
         workorder_id,
         elapsed_seconds,
+        expected_duration_seconds,
         is_running,
         active_since,
         updated_by,
@@ -116,6 +130,7 @@ export async function saveWorkOrderTimerSnapshot(
         $1,
         $2,
         $3,
+        $7,
         $4,
         CASE
           WHEN NOT $4 THEN NULL
@@ -144,6 +159,10 @@ export async function saveWorkOrderTimerSnapshot(
           END,
           EXCLUDED.elapsed_seconds
         ),
+        expected_duration_seconds = COALESCE(
+          NULLIF(work_order_time_snapshots.expected_duration_seconds, 0),
+          NULLIF(EXCLUDED.expected_duration_seconds, 0)
+        ),
         is_running = EXCLUDED.is_running,
         active_since = CASE
           WHEN EXCLUDED.is_running THEN CASE
@@ -157,7 +176,7 @@ export async function saveWorkOrderTimerSnapshot(
         END,
         updated_by = EXCLUDED.updated_by,
         updated_at = NOW()
-      RETURNING elapsed_seconds, is_running, active_since
+      RETURNING elapsed_seconds, expected_duration_seconds, is_running, active_since
       `,
       [
         companyId,
@@ -166,6 +185,7 @@ export async function saveWorkOrderTimerSnapshot(
         Boolean(isRunning),
         String(user?.code || user?.email || ''),
         activeSince || null,
+        expectedSeconds,
       ] as any[]
     );
 
@@ -173,6 +193,7 @@ export async function saveWorkOrderTimerSnapshot(
     return {
       status: true,
       elapsed_seconds: normalizeElapsedSeconds(snapshot?.elapsed_seconds, elapsed),
+      expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds) ?? expectedSeconds,
       is_running: Boolean(snapshot?.is_running),
     };
   });
@@ -189,6 +210,7 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
         SELECT
           workorder_id,
           elapsed_seconds,
+          expected_duration_seconds,
           elapsed_seconds + CASE
             WHEN is_running AND active_since IS NOT NULL THEN GREATEST(
               0,
@@ -245,6 +267,7 @@ export async function getSharedWorkOrderTimer(user: any, workOrderId: number) {
     local_blocked_by: activeBlock?.blocked_by || '',
     local_blocked_at: activeBlock?.blocked_at || null,
     active_since: snapshot?.active_since || null,
+    expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds),
   };
 }
 
@@ -255,6 +278,42 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
   const snapshots = await getWorkOrderTimerSnapshots(user, workOrderIds);
   if (!snapshots.size) return workOrders || [];
 
+  const missingExpectedDurations = (workOrders || [])
+    .map((workOrder: any) => ({
+      workorderId: Number(workOrder?.id),
+      expectedSeconds: getWorkOrderExpectedDurationSeconds(workOrder),
+      snapshot: snapshots.get(Number(workOrder?.id)),
+    }))
+    .filter(({ workorderId, expectedSeconds, snapshot }) => (
+      workorderId
+      && expectedSeconds
+      && snapshot
+      && !normalizeExpectedDurationSeconds(snapshot.expected_duration_seconds)
+    ));
+
+  if (missingExpectedDurations.length) {
+    try {
+      await withPool(async (client) => {
+        for (const item of missingExpectedDurations) {
+          await client.query(
+            `
+            UPDATE work_order_time_snapshots
+            SET expected_duration_seconds = $3,
+                updated_at = NOW()
+            WHERE id_company = $1
+              AND workorder_id = $2
+              AND (expected_duration_seconds IS NULL OR expected_duration_seconds <= 0)
+            `,
+            [String(user?.company_id || ''), item.workorderId, item.expectedSeconds] as any[]
+          );
+          item.snapshot.expected_duration_seconds = item.expectedSeconds;
+        }
+      });
+    } catch (error) {
+      console.error('No se pudo conservar la duracion teorica de las OT:', error);
+    }
+  }
+
   const now = Date.now();
   return (workOrders || []).map((workOrder: any) => {
     const snapshot = snapshots.get(Number(workOrder?.id));
@@ -264,8 +323,16 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
     const currentElapsed = normalizeElapsedSeconds(snapshot.current_elapsed_seconds, snapshotElapsed);
     const canRun = Boolean(snapshot.is_running) && isTimerAllowedToRun(workOrder);
     const realDurationSeconds = canRun ? currentElapsed : snapshotElapsed;
-    const expectedDurationSource = workOrder?.piso_expected_duration_seconds ?? (Number(workOrder?.duration_expected || 0) * 60);
-    const expectedDurationSeconds = Math.max(0, Math.round(Number(expectedDurationSource) || 0));
+    const expectedDurationSeconds = normalizeExpectedDurationSeconds(snapshot.expected_duration_seconds)
+      ?? getWorkOrderExpectedDurationSeconds(workOrder)
+      ?? 0;
+    const synchronizedWorkingState = workOrder?.local_blocked
+      ? 'blocked'
+      : canRun
+        ? 'progress'
+        : !isWorkOrderDone(workOrder)
+          ? 'paused'
+          : workOrder?.working_state;
 
     return {
       ...workOrder,
@@ -274,6 +341,7 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
       piso_expected_duration_seconds: expectedDurationSeconds,
       piso_active_since: canRun ? snapshot.active_since : false,
       piso_duration_calculated_at: new Date(now).toISOString(),
+      working_state: synchronizedWorkingState,
       is_user_working: canRun,
     };
   });

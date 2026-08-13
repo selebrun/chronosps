@@ -1,5 +1,5 @@
 'use server'
-import { getOdooData } from '@/app/api/odoo/odooService';
+import { executeOdooMethod, getOdooData } from '@/app/api/odoo/odooService';
 import { getActiveWorkOrderBlocks } from '@/app/api/workOrderBlocks/workOrderBlocks';
 import { applyWorkOrderTimerSnapshots } from '@/app/api/workOrderTimers/workOrderTimers';
 import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
@@ -77,6 +77,18 @@ function getOdooErrorMessage(response: any, fallback: string) {
     || response?.message?.message
     || response?.message;
   return typeof message === 'string' && message.trim() ? message : fallback;
+}
+
+function callOdooMethod(
+  model: string,
+  method: string,
+  args: any[],
+  companyId: string,
+  kwargs: any = false,
+): Promise<any> {
+  return new Promise((resolve) => {
+    executeOdooMethod(model, method, args, companyId, (response: any) => resolve(response), kwargs);
+  });
 }
 
 // ─── Resolución de usuario Líder ─────────────────────────────────────────────
@@ -205,6 +217,76 @@ async function filterProductionsWithRealWorkOrders(user: any, productions: any[]
 }
 
 // ─── Enriquecimiento de OTs (paralelo) ───────────────────────────────────────
+
+const OPERATION_INSTRUCTION_FIELDS = [
+  'id',
+  'note',
+  'operation_note',
+  'worksheet',
+  'worksheet_type',
+  'worksheet_google_slide',
+  'worksheet_document',
+  'worksheet_url',
+];
+const operationInstructionFieldsByCompany = new Map<string, string[]>();
+
+async function getCompatibleOperationInstructionFields(companyId: string) {
+  const cacheKey = String(companyId || '').trim();
+  const cachedFields = operationInstructionFieldsByCompany.get(cacheKey);
+  if (cachedFields) return cachedFields;
+
+  const fieldsResponse = await callOdooMethod(
+    'mrp.routing.workcenter',
+    'fields_get',
+    [],
+    companyId,
+    { attributes: ['type'] }
+  );
+  const availableFields = fieldsResponse?.status && fieldsResponse?.data
+    ? new Set(Object.keys(fieldsResponse.data))
+    : new Set(['id', 'note']);
+  const compatibleFields = OPERATION_INSTRUCTION_FIELDS.filter((field) => availableFields.has(field));
+
+  operationInstructionFieldsByCompany.set(cacheKey, compatibleFields);
+  return compatibleFields;
+}
+
+async function addOperationInstructionsToWorkOrders(user: any, workOrders: any[]) {
+  const operationIds = Array.from(new Set<number>(
+    (workOrders || [])
+      .map((workOrder: any) => Number(asOdooId(workOrder?.operation_id)))
+      .filter(Boolean)
+  ));
+  if (!operationIds.length) return workOrders || [];
+
+  const fields = await getCompatibleOperationInstructionFields(user.company_id);
+  const operations = await getOdooRecords(
+    'mrp.routing.workcenter',
+    [['id', 'in', operationIds]],
+    fields.length ? fields : ['id'],
+    user.company_id
+  );
+  const operationById = new Map<number, any>(
+    operations.map((operation: any) => [Number(operation.id), operation])
+  );
+
+  return (workOrders || []).map((workOrder: any) => {
+    const operation = operationById.get(Number(asOdooId(workOrder?.operation_id)));
+    if (!operation) return workOrder;
+
+    return {
+      ...workOrder,
+      operation_note: normalizeText(workOrder?.operation_note)
+        || normalizeText(operation?.operation_note)
+        || normalizeText(operation?.note),
+      worksheet: workOrder?.worksheet || operation?.worksheet || false,
+      worksheet_type: workOrder?.worksheet_type || operation?.worksheet_type || false,
+      worksheet_google_slide: workOrder?.worksheet_google_slide || operation?.worksheet_google_slide || false,
+      worksheet_document: workOrder?.worksheet_document || operation?.worksheet_document || false,
+      worksheet_url: workOrder?.worksheet_url || operation?.worksheet_url || false,
+    };
+  });
+}
 
 function parseOdooDate(dateValue: string) {
   if (!dateValue) return null;
@@ -395,8 +477,11 @@ async function enrichWorkOrders(user: any, workOrders: any[]) {
   if (!workOrders.length) return workOrders;
 
   const workOrderIds = workOrders.map((wo: any) => wo.id).filter(Boolean);
-  const blocksMap = await getActiveWorkOrderBlocks(user, workOrderIds);
-  const withBlockState = workOrders.map((wo: any) => {
+  const [blocksMap, withInstructions] = await Promise.all([
+    getActiveWorkOrderBlocks(user, workOrderIds),
+    addOperationInstructionsToWorkOrders(user, workOrders),
+  ]);
+  const withBlockState = withInstructions.map((wo: any) => {
     const woId = Number(wo.id);
     const block = blocksMap.get(woId);
     if (!block) return wo;

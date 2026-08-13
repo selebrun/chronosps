@@ -77,6 +77,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [modalIsOpenCompleteOrder, setModalIsOpenCompleteOrder] = useState(false);
   const [modalIsMaterials, setModalIsMaterials] = useState(false);
   const [materials, setMaterials] = useState<any>([]);
+  const [materialsLoading, setMaterialsLoading] = useState(false);
+  const [materialsError, setMaterialsError] = useState('');
   const [modalIsAddMaterials, setModalIsAddMaterials] = useState(false);
   const [orderWorkSelected, seOrderWorkSelected] = useState<any>({});
   const [loadigSaveMaterials, setLoadigSaveMaterials] = useState(false);
@@ -166,19 +168,29 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       const elapsedSeconds = timer?.has_timer_snapshot === false
         ? Number(order.piso_real_duration_seconds || Number(order.duration || 0) * 60)
         : Number(timer.elapsed_seconds || 0);
+      const expectedSeconds = Number(timer?.expected_duration_seconds);
+      const isDone = ['done', 'completed', 'cancel'].includes(order.state);
+      const sharedWorkingState = isBlocked
+        ? 'blocked'
+        : canRun
+          ? 'progress'
+          : !isDone && timer?.has_timer_snapshot !== false
+            ? 'paused'
+            : order.working_state === 'blocked' ? 'paused' : order.working_state;
       return {
         ...order,
         duration: elapsedSeconds / 60,
         piso_real_duration_seconds: elapsedSeconds,
+        piso_expected_duration_seconds: Number.isFinite(expectedSeconds) && expectedSeconds > 0
+          ? expectedSeconds
+          : order.piso_expected_duration_seconds,
         piso_duration_calculated_at: timer.calculated_at,
         local_blocked: isBlocked,
         local_block_reason_id: timer.local_block_reason_id ?? null,
         local_block_reason_name: timer.local_block_reason_name || '',
         local_blocked_by: timer.local_blocked_by || '',
         local_blocked_at: timer.local_blocked_at || null,
-        working_state: isBlocked
-          ? 'blocked'
-          : order.working_state === 'blocked' ? 'paused' : order.working_state,
+        working_state: sharedWorkingState,
         is_user_working: canRun,
       };
     };
@@ -275,10 +287,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
   const getMaterials = async () => {
     setMaterials([])
+    setMaterialsError('')
+    setMaterialsLoading(true)
     const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
-    const materials = await getMaterialsOrder(user, orderProductionSelected.move_raw_ids, currentWorkOrder).then( res => res).catch((err) => console.log(err))
-    if(materials?.status) {
-      setMaterials(materials.data)
+    try {
+      const response: any = await Promise.race([
+        getMaterialsOrder(user, orderProductionSelected.move_raw_ids || [], currentWorkOrder),
+        new Promise((resolve) => window.setTimeout(
+          () => resolve({ status: false, message: 'Odoo no respondio a tiempo al consultar los materiales.' }),
+          20000
+        )),
+      ])
+      if (response?.status) {
+        setMaterials(Array.isArray(response.data) ? response.data : [])
+      } else {
+        setMaterialsError(response?.message || 'No se pudieron consultar los materiales de la orden de trabajo.')
+      }
+    } catch (error: any) {
+      setMaterialsError(error?.message || 'No se pudieron consultar los materiales de la orden de trabajo.')
+    } finally {
+      setMaterialsLoading(false)
     }
   }
 
@@ -399,6 +427,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
          setModalIsAddMaterials={setModalIsAddMaterials}
          getMaterials={getMaterials}
          materials={materials}
+         materialsLoading={materialsLoading}
+         materialsError={materialsError}
          onAddMaterial={onAddMaterial}
          loadigSaveMaterials={loadigSaveMaterials}
          onSaveMaterialsOrder={onSaveMaterialsOrder}

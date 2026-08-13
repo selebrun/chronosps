@@ -49,6 +49,8 @@ export function ModalDetailWork({
   setModalIsMaterials,
   getMaterials,
   materials,
+  materialsLoading,
+  materialsError,
   setModalIsAddMaterials,
   modalIsAddMaterials,
   onAddMaterial,
@@ -81,6 +83,8 @@ export function ModalDetailWork({
   setModalIsMaterials: any
   getMaterials: any
   materials: any
+  materialsLoading: boolean
+  materialsError: string
   setModalIsAddMaterials: any
   modalIsAddMaterials: boolean
   onAddMaterial: (material:any, total: number) => void
@@ -113,6 +117,13 @@ export function ModalDetailWork({
       : Math.max(0, Math.round(Number(showDetailOrderWork?.duration || 0) * 60) + Number(showDetailOrderWork?.piso_active_elapsed_seconds || 0));
   }, [normalizedRealDurationSeconds, showDetailOrderWork?.duration, showDetailOrderWork?.piso_active_elapsed_seconds]);
   const [elapsedSeconds, setElapsedSeconds] = useState(baseElapsedSeconds);
+  const isEffectivelyPaused = Boolean(
+    !isBlocked
+    && !isWorkOrderDone
+    && !showDetailOrderWork?.quality_failed
+    && !isTimerRunning
+    && (showDetailOrderWork?.working_state === 'paused' || elapsedSeconds > 0)
+  );
   const expectedSeconds = Number.isFinite(normalizedExpectedSeconds)
     ? Math.max(0, Math.round(normalizedExpectedSeconds))
     : Math.max(Number(showDetailOrderWork?.duration_expected || 0) * 60, 0);
@@ -168,17 +179,33 @@ export function ModalDetailWork({
 
       const sharedTimerChanged = Boolean(timer.is_running) !== isTimerRunning;
       const sharedBlockChanged = Boolean(timer.local_blocked) !== isBlocked;
+      const sharedElapsedSeconds = timer.has_timer_snapshot === false
+        ? baseElapsedSeconds
+        : Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
+      const shouldBePaused = Boolean(
+        !timer.is_running
+        && !timer.local_blocked
+        && !showDetailOrderWork?.quality_failed
+        && !isWorkOrderDone
+        && timer.has_timer_snapshot !== false
+      );
+      const sharedStatusChanged = timer.is_running
+        ? showDetailOrderWork?.working_state !== 'progress' || !showDetailOrderWork?.is_user_working
+        : shouldBePaused && showDetailOrderWork?.working_state !== 'paused';
+      const timerExpectedSeconds = Number(timer.expected_duration_seconds);
+      const sharedExpectedChanged = Number.isFinite(timerExpectedSeconds)
+        && timerExpectedSeconds > 0
+        && timerExpectedSeconds !== normalizedExpectedSeconds;
 
       // El valor visible sale siempre del reloj central de Piso. Ninguna sesion
       // mantiene un contador independiente en memoria.
       if (timer.has_timer_snapshot !== false) {
-        const sharedElapsedSeconds = Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
         setElapsedSeconds(sharedElapsedSeconds);
       }
 
-      // Solo se propagan al padre los cambios remotos de ejecucion o bloqueo.
-      // El sondeo del tiempo no reconstruye el detalle en cada ciclo.
-      if (sharedTimerChanged || sharedBlockChanged) {
+      // El estado visual se reconcilia aunque el booleano de ejecucion ya
+      // coincida, porque otra sesion puede conservar "paused" en memoria.
+      if (sharedTimerChanged || sharedBlockChanged || sharedStatusChanged || sharedExpectedChanged) {
         sharedTimerSyncRef.current?.(timer);
       }
     };
@@ -189,7 +216,7 @@ export function ModalDetailWork({
       active = false;
       window.clearInterval(interval);
     };
-  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, isTimerRunning, isBlocked]);
+  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, showDetailOrderWork?.working_state, showDetailOrderWork?.is_user_working, showDetailOrderWork?.quality_failed, isTimerRunning, isBlocked, isWorkOrderDone, normalizedExpectedSeconds, baseElapsedSeconds]);
 
   const formatElapsedTime = (totalSeconds: number) => {
     const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -218,14 +245,18 @@ export function ModalDetailWork({
     ? 'quality_failed'
     : isWorkOrderBlocked(showDetailOrderWork)
     ? 'blocked'
-    : showDetailOrderWork.working_state === 'paused'
+    : isTimerRunning
+      ? 'progress'
+    : isEffectivelyPaused
       ? 'paused'
       : showDetailOrderWork.state;
 
   const renderButtons = (showDetailOrderWork: any) => {
     const isBlocked = isWorkOrderBlocked(showDetailOrderWork);
     const isUserWorking = showDetailOrderWork.is_user_working;
-    const isPaused = showDetailOrderWork.working_state === "paused" || (!isUserWorking && showDetailOrderWork.duration > 0);
+    const isPaused = !isBlocked
+      && !isUserWorking
+      && (showDetailOrderWork.working_state === "paused" || elapsedSeconds > 0);
     const canUnblock = isRole(user, 'Jefe');
     const canReleaseQualityFailure = isRole(user, 'Lider') || isRole(user, 'Jefe');
     const isFailedForOperator = Boolean(showDetailOrderWork.quality_failed && isRole(user, 'Operario'));
@@ -316,6 +347,13 @@ export function ModalDetailWork({
     setvValueTotalMaterial(e)
   }
 
+  const instructionNote = showDetailOrderWork?.operation_note || showDetailOrderWork?.note || '';
+  const instructionUrlCandidate = showDetailOrderWork?.worksheet_google_slide || showDetailOrderWork?.worksheet_url || '';
+  const instructionUrl = typeof instructionUrlCandidate === 'string' && /^https?:\/\//i.test(instructionUrlCandidate)
+    ? instructionUrlCandidate
+    : '';
+  const hasInstructions = Boolean(instructionNote || showDetailOrderWork?.worksheet || instructionUrl);
+
   return (
     <>
       <Modal setOpen={Boolean(error)} title='Mensaje' className='max-w-md'>
@@ -362,12 +400,16 @@ export function ModalDetailWork({
             />
           </button>
         </div>
-        {showDetailOrderWork?.operation_note &&
-        <div dangerouslySetInnerHTML={{ __html: showDetailOrderWork?.operation_note }} />}
-        {!showDetailOrderWork?.operation_note && 
+        {instructionNote &&
+        <div className="whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: instructionNote }} />}
+        {!hasInstructions &&
         <div className="font-bold text-center" >No posee instrucciones</div>}
         {showDetailOrderWork?.worksheet && 
         <div ><iframe width={'100%'} height="600px"  src={`data:application/pdf;base64,${showDetailOrderWork?.worksheet}`} ></iframe></div>}
+        {instructionUrl &&
+        <div className="mt-4">
+          <a className="font-bold text-blue-700 underline" href={instructionUrl} target="_blank" rel="noreferrer">Abrir documento de instrucciones</a>
+        </div>}
       </Modal>
       <Modal setOpen={modalIsOpenJobDetail} title='Detalle de Trabajo' className='max-w-3xl'>
           <div className="flex justify-end relative bottom-10">
@@ -452,7 +494,7 @@ export function ModalDetailWork({
               {showDetailOrderWork?.quality_failed_points?.length ? ` - ${showDetailOrderWork.quality_failed_points.join(', ')}` : ''}. El operador no puede continuar hasta que Lider o Calidad revise el control.
             </div>
           )}
-          {showDetailOrderWork.working_state === "paused" && !isWorkOrderBlocked(showDetailOrderWork) && (
+          {isEffectivelyPaused && (
             <div className='mt-3 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-3 rounded'>
               <strong>Estado: Pausada</strong> - La actividad se ha pausado. Puede reanudarla desde donde quedó usando el botón &quot;Reanudar&quot;.
             </div>
@@ -555,7 +597,7 @@ export function ModalDetailWork({
             />
           </button>
         </div>
-        {materials.length === 0 &&
+        {materialsLoading &&
             <div className="rounded-md absolute p-7 top-[50%] left-[50%] transform translate-x-[-50%] translate-y-[-50%] bg-white dark:bg-gray-800 dark:text-gray-100 shadow-[0_35px_60px_-15px_rgba(0.7,0,0,0.7)]">                
               <svg aria-hidden="true" className="inline w-8 h-8 text-gray-200 animate-spin dark:text-gray-600 fill-gray-600 dark:fill-gray-300" viewBox="0 0 100 101" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M100 50.5908C100 78.2051 77.6142 100.591 50 100.591C22.3858 100.591 0 78.2051 0 50.5908C0 22.9766 22.3858 0.59082 50 0.59082C77.6142 0.59082 100 22.9766 100 50.5908ZM9.08144 50.5908C9.08144 73.1895 27.4013 91.5094 50 91.5094C72.5987 91.5094 90.9186 73.1895 90.9186 50.5908C90.9186 27.9921 72.5987 9.67226 50 9.67226C27.4013 9.67226 9.08144 27.9921 9.08144 50.5908Z" fill="currentColor"/>
@@ -563,6 +605,15 @@ export function ModalDetailWork({
               </svg>
               <span className="ml-2">Cargando ...</span>
             </div>}
+        {!materialsLoading && materialsError &&
+          <div className="mb-5 rounded-md border border-red-400 bg-red-50 p-4 text-center text-red-800">
+            <div className="mb-3 font-medium">{materialsError}</div>
+            <button type="button" onClick={() => getMaterials()} className="rounded-md bg-[#1D4C92] px-4 py-2 font-bold text-white">Reintentar</button>
+          </div>}
+        {!materialsLoading && !materialsError && materials.length === 0 &&
+          <div className="mb-5 rounded-md bg-gray-100 p-4 text-center font-medium text-gray-700">
+            No hay materiales disponibles para esta orden de trabajo.
+          </div>}
         {!user.materiales && <div className='pb-5'>Su usuario no tiene permitido añadir materiales adicionales al BOM. Contacte con un supervisor.</div>}
         <div className="relative overflow-x-auto overflow-y-auto max-w-full max-h-[500px] rounded">
           <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400 relative overflow-y-auto">
