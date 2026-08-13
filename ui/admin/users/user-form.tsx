@@ -7,10 +7,18 @@ import { Spinner } from '@/ui/spinner';
 
 export function ChronosUsersForm({
   user,
-  companies
+  companies,
+  fixedCompanyId,
+  returnPath = '/admin/users',
+  companyScope = false,
+  lockAdministratorIdentity = false,
 }: {
   user?: ChronosUsers
   companies?: any
+  fixedCompanyId?: string
+  returnPath?: string
+  companyScope?: boolean
+  lockAdministratorIdentity?: boolean
 }) {
 
   const router = useRouter();
@@ -19,7 +27,7 @@ export function ChronosUsersForm({
   const [loading, setLoading] = useState<boolean>(false)
 
   const [formData, setFormData] = useState<any>({
-    id_company: user?.id_company?.trim() || '',
+    id_company: fixedCompanyId?.trim() || user?.id_company?.trim() || '',
     code: user?.code?.trim() || '',
     password: user?.password?.trim() || '',
     name: user?.name?.trim() || '',
@@ -60,13 +68,16 @@ export function ChronosUsersForm({
     }
   };
 
+  const requestHeaders = {
+    "Content-Type": "application/json",
+    ...(companyScope ? { "x-chronos-company-scope": "1" } : {}),
+  };
+
   const createUser = async () => {
     const response = await fetch("/api/users", {
       method: 'POST',
       credentials: 'same-origin',
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: requestHeaders,
       body: JSON.stringify(getPayload())
     });
 
@@ -83,9 +94,7 @@ export function ChronosUsersForm({
     const response = await fetch("/api/users", {
       method: 'PUT',
       credentials: 'same-origin',
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: requestHeaders,
       body: JSON.stringify(getPayload())
     });
 
@@ -110,9 +119,7 @@ export function ChronosUsersForm({
       const response = await fetch("/api/users", {
         method: 'DELETE',
         credentials: 'same-origin',
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: requestHeaders,
         body: JSON.stringify(formData)
       });
 
@@ -152,7 +159,7 @@ export function ChronosUsersForm({
   };
 
   const navigateOnSuccess = () => {
-    router.push("/admin/users");
+    router.push(returnPath);
     router.refresh();
   }
 
@@ -177,6 +184,7 @@ export function ChronosUsersForm({
           name="code"
           value={formData?.code || ''}
           onChange={handleChange}
+          disabled={lockAdministratorIdentity}
           className="w-full p-2 border border-gray-300 rounded-md"
           required
         />
@@ -234,6 +242,7 @@ export function ChronosUsersForm({
           name="id_company"
           value={formData?.id_company || ''}
           onChange={handleChange}
+          disabled={Boolean(fixedCompanyId)}
           className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
             <option>{"Seleccionar compañia"}</option>
             {companies?.map((item:any, index: number)=> (
@@ -250,6 +259,7 @@ export function ChronosUsersForm({
           name='rol'
           onChange={handleChange}
           value={formData?.rol || ''}
+          disabled={lockAdministratorIdentity}
           className="w-full bg-white shadow border rounded py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline">
               <option>{"Seleccionar rol"}</option>
             <option value={'Lider'}>Lider</option>
@@ -258,6 +268,9 @@ export function ChronosUsersForm({
 	    <option value={'Calidad'}>Calidad</option>
             <option value={'Cliente'}>Cliente</option>
         </select>
+        {lockAdministratorIdentity && (
+          <p className="mt-1 text-xs text-gray-500">La identificacion y el rol Jefe estan protegidos mientras este usuario sea el administrador designado.</p>
+        )}
       </div>
       <label className="mb-4 flex items-center gap-2 text-sm font-medium text-gray-700">
         <input

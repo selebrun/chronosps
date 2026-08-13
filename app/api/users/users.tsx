@@ -1,4 +1,4 @@
-'use server'
+import 'server-only';
 
 import { Client } from "pg";
 import Odoo from "async-odoo-xmlrpc";
@@ -14,6 +14,10 @@ const dbConfig = {
     rejectUnauthorized: false,
   },
 } as any;
+
+async function ensureCompanyAdministratorColumn(client: Client) {
+  await client.query('ALTER TABLE "company" ADD COLUMN IF NOT EXISTS admin_user_code CHARACTER(20)');
+}
 
 async function getCompanyById(idCompany: string | number) {
   const client = new Client(dbConfig);
@@ -175,6 +179,46 @@ export async function getUsers() {
   }
 }
 
+export async function getUsersByCompany(companyId: string) {
+  const client = new Client(dbConfig);
+
+  try {
+    await client.connect();
+    const result = await client.query(
+      `SELECT *
+       FROM users
+       WHERE TRIM(id_company) = TRIM($1)
+       ORDER BY LOWER(TRIM(name)) ASC`,
+      [companyId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error consultando usuarios de la empresa:', error);
+    throw new Error('No se pudieron consultar los usuarios de la empresa');
+  } finally {
+    await client.end();
+  }
+}
+
+export async function getUserByCompanyAndCode(companyId: string, code: string) {
+  const client = new Client(dbConfig);
+
+  try {
+    await client.connect();
+    const result = await client.query(
+      `SELECT *
+       FROM users
+       WHERE TRIM(id_company) = TRIM($1)
+         AND TRIM(code) = TRIM($2)
+       LIMIT 1`,
+      [companyId, code]
+    );
+    return result.rows[0] || null;
+  } finally {
+    await client.end();
+  }
+}
+
 export async function getUsersByID(id: string) {
   const client = new Client(dbConfig);
 
@@ -283,9 +327,25 @@ export async function updateUsers(user: any) {
     const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
     const lookupCode = user.original_code || code;
     const lookupCompany = user.original_id_company || id_company;
-    const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
-
     await client.connect();
+    await ensureCompanyAdministratorColumn(client);
+    const companyAdminResult = await client.query(
+      `SELECT TRIM(admin_user_code) AS admin_user_code
+       FROM company
+       WHERE TRIM(id_company) = TRIM($1)
+         AND TRIM(admin_user_code) = TRIM($2)
+       LIMIT 1`,
+      [lookupCompany, lookupCode]
+    );
+    const updatesCompanyAdministrator = Boolean(companyAdminResult.rows[0]);
+    if (updatesCompanyAdministrator && (
+      id_company?.toString?.().trim?.() !== lookupCompany?.toString?.().trim?.()
+      || rol?.toString?.().trim?.() !== 'Jefe'
+    )) {
+      throw new Error('El administrador designado debe permanecer en la misma empresa y conservar el perfil Jefe.');
+    }
+
+    const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
 
     const query = `
       UPDATE users
@@ -322,10 +382,21 @@ export async function updateUsers(user: any) {
       return null;
     }
 
+    if (updatesCompanyAdministrator && code?.toString?.().trim?.() !== lookupCode?.toString?.().trim?.()) {
+      await client.query(
+        `UPDATE company
+         SET admin_user_code = $1
+         WHERE TRIM(id_company) = TRIM($2)
+           AND TRIM(admin_user_code) = TRIM($3)`,
+        [code, lookupCompany, lookupCode]
+      );
+    }
+
     console.log(`Usuario ${result.rows[0].name} actualizado en DB`);
     return result.rows[0];
   } catch (error) {
     console.error("Error al actualizar usuario:", error);
+    if (error instanceof Error && error.message.includes('administrador designado')) throw error;
     throw new Error("No se pudo actualizar el usuario");
   } finally {
     await client.end();
@@ -337,8 +408,21 @@ export async function deleteUsers(user: any) {
 
   try {
     await client.connect();
+    await ensureCompanyAdministratorColumn(client);
     const code = user.original_code || user.code;
     const idCompany = user.original_id_company || user.id_company;
+
+    const companyAdminResult = await client.query(
+      `SELECT 1
+       FROM company
+       WHERE TRIM(id_company) = TRIM($1)
+         AND TRIM(admin_user_code) = TRIM($2)
+       LIMIT 1`,
+      [idCompany, code]
+    );
+    if (companyAdminResult.rows[0]) {
+      throw new Error('No se puede eliminar al administrador designado de la empresa. Reasigne primero el administrador en la ficha de la empresa.');
+    }
 
     const result = await client.query(
       `DELETE FROM users
@@ -352,6 +436,7 @@ export async function deleteUsers(user: any) {
     return result.rows[0];
   } catch (error) {
     console.error("Error al eliminar usuario:", error);
+    if (error instanceof Error && error.message.includes('administrador designado')) throw error;
     throw new Error("No se pudo eliminar el usuario");
   } finally {
     await client.end();

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { type ChronosCompany } from "@/types/chronosCompany";
-import { getCompanyByID } from "@/app/api/companies/companies";
+import { getCompanyByID, getCompanyJefeUsers } from "@/app/api/companies/companies";
 import { ChronosCompanyForm } from "@/ui/admin/companies/company-form";
 
 export default async function Page({
@@ -9,7 +9,10 @@ export default async function Page({
   params: { companyId: string };
 }) {
   const { companyId } = params;
-  const company = await getCompanyByID(companyId) as ChronosCompany
+  const [company, companyJefes] = await Promise.all([
+    getCompanyByID(companyId) as Promise<ChronosCompany>,
+    getCompanyJefeUsers(companyId),
+  ]);
 
   return (
     <>
@@ -17,7 +20,7 @@ export default async function Page({
         <h6 className="font-bold">Editar Compania</h6>
         <Link href={"/admin/companies"} className="bg-gray-100 text-gray-800 py-1 px-4 rounded hover:bg-gray-300">Cancelar</Link>
       </div>
-      <ChronosCompanyForm company={company}/>
+      <ChronosCompanyForm company={company} companyJefes={companyJefes}/>
     </>
   );
 }

@@ -21,7 +21,9 @@ export async function POST(req: Request) {
     return NextResponse.json(company);
   } catch (error) {
     console.error("Error en POST /api/companies:", error);
-    return NextResponse.json({ message: "No se pudo crear la compania" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "No se pudo crear la compania";
+    const status = message.includes('administrador de empresa') ? 400 : 500;
+    return NextResponse.json({ message }, { status });
   }
 }
 
@@ -48,7 +50,9 @@ export async function PUT(req: Request) {
     return NextResponse.json(updatedCompany);
   } catch (error) {
     console.error("Error en PUT /api/companies:", error);
-    return NextResponse.json({ message: "No se pudo actualizar la compania" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "No se pudo actualizar la compania";
+    const status = message.includes('administrador de empresa') ? 400 : 500;
+    return NextResponse.json({ message }, { status });
   }
 }
 

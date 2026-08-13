@@ -7,9 +7,11 @@ import { type ChronosCompany } from "@/types/chronosCompany";
 import { Spinner } from '@/ui/spinner';
 
 export function ChronosCompanyForm({
-  company
+  company,
+  companyJefes = [],
 }: {
   company?: ChronosCompany
+  companyJefes?: Array<{ code: string; name: string; email?: string }>
 }) {
 
   const router = useRouter();
@@ -26,9 +28,10 @@ export function ChronosCompanyForm({
     user_default: company?.user_default || '',
     password: company?.password || '',
     default_odoo_user_id: company?.default_odoo_user_id || '',
+    admin_user_code: company?.admin_user_code?.trim() || '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
@@ -43,6 +46,7 @@ export function ChronosCompanyForm({
     user_default: formData.user_default?.trim() || '',
     password: formData.password?.trim() || '',
     default_odoo_user_id: formData.default_odoo_user_id?.toString?.().trim?.() || '',
+    admin_user_code: formData.admin_user_code?.toString?.().trim?.() || '',
   });
 
   const isFormInvalid = !formData.name?.trim()
@@ -275,6 +279,31 @@ export function ChronosCompanyForm({
           placeholder="Ej: 6"
         />
       </div>
+
+      {company && (
+        <div className="mb-4">
+          <label htmlFor="admin_user_code" className="text-xs block text-gray-700 font-bold mb-2">
+            Administrador de usuarios de la empresa
+          </label>
+          <select
+            id="admin_user_code"
+            name="admin_user_code"
+            value={formData.admin_user_code || ''}
+            onChange={handleChange}
+            className="w-full rounded-md border border-gray-300 bg-white p-2 text-gray-900"
+          >
+            <option value="">Sin administrador asignado</option>
+            {companyJefes.map((jefe) => (
+              <option value={jefe.code.trim()} key={jefe.code.trim()}>
+                {jefe.name?.trim() || jefe.code.trim()} ({jefe.code.trim()})
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Solo aparecen usuarios de esta empresa con perfil Jefe.
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <button

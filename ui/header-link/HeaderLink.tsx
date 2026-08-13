@@ -3,12 +3,13 @@ import { navItems } from "@/config/nav-links";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 
-function roleCanSeeItem(itemRoles: string[] = [], userRole: string = "") {
+function roleCanSeeItem(item: any, userRole: string = "", isCompanyAdmin = false) {
   const normalizedUserRole = userRole.toString().trim();
-  return itemRoles.some((role) => role.toString().trim() === normalizedUserRole);
+  const roleAllowed = (item?.role || []).some((role: string) => role.toString().trim() === normalizedUserRole);
+  return roleAllowed && (!item?.companyAdminOnly || isCompanyAdmin);
 }
 
-export function HeaderLink({ userRole }: any) {
+export function HeaderLink({ userRole, isCompanyAdmin = false }: any) {
   const pathName = usePathname();
   const normalizedPath = pathName.replace(/\/$/, "");
   const shouldShowHeader = normalizedPath.startsWith("/dashboard");
@@ -23,12 +24,12 @@ export function HeaderLink({ userRole }: any) {
             </div>
             <div className="space-y-2">
               {section.items.map((item) =>
-                roleCanSeeItem(item.role, userRole) ? (
+                roleCanSeeItem(item, userRole, isCompanyAdmin) ? (
                   <Link
                     href={`/dashboard/${item.slug}`}
                     key={item.name}
                     className={`block rounded-md px-3 py-2 text-sm font-semibold ${
-                      normalizedPath === `/dashboard/${item.slug}`
+                      normalizedPath === `/dashboard/${item.slug}` || normalizedPath.startsWith(`/dashboard/${item.slug}/`)
                         ? "bg-sky-950 text-white"
                         : "bg-lightCyan text-gray-900 hover:bg-sky-950 hover:text-white dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-sky-900"
                     }`}

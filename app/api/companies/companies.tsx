@@ -1,4 +1,4 @@
-'use server'
+import 'server-only';
 
 import { Client } from "pg";
 
@@ -14,13 +14,43 @@ const config = {
   }
 } as any;
 
-async function ensureCompanyDefaultOdooUserColumn(client: Client) {
-  await client.query('ALTER TABLE "company" ADD COLUMN IF NOT EXISTS default_odoo_user_id INTEGER');
+async function ensureCompanyColumns(client: Client) {
+  await client.query(`
+    ALTER TABLE "company"
+      ADD COLUMN IF NOT EXISTS default_odoo_user_id INTEGER,
+      ADD COLUMN IF NOT EXISTS admin_user_code CHARACTER(20)
+  `);
 }
 
 function normalizeDefaultOdooUserId(value: any) {
   const userId = Number(value);
   return Number.isFinite(userId) && userId > 0 ? userId : null;
+}
+
+function normalizeCompanyAdminCode(value: any) {
+  const code = value?.toString?.().trim?.() || '';
+  return code || null;
+}
+
+async function validateCompanyAdministrator(client: Client, companyId: string, adminUserCode: any) {
+  const normalizedCode = normalizeCompanyAdminCode(adminUserCode);
+  if (!normalizedCode) return null;
+
+  const result = await client.query(
+    `SELECT TRIM(code) AS code
+     FROM users
+     WHERE TRIM(id_company) = TRIM($1)
+       AND TRIM(code) = TRIM($2)
+       AND TRIM(rol) = 'Jefe'
+     LIMIT 1`,
+    [companyId, normalizedCode]
+  );
+
+  if (!result.rows[0]) {
+    throw new Error('El administrador de empresa debe ser un usuario con perfil Jefe de la misma empresa.');
+  }
+
+  return result.rows[0].code;
 }
 
 /**
@@ -37,7 +67,7 @@ export async function getCompanies() {
 
   try {
     await client.connect();
-    await ensureCompanyDefaultOdooUserColumn(client);
+    await ensureCompanyColumns(client);
     const res = await client.query('SELECT * FROM "company" ORDER BY LOWER(TRIM(name)) ASC');
     const companies = res.rows;
 
@@ -64,7 +94,7 @@ export async function getCompanyByID(companyId: string) {
 
   try {
     await client.connect();
-    await ensureCompanyDefaultOdooUserColumn(client);
+    await ensureCompanyColumns(client);
     const res = await client.query('SELECT * FROM "company" WHERE id_company = $1', [companyId]);
     const company = res.rows[0];
 
@@ -96,12 +126,13 @@ export async function createCompany(companyData: any) {
     await client.connect();
     console.log("Conectado correctamente al servidor PostgreSQL en Azure");
 
+    await ensureCompanyColumns(client);
+    const adminUserCode = await validateCompanyAdministrator(client, companyData.id_company, companyData.admin_user_code);
     const query = `
-        INSERT INTO company (id_company, name, url, domain, database, user_default, password, default_odoo_user_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO company (id_company, name, url, domain, database, user_default, password, default_odoo_user_id, admin_user_code)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       `;
 
-    await ensureCompanyDefaultOdooUserColumn(client);
     await client.query(query, [
       companyData.id_company,
       companyData.name,
@@ -110,11 +141,13 @@ export async function createCompany(companyData: any) {
       companyData.database,
       companyData.user_default,
       companyData.password,
-      normalizeDefaultOdooUserId(companyData.default_odoo_user_id)
+      normalizeDefaultOdooUserId(companyData.default_odoo_user_id),
+      adminUserCode
     ]);
     return companyData
   } catch (error) {
     console.error("Error al crear la empresa:", error);
+    if (error instanceof Error && error.message.includes('administrador de empresa')) throw error;
     throw new Error("No se pudo crear la compania");
   } finally {
     await client.end();
@@ -136,13 +169,15 @@ export async function updateCompany(companyData: any) {
     await client.connect();
     console.log("Conectado correctamente al servidor PostgreSQL en Azure");
 
+    await ensureCompanyColumns(client);
+    const adminUserCode = await validateCompanyAdministrator(client, companyData.id_company, companyData.admin_user_code);
     const query = `
         UPDATE company
-        SET name = $1, url = $2, domain = $3, database = $4, user_default = $5, password = $6, default_odoo_user_id = $7
-        WHERE id_company = $8
+        SET name = $1, url = $2, domain = $3, database = $4, user_default = $5, password = $6,
+            default_odoo_user_id = $7, admin_user_code = $8
+        WHERE id_company = $9
       `;
 
-    await ensureCompanyDefaultOdooUserColumn(client);
     await client.query(query, [
       companyData.name,
       companyData.url,
@@ -151,6 +186,7 @@ export async function updateCompany(companyData: any) {
       companyData.user_default,
       companyData.password,
       normalizeDefaultOdooUserId(companyData.default_odoo_user_id),
+      adminUserCode,
       companyData.id_company
     ]);
   
@@ -159,7 +195,58 @@ export async function updateCompany(companyData: any) {
   
   } catch (error) {
     console.error("Error al actualizar la empresa:", error);
+    if (error instanceof Error && error.message.includes('administrador de empresa')) throw error;
     throw new Error("No se pudo actualizar la compania");
+  } finally {
+    await client.end();
+  }
+}
+
+export async function getCompanyJefeUsers(companyId: string) {
+  const client = new Client(config);
+
+  try {
+    await client.connect();
+    const result = await client.query(
+      `SELECT id_company, code, name, email, rol
+       FROM users
+       WHERE TRIM(id_company) = TRIM($1)
+         AND TRIM(rol) = 'Jefe'
+       ORDER BY LOWER(TRIM(name)) ASC`,
+      [companyId]
+    );
+    return result.rows;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function isCompanyAdministrator(user: any) {
+  const companyId = user?.company_id?.toString?.().trim?.() || user?.id_company?.toString?.().trim?.() || '';
+  const userCode = user?.document?.toString?.().trim?.() || user?.code?.toString?.().trim?.() || '';
+  const role = user?.role?.toString?.().trim?.() || user?.rol?.toString?.().trim?.() || '';
+  if (!companyId || !userCode || role !== 'Jefe') return false;
+
+  const client = new Client(config);
+  try {
+    await client.connect();
+    await ensureCompanyColumns(client);
+    const result = await client.query(
+      `SELECT 1
+       FROM company c
+       INNER JOIN users u
+         ON TRIM(u.id_company) = TRIM(c.id_company)
+        AND TRIM(u.code) = TRIM(c.admin_user_code)
+       WHERE TRIM(c.id_company) = TRIM($1)
+         AND TRIM(c.admin_user_code) = TRIM($2)
+         AND TRIM(u.rol) = 'Jefe'
+       LIMIT 1`,
+      [companyId, userCode]
+    );
+    return Boolean(result.rows[0]);
+  } catch (error) {
+    console.error('No se pudo validar el administrador de empresa:', error);
+    return false;
   } finally {
     await client.end();
   }

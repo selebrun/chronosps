@@ -3,21 +3,25 @@ import { navItems } from '@/config/nav-links';
 import Link from 'next/link';
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
+import { isCompanyAdministrator } from '@/app/api/companies/companies';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-function roleCanSeeItem(itemRoles: string[] = [], userRole: string = "") {
+function roleCanSeeItem(item: any, userRole: string = "", isCompanyAdmin = false) {
   const normalizedUserRole = userRole.toString().trim();
-  return itemRoles.some((role) => role.toString().trim() === normalizedUserRole);
+  const roleAllowed = (item?.role || []).some((role: string) => role.toString().trim() === normalizedUserRole);
+  return roleAllowed && (!item?.companyAdminOnly || isCompanyAdmin);
 }
 
 export default async function Page() {
   const session = await getServerSession(config);
+  if (!session?.user) return null;
   const user = session.user;
+  const isCompanyAdmin = await isCompanyAdministrator(user);
   const navSections =  navItems.map((item: any) => ({
                       ...item,
-                      items: item.items.filter((subItem: any) => roleCanSeeItem(subItem.role, user.role)),
+                      items: item.items.filter((subItem: any) => roleCanSeeItem(subItem, user.role, isCompanyAdmin)),
                     }));
   
 

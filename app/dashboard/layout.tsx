@@ -57,6 +57,9 @@ export default async function Layout({
   if (!session.user?.company_id || !session.user?.role || session.user.role === 'chronosAdmin') redirect(LOGIN_URL)
   const company = await getDashboardCompany(session.user.company_id);
   const useHidrosumiLogo = isHidrosumiCompany(company, session.user.company_id);
+  const isCompanyAdmin = session.user.role === 'Jefe'
+    && Boolean(company?.admin_user_code)
+    && company.admin_user_code.toString().trim() === session.user.document?.toString?.().trim?.();
 
   return (
     <div className="min-h-screen bg-cover bg-right bg-[url('../public/fondo_engranajes.jpg')]">
@@ -70,7 +73,7 @@ export default async function Layout({
               logoSrc={useHidrosumiLogo ? "/logo-hidrosumi.png" : "/logo.png"}
               logoAlt={useHidrosumiLogo ? "Logo Hidrosumi" : "Logo Chronos"}
             />
-            <HeaderLink userRole={session.user.role}></HeaderLink>
+            <HeaderLink userRole={session.user.role} isCompanyAdmin={isCompanyAdmin}></HeaderLink>
           </div>
           <div className="mt-4 px-1 text-center text-[10px] leading-tight text-gray-400 dark:text-gray-500">
             © 2026 Chronos Producción Software<br />versión 1.5

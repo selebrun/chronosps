@@ -7,4 +7,5 @@ export interface ChronosCompany {
   user_default: string;
   password: string;
   default_odoo_user_id?: string;
+  admin_user_code?: string;
 }

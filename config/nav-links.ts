@@ -3,6 +3,7 @@ export type navItem = {
   slug: string;
   description?: string;
   role: string[];
+  companyAdminOnly?: boolean;
 };
 
 export const navItems: { name: string; items: navItem[] }[] = [
@@ -32,6 +33,13 @@ export const navItems: { name: string; items: navItem[] }[] = [
         slug: 'customer-sales-notes',
         description: 'Consulta de notas de venta y avance de produccion',
         role: ['Cliente', 'Jefe'],
+      },
+      {
+        name: 'Usuarios de la empresa',
+        slug: 'company-users',
+        description: 'Crear y mantener los usuarios de su empresa',
+        role: ['Jefe'],
+        companyAdminOnly: true,
       },
     ],
   },
