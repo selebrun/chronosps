@@ -50,10 +50,15 @@ const STOCK_MOVE_FALLBACK_FIELDS = [
 
 const stockMoveFieldsByCompany = new Map<string, Record<string, OdooFieldDefinition>>();
 
-async function getOdooExecutionUserId(user: any) {
+async function getOdooActingUser(user: any) {
   const defaultUserId = await getDefaultOdooUserId(user?.company_id);
-  if (user?.role === 'Operario') return defaultUserId;
-  return Number(user?.odoo_user_id) || defaultUserId;
+  if (user?.role === 'Operario') {
+    return { id: defaultUserId, source: 'company_default' };
+  }
+  const userId = Number(user?.odoo_user_id);
+  return userId
+    ? { id: userId, source: 'user' }
+    : { id: defaultUserId, source: 'company_default' };
 }
 
 function callOdooMethod(
@@ -328,7 +333,7 @@ export async function saveMaterialsOrder(
   }
   if (operationId) setValue('operation_id', operationId);
 
-  const odooExecutionUserId = await getOdooExecutionUserId(user);
+  const actingUser = await getOdooActingUser(user);
   const context = {
     force_manual_consumption: true,
     default_raw_material_production_id: productionId,
@@ -336,17 +341,20 @@ export async function saveMaterialsOrder(
     default_operation_id: operationId || false,
     allowed_company_ids: [odooCompanyId],
     company_id: odooCompanyId,
+    chronos_actor_uid: actingUser.id,
+    chronos_actor_source: actingUser.source,
+    chronos_user_code: String(user?.document || user?.code || '').trim(),
   };
 
   // Writing through mrp.production reproduces Odoo's own Components tab flow.
-  // Odoo creates the move, auto-confirms it and runs its procurement hooks atomically.
+  // Authentication always uses the company's integration credentials. Passing
+  // another user's UID with that password makes Odoo reject XML-RPC as Access Denied.
   const writeResult = await callOdooMethod(
     'mrp.production',
     'write',
     [[productionId], { move_raw_ids: [[0, 0, values]] }],
     chronosCompanyId,
-    { context },
-    odooExecutionUserId
+    { context }
   );
   if (!writeResult?.status) {
     return {
@@ -360,8 +368,7 @@ export async function saveMaterialsOrder(
     'action_assign',
     [[productionId]],
     chronosCompanyId,
-    { context },
-    odooExecutionUserId
+    { context }
   );
 
   const verificationDomain: any[] = [
@@ -377,8 +384,7 @@ export async function saveMaterialsOrder(
     'search_read',
     [verificationDomain],
     chronosCompanyId,
-    { fields: verificationFields, limit: 1, order: 'id desc', context },
-    odooExecutionUserId
+    { fields: verificationFields, limit: 1, order: 'id desc', context }
   );
   const createdMove = verificationResult?.status && Array.isArray(verificationResult.data)
     ? verificationResult.data[0]
@@ -392,6 +398,8 @@ export async function saveMaterialsOrder(
     move_id: createdMove?.id || null,
     move_state: createdMove?.state || null,
     assigned: Boolean(assignResult?.status),
+    acting_odoo_user_id: actingUser.id,
+    acting_odoo_user_source: actingUser.source,
   });
 
   return {
