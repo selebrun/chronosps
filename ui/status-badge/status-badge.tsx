@@ -12,6 +12,7 @@ const STATUS_DICT: Record<string, { name: string; color: string }> = {
   ready: { name: "Disponible", color: "bg-blue-100 text-blue-800" },
   fail: { name: "Fallado", color: "bg-red-500 text-white" },
   quality_failed: { name: "Fallada", color: "bg-red-600 text-white" },
+  quality_pending: { name: "Esperando calidad", color: "bg-amber-200 text-amber-900" },
   draft: { name: "Borrador", color: "bg-gray-200 text-gray-800" },
   sent: { name: "Enviada", color: "bg-blue-100 text-blue-800" },
   sale: { name: "Confirmada", color: "bg-green-100 text-green-800" },

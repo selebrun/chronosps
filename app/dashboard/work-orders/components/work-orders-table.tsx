@@ -11,10 +11,12 @@ import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrderInstructions, getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 import { applySharedWorkOrderTimer } from '@/helper/applySharedWorkOrderTimer'
+import { applySuccessfulWorkOrderAction } from '@/helper/applySuccessfulWorkOrderAction'
 
 function getWorkOrderDisplayStatus(order: any) {
-  if (order?.quality_failed) return 'quality_failed';
   if (order?.local_blocked) return 'blocked';
+  if (order?.quality_failed) return 'quality_failed';
+  if (order?.quality_pending) return 'quality_pending';
   if (order?.working_state === 'paused') return 'paused';
   if (order?.is_user_working || order?.working_state === 'progress') return 'progress';
   return order?.state;
@@ -294,17 +296,21 @@ export function WorkOrdersTable({ odooOrders, user, blockReasons }: { odooOrders
 
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
-      let orderWorkSelected = orderSelected;
+      const optimisticOrder = applySuccessfulWorkOrderAction(orderSelected, action)
+      let orderWorkSelected = optimisticOrder;
       const refreshedOrder = odooOrdersWork?.data?.find((item: any) => item.id === orderSelected.id)
-      if (action === 'finish_work_order') {
-        orderWorkSelected = refreshedOrder || {...orderWorkSelected, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
-      } else {
-        orderWorkSelected = refreshedOrder || orderSelected
-      }
+      orderWorkSelected = refreshedOrder || optimisticOrder
 
       setOrderSelected(orderWorkSelected)
       getDetailOrderWork(orderWorkSelected)
-      setOrdersWork(odooOrdersWork)
+      if (odooOrdersWork?.status && Array.isArray(odooOrdersWork?.data)) {
+        setOrdersWork(odooOrdersWork)
+      } else {
+        setOrdersWork((current: any) => current?.data
+          ? { ...current, data: current.data.map((item: any) => item.id === orderSelected.id ? optimisticOrder : item) }
+          : current
+        )
+      }
       setLoadigAction(false)
     } else {
       const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'

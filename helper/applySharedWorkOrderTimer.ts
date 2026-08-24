@@ -10,12 +10,18 @@ export function applySharedWorkOrderTimer(order: any, timer: any) {
   const isBlocked = Boolean(timer?.local_blocked);
   const sharedState = normalizeState(timer?.workorder_state);
   const sharedDone = sharedState === 'done';
+  const sharedQualityPending = sharedState === 'quality_pending';
+  const sharedQualityFailed = timer?.quality_failed === true || ['quality_failed', 'quality_failed_pending'].includes(sharedState);
+  const hasSharedQualityState = sharedQualityFailed
+    || ['quality_pending', 'quality_cleared', 'progress', 'done'].includes(sharedState);
   const orderState = normalizeState(order?.state);
   const orderIsDone = ['done', 'completed', 'cancel'].includes(orderState);
   const canRun = Boolean(timer?.is_running)
     && !sharedDone
     && !isBlocked
-    && !order?.quality_failed
+    && !sharedQualityPending
+    && !sharedQualityFailed
+    && !(order?.quality_failed && !hasSharedQualityState)
     && !orderIsDone;
   const elapsedSeconds = timer?.has_timer_snapshot === false
     ? Number(order?.piso_real_duration_seconds || Number(order?.duration || 0) * 60)
@@ -34,9 +40,10 @@ export function applySharedWorkOrderTimer(order: any, timer: any) {
   return {
     ...order,
     state: sharedDone ? 'done' : order?.state,
-    quality_failed: sharedDone ? false : order?.quality_failed,
-    quality_failed_count: sharedDone ? 0 : order?.quality_failed_count,
-    quality_failed_points: sharedDone ? [] : order?.quality_failed_points,
+    quality_pending: sharedDone ? false : sharedQualityPending,
+    quality_failed: sharedDone ? false : hasSharedQualityState ? sharedQualityFailed : order?.quality_failed,
+    quality_failed_count: sharedDone || (hasSharedQualityState && !sharedQualityFailed) ? 0 : order?.quality_failed_count,
+    quality_failed_points: sharedDone || (hasSharedQualityState && !sharedQualityFailed) ? [] : order?.quality_failed_points,
     duration: elapsedSeconds / 60,
     piso_real_duration_seconds: elapsedSeconds,
     piso_expected_duration_seconds: Number.isFinite(expectedSeconds) && expectedSeconds > 0

@@ -13,6 +13,7 @@ import { updateOrder } from '@/app/api/updateOrder/updateOrder'
 import { getWorkOrderInstructions, getWorkOrders } from '@/app/api/orders/getOrders'
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 import { applySharedWorkOrderTimer } from '@/helper/applySharedWorkOrderTimer'
+import { applySuccessfulWorkOrderAction } from '@/helper/applySuccessfulWorkOrderAction'
 
 function asArray(value: any) {
   return Array.isArray(value) ? value : [];
@@ -288,26 +289,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     const update = await updateOrder(user, currentWorkOrder, action, block_reason, qtyDone, elapsedSeconds).then( res => res).catch((err) => console.log(err))
     if (update?.status) {
       const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
-      if (!odooOrdersWork?.status) {
-        setError(odooOrdersWork?.message || 'La accion fue realizada, pero no se pudo actualizar el listado de OT.')
-        setLoadigAction(false)
-        return
-      }
-      const refreshedWorkOrders = asArray(odooOrdersWork?.data)
+      const optimisticOrder = applySuccessfulWorkOrderAction(currentWorkOrder, action)
+      const refreshedWorkOrders = odooOrdersWork?.status ? asArray(odooOrdersWork?.data) : []
       const dateilOrden = refreshedWorkOrders.filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(orderProductionSelected?.id))
 
-      let orderWorkSelected1 = currentWorkOrder;
+      let orderWorkSelected1 = optimisticOrder;
       const refreshedOrder = refreshedWorkOrders.find((item: any) => Number(item?.id) === Number(currentWorkOrder?.id))
-      if (action === 'finish_work_order') {
-        orderWorkSelected1 = refreshedOrder || {...currentWorkOrder, state: 'completed', is_user_working: false, working_state: 'done', piso_active_elapsed_seconds: 0}
-      } else {
-        orderWorkSelected1 = refreshedOrder || currentWorkOrder
-      }
+      orderWorkSelected1 = refreshedOrder || optimisticOrder
 
       seOrderWorkSelected(orderWorkSelected1)
       setShowDetailOrderWork(orderWorkSelected1)
-      setOrderWorkDetail(dateilOrden)
-      setOrdersWork(odooOrdersWork)
+      if (odooOrdersWork?.status) {
+        setOrderWorkDetail(dateilOrden)
+        setOrdersWork(odooOrdersWork)
+      } else {
+        setOrderWorkDetail((current: any[]) => asArray(current).map((item: any) => Number(item?.id) === Number(currentWorkOrder?.id) ? optimisticOrder : item))
+        setOrdersWork((current: any) => current?.data
+          ? { ...current, data: current.data.map((item: any) => Number(item?.id) === Number(currentWorkOrder?.id) ? optimisticOrder : item) }
+          : current
+        )
+      }
       setLoadigAction(false)
     } else {
       const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'

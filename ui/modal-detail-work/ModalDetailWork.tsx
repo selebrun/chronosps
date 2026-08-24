@@ -125,6 +125,7 @@ export function ModalDetailWork({
     !isBlocked
     && !isWorkOrderDone
     && !showDetailOrderWork?.quality_failed
+    && !showDetailOrderWork?.quality_pending
     && !isTimerRunning
     && (showDetailOrderWork?.working_state === 'paused' || elapsedSeconds > 0)
   );
@@ -188,9 +189,19 @@ export function ModalDetailWork({
         : Math.max(0, Math.round(Number(timer.elapsed_seconds) || 0));
       const sharedWorkOrderState = timer?.workorder_state?.toString?.().trim?.().toLowerCase?.() || '';
       const sharedDone = sharedWorkOrderState === 'done';
+      const sharedQualityPending = sharedWorkOrderState === 'quality_pending';
+      const sharedQualityFailed = timer?.quality_failed === true
+        || ['quality_failed', 'quality_failed_pending'].includes(sharedWorkOrderState);
+      const hasSharedQualityState = sharedQualityFailed
+        || ['quality_pending', 'quality_cleared', 'progress', 'done'].includes(sharedWorkOrderState);
+      const sharedQualityChanged = hasSharedQualityState
+        && sharedQualityFailed !== Boolean(showDetailOrderWork?.quality_failed);
+      const sharedQualityPendingChanged = sharedQualityPending !== Boolean(showDetailOrderWork?.quality_pending);
       const shouldBePaused = Boolean(
         !timer.is_running
         && !sharedDone
+        && !sharedQualityPending
+        && !sharedQualityFailed
         && !timer.local_blocked
         && !showDetailOrderWork?.quality_failed
         && !isWorkOrderDone
@@ -214,7 +225,7 @@ export function ModalDetailWork({
 
       // El estado visual se reconcilia aunque el booleano de ejecucion ya
       // coincida, porque otra sesion puede conservar "paused" en memoria.
-      if (sharedTimerChanged || sharedBlockChanged || sharedStatusChanged || sharedExpectedChanged) {
+      if (sharedTimerChanged || sharedBlockChanged || sharedStatusChanged || sharedExpectedChanged || sharedQualityChanged || sharedQualityPendingChanged) {
         sharedTimerSyncRef.current?.(timer);
       }
     };
@@ -225,7 +236,7 @@ export function ModalDetailWork({
       active = false;
       window.clearInterval(interval);
     };
-  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, showDetailOrderWork?.working_state, showDetailOrderWork?.is_user_working, showDetailOrderWork?.quality_failed, isTimerRunning, isBlocked, isWorkOrderDone, normalizedExpectedSeconds, baseElapsedSeconds]);
+  }, [modalIsOpenJobDetail, showDetailOrderWork?.id, showDetailOrderWork?.working_state, showDetailOrderWork?.is_user_working, showDetailOrderWork?.quality_failed, showDetailOrderWork?.quality_pending, isTimerRunning, isBlocked, isWorkOrderDone, normalizedExpectedSeconds, baseElapsedSeconds]);
 
   const formatElapsedTime = (totalSeconds: number) => {
     const seconds = Math.max(0, Math.floor(totalSeconds));
@@ -250,10 +261,12 @@ export function ModalDetailWork({
 
   const theoreticalDuration = expectedSeconds > 0 ? formatElapsedTime(expectedSeconds) : formatDurationFromMinutes(showDetailOrderWork?.duration_expected, showDetailOrderWork?.theoretical_duration);
   const realDuration = formatElapsedTime(elapsedSeconds);
-  const displayStatus = showDetailOrderWork.quality_failed
-    ? 'quality_failed'
-    : isWorkOrderBlocked(showDetailOrderWork)
+  const displayStatus = isWorkOrderBlocked(showDetailOrderWork)
     ? 'blocked'
+    : showDetailOrderWork.quality_failed
+      ? 'quality_failed'
+    : showDetailOrderWork.quality_pending
+      ? 'quality_pending'
     : isTimerRunning
       ? 'progress'
     : isEffectivelyPaused
@@ -265,6 +278,7 @@ export function ModalDetailWork({
     const isUserWorking = showDetailOrderWork.is_user_working;
     const isPaused = !isBlocked
       && !isUserWorking
+      && !showDetailOrderWork.quality_pending
       && (showDetailOrderWork.working_state === "paused" || elapsedSeconds > 0);
     const canUnblock = isRole(user, 'Jefe');
     const canReleaseQualityFailure = isRole(user, 'Lider') || isRole(user, 'Jefe');
@@ -295,6 +309,19 @@ export function ModalDetailWork({
       if (isFailedForOperator) {
         return <div className="mb-3 rounded-md bg-red-100 p-3 text-center font-bold text-red-800">Control de calidad fallado</div>
       }
+    }
+
+    if (showDetailOrderWork.quality_pending) {
+      return (
+        <>
+          <div className="mb-3 rounded-md bg-amber-100 p-3 text-center font-bold text-amber-900">
+            Esperando controles de calidad
+          </div>
+          <div className="mb-3">
+            <button onClick={() => openModalInstructions()} className='font-bold bg-[#A9D1DC] p-3 rounded-md w-full'>Instrucciones</button>
+          </div>
+        </>
+      )
     }
 
     if (disabledBtns) {
@@ -502,7 +529,12 @@ export function ModalDetailWork({
           {showDetailOrderWork.quality_failed && (
             <div className='mt-3 bg-red-100 border border-red-500 text-red-800 px-4 py-3 rounded'>
               <strong>Control de calidad fallado</strong>
-              {showDetailOrderWork?.quality_failed_points?.length ? ` - ${showDetailOrderWork.quality_failed_points.join(', ')}` : ''}. El operador no puede continuar hasta que Lider o Calidad revise el control.
+              {showDetailOrderWork?.quality_failed_points?.length ? ` - ${showDetailOrderWork.quality_failed_points.join(', ')}` : ''}. La OT no puede continuar hasta que Calidad, Lider o Jefe libere la falla.
+            </div>
+          )}
+          {showDetailOrderWork.quality_pending && (
+            <div className='mt-3 bg-amber-100 border border-amber-400 text-amber-900 px-4 py-3 rounded'>
+              <strong>Control de calidad pendiente</strong> - La actividad y su reloj permanecen pausados hasta completar todos los controles requeridos.
             </div>
           )}
           {isEffectivelyPaused && (

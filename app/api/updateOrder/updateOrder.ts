@@ -3,7 +3,7 @@
 import { createOdooData, executeOdooMethod, getOdooData, setOdooData } from '@/app/api/odoo/odooService';
 import { getDefaultOdooUserId } from '@/app/api/odoo/defaultOdooUser';
 import { getActiveWorkOrderBlocks, isWorkOrderLocallyBlocked, markWorkOrderBlocked, markWorkOrderUnblocked } from '@/app/api/workOrderBlocks/workOrderBlocks';
-import { saveWorkOrderTimerSnapshot } from '@/app/api/workOrderTimers/workOrderTimers';
+import { getWorkOrderTimerSnapshots, saveWorkOrderTimerSnapshot } from '@/app/api/workOrderTimers/workOrderTimers';
 
 const WORK_ORDER_FIELDS = ['id', 'name', 'state', 'production_id', 'duration', 'duration_expected', 'operation_note', 'working_state', 'workcenter_id', 'company_id', 'is_user_working', 'employee_assigned_ids', 'sequence'];
 const WORK_ORDER_REQUIRED_FIELDS = WORK_ORDER_FIELDS.filter((field) => field !== 'operation_note');
@@ -82,7 +82,8 @@ async function saveTimerSnapshot(
   elapsedSeconds: any,
   isRunning: boolean,
   activeSince?: string | null,
-  sharedState?: 'progress' | 'paused' | 'done'
+  sharedState?: 'progress' | 'paused' | 'quality_pending' | 'quality_failed' | 'quality_failed_pending' | 'quality_cleared' | 'done',
+  qualityFailed?: boolean | null
 ) {
   const result = await saveWorkOrderTimerSnapshot(
     user,
@@ -91,7 +92,8 @@ async function saveTimerSnapshot(
     isRunning,
     activeSince,
     getExpectedDurationSeconds(workOrder),
-    sharedState
+    sharedState,
+    qualityFailed
   );
 
   if (!result?.status) {
@@ -105,12 +107,12 @@ async function getCurrentOdooProductivityStart(workOrderId: number, companyId: s
   const productivityResponse: any = await getOdooRecord(
     'mrp.workcenter.productivity',
     [['workorder_id', '=', workOrderId], ['date_end', '=', false]],
-    ['id', 'date_start', 'loss_id'],
+    ['id', 'date_start', 'description'],
     companyId
   );
 
   return (productivityResponse?.data || [])
-    .filter((record: any) => !getMany2OneId(record?.loss_id))
+    .filter((record: any) => !String(record?.description || '').trim().toLowerCase().startsWith('bloqueo:'))
     .sort((left: any, right: any) => String(right?.date_start || '').localeCompare(String(left?.date_start || '')))[0]
     ?.date_start || null;
 }
@@ -178,6 +180,11 @@ async function releaseFailedQualityChecks(workOrderId: number, user: any) {
   );
   const qualityCheckIds = (qualityChecks?.data || []).map((check: any) => check.id).filter(Boolean);
 
+  const pauseResponse = await pauseWorkOrderIfRunning({ id: workOrderId }, user);
+  if (!pauseResponse?.status) {
+    return { status: false, message: `No se pudo pausar la OT antes de liberar la falla: ${pauseResponse.message}` };
+  }
+
   if (!qualityCheckIds.length) {
     return { status: true, message: 'La orden de trabajo no tiene controles de calidad fallidos.' };
   }
@@ -191,11 +198,6 @@ async function releaseFailedQualityChecks(workOrderId: number, user: any) {
 
   if (!result?.status) {
     return { status: false, message: getOdooError(result, 'No se pudo reactivar la orden de trabajo.') };
-  }
-
-  const pauseResponse = await pauseWorkOrderIfRunning({ id: workOrderId }, user);
-  if (!pauseResponse?.status) {
-    return { status: false, message: `Se reactivo la orden, pero no se pudo pausar la OT: ${pauseResponse.message}` };
   }
 
   return { status: true, message: 'Orden de trabajo reactivada para retrabajo. El reloj permanece detenido hasta iniciar o reanudar.' };
@@ -319,9 +321,10 @@ async function saveAndSynchronizePausedTimer(
   user: any,
   workOrder: any,
   elapsedSeconds: any,
-  sharedState: 'paused' | 'done' = 'paused'
+  sharedState: 'paused' | 'quality_pending' | 'quality_failed' | 'quality_failed_pending' | 'quality_cleared' | 'done' = 'paused',
+  qualityFailed?: boolean | null
 ) {
-  const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false, null, sharedState);
+  const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false, null, sharedState, qualityFailed);
   try {
     const synchronization = await synchronizeWorkOrderDurationToOdoo(
       user,
@@ -404,7 +407,21 @@ async function pauseWorkOrderIfRunning(workOrder: any, user: any) {
   if (!workOrderId) return { status: true, paused: false };
 
   const freshWorkOrder = await getFreshWorkOrder(workOrderId, user.company_id);
-  if (!freshWorkOrder?.is_user_working) {
+  const openProductivity: any = await getOdooRecord(
+    'mrp.workcenter.productivity',
+    [['workorder_id', '=', workOrderId], ['date_end', '=', false]],
+    ['id', 'description'],
+    user.company_id
+  );
+  if (!openProductivity?.status) {
+    return { status: false, paused: false, message: 'No se pudieron verificar los tiempos activos de la OT en Odoo.' };
+  }
+  const openProductiveIds = (openProductivity?.data || [])
+    .filter((record: any) => !String(record?.description || '').trim().toLowerCase().startsWith('bloqueo:'))
+    .map((record: any) => Number(record?.id))
+    .filter(Boolean);
+
+  if (!freshWorkOrder?.is_user_working && !openProductiveIds.length) {
     return { status: true, paused: false };
   }
 
@@ -413,7 +430,97 @@ async function pauseWorkOrderIfRunning(workOrder: any, user: any) {
     return { status: false, paused: false, message: getOdooError(response, 'No se pudo pausar la orden de trabajo en Odoo.') };
   }
 
+  const remainingProductivity: any = await getOdooRecord(
+    'mrp.workcenter.productivity',
+    [['id', 'in', openProductiveIds], ['date_end', '=', false]],
+    ['id'],
+    user.company_id
+  );
+  if (!remainingProductivity?.status) {
+    return { status: false, paused: false, message: 'No se pudo confirmar la pausa de la OT en Odoo.' };
+  }
+  if (remainingProductivity?.data?.length) {
+    const endAllResponse: any = await callOdooMethod(
+      'mrp.workorder',
+      'end_all',
+      [[workOrderId]],
+      user.company_id,
+      await getOdooActionKwargs(user)
+    );
+    if (!endAllResponse?.status) {
+      return { status: false, paused: false, message: getOdooError(endAllResponse, 'No se pudieron cerrar todos los tiempos activos de la OT en Odoo.') };
+    }
+  }
+
+  const verification: any = await getOdooRecord(
+    'mrp.workcenter.productivity',
+    [['workorder_id', '=', workOrderId], ['date_end', '=', false]],
+    ['id', 'description'],
+    user.company_id
+  );
+  const stillRunning = (verification?.data || []).some((record: any) => (
+    !String(record?.description || '').trim().toLowerCase().startsWith('bloqueo:')
+  ));
+  if (!verification?.status || stillRunning) {
+    return { status: false, paused: false, message: 'Odoo mantiene un tiempo productivo abierto para esta OT.' };
+  }
+
   return { status: true, paused: true };
+}
+
+async function getCurrentSharedElapsedSeconds(user: any, workOrder: any) {
+  const snapshots = await getWorkOrderTimerSnapshots(user, [Number(workOrder?.id)]);
+  const snapshot = snapshots.get(Number(workOrder?.id));
+  return normalizeElapsedSeconds(snapshot?.current_elapsed_seconds, Number(workOrder?.duration || 0) * 60);
+}
+
+export async function pauseWorkOrderForQuality(user: any, workOrderId: number) {
+  const workOrder = await getFreshWorkOrder(Number(workOrderId), user?.company_id);
+  if (!workOrder) return { status: false, message: 'No se encontro la orden de trabajo asociada al control de calidad.' };
+
+  const elapsedSeconds = await getCurrentSharedElapsedSeconds(user, workOrder);
+  const pauseResponse = await pauseWorkOrderIfRunning(workOrder, user);
+  if (!pauseResponse?.status) return pauseResponse;
+
+  const snapshot = await saveAndSynchronizePausedTimer(user, workOrder, elapsedSeconds, 'paused');
+  return {
+    status: true,
+    paused: true,
+    elapsed_seconds: snapshot.elapsed_seconds,
+    synchronized: snapshot.synchronized,
+    warning: snapshot.synchronized === false && 'synchronization_message' in snapshot
+      ? snapshot.synchronization_message
+      : '',
+  };
+}
+
+export async function publishWorkOrderQualityState(
+  user: any,
+  workOrderId: number,
+  qualityStatus: 'pending' | 'failed' | 'failed_pending' | 'clear'
+) {
+  const workOrder = await getFreshWorkOrder(Number(workOrderId), user?.company_id);
+  if (!workOrder) return { status: false, message: 'No se encontro la orden de trabajo asociada al control de calidad.' };
+
+  const elapsedSeconds = await getCurrentSharedElapsedSeconds(user, workOrder);
+  const result = await saveTimerSnapshot(
+    user,
+    workOrder,
+    elapsedSeconds,
+    false,
+    null,
+    qualityStatus === 'failed_pending'
+      ? 'quality_failed_pending'
+      : qualityStatus === 'failed'
+        ? 'quality_failed'
+        : qualityStatus === 'pending'
+          ? 'quality_pending'
+          : 'quality_cleared',
+    ['failed', 'failed_pending'].includes(qualityStatus)
+  );
+  return result?.elapsed_seconds === undefined
+    ? { status: false, message: 'No se pudo publicar el estado de Calidad en Piso.' }
+    : { status: true, elapsed_seconds: result.elapsed_seconds };
 }
 
 async function closeActiveProductivityBlocks(workOrderId: number, companyId: string) {
@@ -538,6 +645,14 @@ export async function updateOrder(
     }
 
     if (action === 'start_work_order') {
+      const snapshots = await getWorkOrderTimerSnapshots(user, [Number(work_order.id)]);
+      if (snapshots.get(Number(work_order.id))?.workorder_state === 'quality_pending') {
+        return {
+          status: false,
+          message: 'La orden de trabajo esta pausada esperando completar sus controles de calidad.',
+          faultString: 'La orden de trabajo esta pausada esperando completar sus controles de calidad.',
+        };
+      }
       const previousWorkOrdersValidation = await validatePreviousWorkOrdersDone(work_order, user.company_id);
       if (!previousWorkOrdersValidation.status) {
         return previousWorkOrdersValidation;
@@ -557,13 +672,13 @@ export async function updateOrder(
       };
     }
 
-    if (['start_work_order', 'finish_work_order'].includes(action) && user.role === 'Operario') {
+    if (['start_work_order', 'finish_work_order'].includes(action)) {
       const hasFailedQuality = await hasFailedQualityChecks(work_order.id, user.company_id);
       if (hasFailedQuality) {
         return {
           status: false,
-          message: 'Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.',
-          faultString: 'Esta orden de trabajo tiene un control de calidad fallado. Un Lider o Calidad debe revisar antes de continuar.',
+          message: 'Esta orden de trabajo tiene un control de calidad fallado. Debe corregirse y liberarse antes de continuar.',
+          faultString: 'Esta orden de trabajo tiene un control de calidad fallado. Debe corregirse y liberarse antes de continuar.',
         };
       }
     }
@@ -610,11 +725,11 @@ export async function updateOrder(
         response = await callOdooMethod('mrp.workorder', 'button_start', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
           const odooProductivityStart = await getCurrentOdooProductivityStart(work_order.id, user.company_id);
-          await saveTimerSnapshot(user, work_order, elapsedSeconds, true, odooProductivityStart, 'progress');
+          await saveTimerSnapshot(user, work_order, elapsedSeconds, true, odooProductivityStart, 'progress', false);
         }
         break;
       case 'stop_work_order':
-        response = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
+        response = await pauseWorkOrderIfRunning(work_order, user);
         if (response?.status) {
           await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'paused');
         }
@@ -623,19 +738,16 @@ export async function updateOrder(
         await writeOdooData('mrp.production', [work_order.production_id[0]], { qty_producing: qtyDone }, user.company_id);
         response = await callOdooMethod('mrp.workorder', 'button_finish', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
         if (response?.status) {
-          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'done');
+          await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'done', false);
         }
         if (!response?.status) {
           const errorMsg = getOdooError(response, 'Error ejecutando accion en Odoo');
           if (isQualityControlError(errorMsg)) {
-            let pauseResponse: any = { status: true };
-            if (work_order.is_user_working) {
-              pauseResponse = await callOdooMethod('mrp.workorder', 'button_pending', [[workorder.id]], user.company_id, await getOdooActionKwargs(user));
-            }
-            const paused = !work_order.is_user_working || Boolean(pauseResponse?.status);
+            const pauseResponse = await pauseWorkOrderIfRunning(work_order, user);
+            const paused = Boolean(pauseResponse?.status);
             if (paused) {
               try {
-                await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
+                await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'quality_pending', false);
               } catch (timerError) {
                 // El bloqueo funcional de Calidad no puede ocultarse si falla
                 // una sincronizacion secundaria de tiempo.
@@ -697,9 +809,17 @@ export async function updateOrder(
         }
       case 'release_quality_failure':
         {
+          const snapshots = await getWorkOrderTimerSnapshots(user, [Number(work_order.id)]);
+          const sharedState = String(snapshots.get(Number(work_order.id))?.workorder_state || '').trim();
           const releaseResponse = await releaseFailedQualityChecks(work_order.id, user);
           if (releaseResponse?.status) {
-            await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds);
+            await saveAndSynchronizePausedTimer(
+              user,
+              work_order,
+              elapsedSeconds,
+              sharedState === 'quality_failed_pending' ? 'quality_pending' : 'quality_cleared',
+              false
+            );
           }
           return releaseResponse;
         }

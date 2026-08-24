@@ -24,7 +24,8 @@ async function ensureWorkOrderTimersTable(client: any) {
       workorder_id INTEGER NOT NULL,
       elapsed_seconds INTEGER NOT NULL DEFAULT 0,
       expected_duration_seconds INTEGER,
-      workorder_state CHARACTER(20),
+      workorder_state VARCHAR(32),
+      quality_failed BOOLEAN,
       is_running BOOLEAN NOT NULL DEFAULT FALSE,
       active_since TIMESTAMP,
       updated_by CHARACTER(40),
@@ -38,8 +39,15 @@ async function ensureWorkOrderTimersTable(client: any) {
       ADD COLUMN IF NOT EXISTS active_since TIMESTAMP,
       ADD COLUMN IF NOT EXISTS expected_duration_seconds INTEGER,
       ADD COLUMN IF NOT EXISTS workorder_state CHARACTER(20),
+      ADD COLUMN IF NOT EXISTS quality_failed BOOLEAN,
       ADD COLUMN IF NOT EXISTS updated_by CHARACTER(40),
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+  `);
+
+  await client.query(`
+    ALTER TABLE work_order_time_snapshots
+      ALTER COLUMN workorder_state TYPE VARCHAR(32)
+      USING TRIM(workorder_state)
   `);
 
   await client.query(`
@@ -87,7 +95,7 @@ function normalizeExpectedDurationSeconds(value: any) {
 
 function normalizeSharedWorkOrderState(value: any) {
   const state = value?.toString?.().trim?.().toLowerCase?.() || '';
-  return ['progress', 'paused', 'done'].includes(state) ? state : null;
+  return ['progress', 'paused', 'quality_pending', 'quality_failed', 'quality_failed_pending', 'quality_cleared', 'done'].includes(state) ? state : null;
 }
 
 function getWorkOrderExpectedDurationSeconds(workOrder: any) {
@@ -112,7 +120,8 @@ export async function saveWorkOrderTimerSnapshot(
   isRunning: boolean,
   activeSince?: string | null,
   expectedDurationSeconds?: any,
-  workOrderState?: any
+  workOrderState?: any,
+  qualityFailed?: boolean | null
 ) {
   const companyId = String(user?.company_id || '').trim();
   const id = Number(workOrderId);
@@ -131,6 +140,7 @@ export async function saveWorkOrderTimerSnapshot(
         elapsed_seconds,
         expected_duration_seconds,
         workorder_state,
+        quality_failed,
         is_running,
         active_since,
         updated_by,
@@ -142,6 +152,7 @@ export async function saveWorkOrderTimerSnapshot(
         $3,
         $7,
         $8,
+        $9,
         $4,
         CASE
           WHEN NOT $4 THEN NULL
@@ -175,6 +186,7 @@ export async function saveWorkOrderTimerSnapshot(
           NULLIF(EXCLUDED.expected_duration_seconds, 0)
         ),
         workorder_state = COALESCE(EXCLUDED.workorder_state, work_order_time_snapshots.workorder_state),
+        quality_failed = COALESCE(EXCLUDED.quality_failed, work_order_time_snapshots.quality_failed),
         is_running = EXCLUDED.is_running,
         active_since = CASE
           WHEN EXCLUDED.is_running THEN CASE
@@ -188,7 +200,7 @@ export async function saveWorkOrderTimerSnapshot(
         END,
         updated_by = EXCLUDED.updated_by,
         updated_at = NOW()
-      RETURNING elapsed_seconds, expected_duration_seconds, workorder_state, is_running, active_since
+      RETURNING elapsed_seconds, expected_duration_seconds, workorder_state, quality_failed, is_running, active_since
       `,
       [
         companyId,
@@ -199,6 +211,7 @@ export async function saveWorkOrderTimerSnapshot(
         activeSince || null,
         expectedSeconds,
         sharedState,
+        typeof qualityFailed === 'boolean' ? qualityFailed : null,
       ] as any[]
     );
 
@@ -208,6 +221,7 @@ export async function saveWorkOrderTimerSnapshot(
       elapsed_seconds: normalizeElapsedSeconds(snapshot?.elapsed_seconds, elapsed),
       expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds) ?? expectedSeconds,
       workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state) ?? sharedState,
+      quality_failed: typeof snapshot?.quality_failed === 'boolean' ? snapshot.quality_failed : null,
       is_running: Boolean(snapshot?.is_running),
     };
   });
@@ -226,6 +240,7 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
           elapsed_seconds,
           expected_duration_seconds,
           workorder_state,
+          quality_failed,
           elapsed_seconds + CASE
             WHEN is_running AND active_since IS NOT NULL THEN GREATEST(
               0,
@@ -284,6 +299,7 @@ export async function getSharedWorkOrderTimers(user: any, workOrderIds: number[]
       active_since: snapshot?.active_since || null,
       expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds),
       workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state),
+      quality_failed: typeof snapshot?.quality_failed === 'boolean' ? snapshot.quality_failed : null,
     }];
   });
 }
@@ -346,13 +362,20 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
 
     const snapshotElapsed = normalizeElapsedSeconds(snapshot.elapsed_seconds);
     const currentElapsed = normalizeElapsedSeconds(snapshot.current_elapsed_seconds, snapshotElapsed);
-    const canRun = Boolean(snapshot.is_running) && isTimerAllowedToRun(workOrder);
-    const realDurationSeconds = canRun ? currentElapsed : snapshotElapsed;
     const expectedDurationSeconds = normalizeExpectedDurationSeconds(snapshot.expected_duration_seconds)
       ?? getWorkOrderExpectedDurationSeconds(workOrder)
       ?? 0;
     const sharedState = normalizeSharedWorkOrderState(snapshot.workorder_state);
     const sharedDone = sharedState === 'done';
+    const sharedQualityPending = sharedState === 'quality_pending';
+    const sharedQualityFailed = snapshot.quality_failed === true || ['quality_failed', 'quality_failed_pending'].includes(String(sharedState));
+    const hasSharedQualityState = sharedQualityFailed
+      || ['quality_pending', 'quality_cleared'].includes(String(sharedState));
+    const canRun = Boolean(snapshot.is_running)
+      && isTimerAllowedToRun(workOrder)
+      && !sharedQualityPending
+      && !sharedQualityFailed;
+    const realDurationSeconds = canRun ? currentElapsed : snapshotElapsed;
     const synchronizedWorkingState = workOrder?.local_blocked
       ? 'blocked'
       : sharedDone
@@ -371,9 +394,10 @@ export async function applyWorkOrderTimerSnapshots(user: any, workOrders: any[])
       piso_active_since: canRun ? snapshot.active_since : false,
       piso_duration_calculated_at: new Date(now).toISOString(),
       state: sharedDone ? 'done' : workOrder?.state,
-      quality_failed: sharedDone ? false : workOrder?.quality_failed,
-      quality_failed_count: sharedDone ? 0 : workOrder?.quality_failed_count,
-      quality_failed_points: sharedDone ? [] : workOrder?.quality_failed_points,
+      quality_pending: sharedDone ? false : sharedQualityPending,
+      quality_failed: sharedDone ? false : hasSharedQualityState ? sharedQualityFailed : workOrder?.quality_failed,
+      quality_failed_count: sharedDone || (hasSharedQualityState && !sharedQualityFailed) ? 0 : workOrder?.quality_failed_count,
+      quality_failed_points: sharedDone || (hasSharedQualityState && !sharedQualityFailed) ? [] : workOrder?.quality_failed_points,
       working_state: synchronizedWorkingState,
       is_user_working: canRun,
     };
