@@ -83,7 +83,8 @@ async function saveTimerSnapshot(
   isRunning: boolean,
   activeSince?: string | null,
   sharedState?: 'progress' | 'paused' | 'quality_pending' | 'quality_failed' | 'quality_failed_pending' | 'quality_cleared' | 'done',
-  qualityFailed?: boolean | null
+  qualityFailed?: boolean | null,
+  activeQualityCheckId?: number | null
 ) {
   const result = await saveWorkOrderTimerSnapshot(
     user,
@@ -93,7 +94,8 @@ async function saveTimerSnapshot(
     activeSince,
     getExpectedDurationSeconds(workOrder),
     sharedState,
-    qualityFailed
+    qualityFailed,
+    activeQualityCheckId
   );
 
   if (!result?.status) {
@@ -169,6 +171,25 @@ async function hasFailedQualityChecks(workOrderId: number, companyId: string) {
   );
 
   return Boolean(qualityChecks?.data?.length);
+}
+
+async function getNextPendingQualityCheckId(workOrderId: number, companyId: string) {
+  const qualityChecks: any = await getOdooRecord(
+    'quality.check',
+    [['workorder_id', '=', workOrderId]],
+    ['id', 'quality_state', 'test_type'],
+    companyId
+  );
+
+  if (!qualityChecks?.status) return null;
+
+  return Number(
+    (qualityChecks.data || [])
+      .filter((check: any) => String(check?.test_type || '').trim().toLowerCase() !== 'instructions')
+      .filter((check: any) => !['pass', 'fail'].includes(String(check?.quality_state || '').trim().toLowerCase()))
+      .sort((left: any, right: any) => Number(left?.id) - Number(right?.id))[0]
+      ?.id
+  ) || null;
 }
 
 async function releaseFailedQualityChecks(workOrderId: number, user: any) {
@@ -322,9 +343,19 @@ async function saveAndSynchronizePausedTimer(
   workOrder: any,
   elapsedSeconds: any,
   sharedState: 'paused' | 'quality_pending' | 'quality_failed' | 'quality_failed_pending' | 'quality_cleared' | 'done' = 'paused',
-  qualityFailed?: boolean | null
+  qualityFailed?: boolean | null,
+  activeQualityCheckId?: number | null
 ) {
-  const snapshot = await saveTimerSnapshot(user, workOrder, elapsedSeconds, false, null, sharedState, qualityFailed);
+  const snapshot = await saveTimerSnapshot(
+    user,
+    workOrder,
+    elapsedSeconds,
+    false,
+    null,
+    sharedState,
+    qualityFailed,
+    activeQualityCheckId
+  );
   try {
     const synchronization = await synchronizeWorkOrderDurationToOdoo(
       user,
@@ -497,7 +528,8 @@ export async function pauseWorkOrderForQuality(user: any, workOrderId: number) {
 export async function publishWorkOrderQualityState(
   user: any,
   workOrderId: number,
-  qualityStatus: 'pending' | 'failed' | 'failed_pending' | 'clear'
+  qualityStatus: 'pending' | 'failed' | 'failed_pending' | 'clear',
+  activeQualityCheckId?: number | null
 ) {
   const workOrder = await getFreshWorkOrder(Number(workOrderId), user?.company_id);
   if (!workOrder) return { status: false, message: 'No se encontro la orden de trabajo asociada al control de calidad.' };
@@ -516,7 +548,8 @@ export async function publishWorkOrderQualityState(
         : qualityStatus === 'pending'
           ? 'quality_pending'
           : 'quality_cleared',
-    ['failed', 'failed_pending'].includes(qualityStatus)
+    ['failed', 'failed_pending'].includes(qualityStatus),
+    activeQualityCheckId
   );
   return result?.elapsed_seconds === undefined
     ? { status: false, message: 'No se pudo publicar el estado de Calidad en Piso.' }
@@ -747,7 +780,15 @@ export async function updateOrder(
             const paused = Boolean(pauseResponse?.status);
             if (paused) {
               try {
-                await saveAndSynchronizePausedTimer(user, work_order, elapsedSeconds, 'quality_pending', false);
+                const activeQualityCheckId = await getNextPendingQualityCheckId(work_order.id, user.company_id);
+                await saveAndSynchronizePausedTimer(
+                  user,
+                  work_order,
+                  elapsedSeconds,
+                  'quality_pending',
+                  false,
+                  activeQualityCheckId
+                );
               } catch (timerError) {
                 // El bloqueo funcional de Calidad no puede ocultarse si falla
                 // una sincronizacion secundaria de tiempo.

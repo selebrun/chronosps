@@ -26,6 +26,7 @@ async function ensureWorkOrderTimersTable(client: any) {
       expected_duration_seconds INTEGER,
       workorder_state VARCHAR(32),
       quality_failed BOOLEAN,
+      active_quality_check_id INTEGER,
       is_running BOOLEAN NOT NULL DEFAULT FALSE,
       active_since TIMESTAMP,
       updated_by CHARACTER(40),
@@ -40,6 +41,7 @@ async function ensureWorkOrderTimersTable(client: any) {
       ADD COLUMN IF NOT EXISTS expected_duration_seconds INTEGER,
       ADD COLUMN IF NOT EXISTS workorder_state CHARACTER(20),
       ADD COLUMN IF NOT EXISTS quality_failed BOOLEAN,
+      ADD COLUMN IF NOT EXISTS active_quality_check_id INTEGER,
       ADD COLUMN IF NOT EXISTS updated_by CHARACTER(40),
       ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW()
   `);
@@ -121,7 +123,8 @@ export async function saveWorkOrderTimerSnapshot(
   activeSince?: string | null,
   expectedDurationSeconds?: any,
   workOrderState?: any,
-  qualityFailed?: boolean | null
+  qualityFailed?: boolean | null,
+  activeQualityCheckId?: number | null
 ) {
   const companyId = String(user?.company_id || '').trim();
   const id = Number(workOrderId);
@@ -141,6 +144,7 @@ export async function saveWorkOrderTimerSnapshot(
         expected_duration_seconds,
         workorder_state,
         quality_failed,
+        active_quality_check_id,
         is_running,
         active_since,
         updated_by,
@@ -153,6 +157,7 @@ export async function saveWorkOrderTimerSnapshot(
         $7,
         $8,
         $9,
+        $10,
         $4,
         CASE
           WHEN NOT $4 THEN NULL
@@ -187,6 +192,12 @@ export async function saveWorkOrderTimerSnapshot(
         ),
         workorder_state = COALESCE(EXCLUDED.workorder_state, work_order_time_snapshots.workorder_state),
         quality_failed = COALESCE(EXCLUDED.quality_failed, work_order_time_snapshots.quality_failed),
+        active_quality_check_id = CASE
+          WHEN EXCLUDED.workorder_state IN ('quality_pending', 'quality_failed', 'quality_failed_pending')
+            THEN COALESCE(EXCLUDED.active_quality_check_id, work_order_time_snapshots.active_quality_check_id)
+          WHEN EXCLUDED.workorder_state IS NOT NULL THEN NULL
+          ELSE work_order_time_snapshots.active_quality_check_id
+        END,
         is_running = EXCLUDED.is_running,
         active_since = CASE
           WHEN EXCLUDED.is_running THEN CASE
@@ -200,7 +211,7 @@ export async function saveWorkOrderTimerSnapshot(
         END,
         updated_by = EXCLUDED.updated_by,
         updated_at = NOW()
-      RETURNING elapsed_seconds, expected_duration_seconds, workorder_state, quality_failed, is_running, active_since
+      RETURNING elapsed_seconds, expected_duration_seconds, workorder_state, quality_failed, active_quality_check_id, is_running, active_since
       `,
       [
         companyId,
@@ -212,6 +223,7 @@ export async function saveWorkOrderTimerSnapshot(
         expectedSeconds,
         sharedState,
         typeof qualityFailed === 'boolean' ? qualityFailed : null,
+        Number(activeQualityCheckId) || null,
       ] as any[]
     );
 
@@ -222,6 +234,7 @@ export async function saveWorkOrderTimerSnapshot(
       expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds) ?? expectedSeconds,
       workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state) ?? sharedState,
       quality_failed: typeof snapshot?.quality_failed === 'boolean' ? snapshot.quality_failed : null,
+      active_quality_check_id: Number(snapshot?.active_quality_check_id) || null,
       is_running: Boolean(snapshot?.is_running),
     };
   });
@@ -241,6 +254,7 @@ export async function getWorkOrderTimerSnapshots(user: any, workOrderIds: number
           expected_duration_seconds,
           workorder_state,
           quality_failed,
+          active_quality_check_id,
           elapsed_seconds + CASE
             WHEN is_running AND active_since IS NOT NULL THEN GREATEST(
               0,
@@ -300,6 +314,7 @@ export async function getSharedWorkOrderTimers(user: any, workOrderIds: number[]
       expected_duration_seconds: normalizeExpectedDurationSeconds(snapshot?.expected_duration_seconds),
       workorder_state: normalizeSharedWorkOrderState(snapshot?.workorder_state),
       quality_failed: typeof snapshot?.quality_failed === 'boolean' ? snapshot.quality_failed : null,
+      active_quality_check_id: Number(snapshot?.active_quality_check_id) || null,
     }];
   });
 }

@@ -36,10 +36,18 @@ async function getQualityCheckSummary(workOrderId: number, companyId: string) {
   const validationChecks = checks.filter((check: any) => (
     String(check?.test_type || '').trim().toLowerCase() !== 'instructions'
   ));
+  const failedChecks = validationChecks
+    .filter((check: any) => check?.quality_state === 'fail')
+    .sort((left: any, right: any) => Number(left?.id) - Number(right?.id));
+  const pendingChecks = validationChecks
+    .filter((check: any) => !['pass', 'fail'].includes(check?.quality_state))
+    .sort((left: any, right: any) => Number(left?.id) - Number(right?.id));
   return {
     status: Boolean(response?.status),
-    failed: validationChecks.some((check: any) => check?.quality_state === 'fail'),
-    pending: validationChecks.some((check: any) => !['pass', 'fail'].includes(check?.quality_state)),
+    failed: failedChecks.length > 0,
+    pending: pendingChecks.length > 0,
+    firstFailedId: Number(failedChecks[0]?.id) || null,
+    firstPendingId: Number(pendingChecks[0]?.id) || null,
   };
 }
 
@@ -61,8 +69,22 @@ async function updateQualityControl(
   const workOrderId = getMany2OneId(quality_control?.workorder_id);
   const wasFailed = quality_control?.quality_state === 'fail';
   const snapshots = workOrderId ? await getWorkOrderTimerSnapshots(user, [workOrderId]) : new Map<number, any>();
-  const previousSharedState = String(snapshots.get(workOrderId)?.workorder_state || '').trim();
+  const timerSnapshot = snapshots.get(workOrderId);
+  const previousSharedState = String(timerSnapshot?.workorder_state || '').trim();
   const wasWaitingForFinalQuality = ['quality_pending', 'quality_failed_pending'].includes(previousSharedState);
+  let activeQualityCheckId = Number(timerSnapshot?.active_quality_check_id) || null;
+
+  if (wasWaitingForFinalQuality && !activeQualityCheckId) {
+    const currentSummary = await getQualityCheckSummary(workOrderId, user.company_id);
+    activeQualityCheckId = currentSummary.firstPendingId;
+  }
+  if (wasWaitingForFinalQuality && activeQualityCheckId && Number(qualityControlId) !== activeQualityCheckId) {
+    return {
+      status: false,
+      message: 'Este control aun no fue convocado para la orden de trabajo. Complete primero el control activo.',
+    };
+  }
+
   const values: any = { quality_state: qualityState };
   if (observations !== undefined) values.additional_note = observations;
   if (measure !== undefined) values.measure = measure;
@@ -102,7 +124,8 @@ async function updateQualityControl(
     const publishResult = await publishWorkOrderQualityState(
       user,
       workOrderId,
-      wasWaitingForFinalQuality ? 'failed_pending' : 'failed'
+      wasWaitingForFinalQuality ? 'failed_pending' : 'failed',
+      Number(qualityControlId)
     );
     if (!publishResult?.status) {
       return { status: false, message: publishResult?.message || 'La falla se registro en Odoo, pero no se pudo bloquear la OT en Piso.' };
@@ -119,12 +142,15 @@ async function updateQualityControl(
       if (!pauseResult?.status) {
         return { status: false, message: pauseResult?.message || 'El control se aprobo, pero no se pudo mantener pausada la OT.' };
       }
-      const qualityStatus = qualitySummary.failed
+      const qualityStatus: 'failed' | 'failed_pending' | 'clear' = qualitySummary.failed
         ? wasWaitingForFinalQuality ? 'failed_pending' : 'failed'
-        : wasWaitingForFinalQuality && qualitySummary.pending
-          ? 'pending'
-          : 'clear';
-      const publishResult = await publishWorkOrderQualityState(user, workOrderId, qualityStatus);
+        : 'clear';
+      const publishResult = await publishWorkOrderQualityState(
+        user,
+        workOrderId,
+        qualityStatus,
+        qualitySummary.failed ? qualitySummary.firstFailedId : null
+      );
       if (!publishResult?.status) {
         return { status: false, message: publishResult?.message || 'El control se aprobo, pero no se pudo actualizar el estado compartido de la OT.' };
       }

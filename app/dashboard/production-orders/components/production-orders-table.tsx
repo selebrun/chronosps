@@ -29,6 +29,14 @@ function getOdooName(value: any, fallback = 'N/A') {
   return fallback;
 }
 
+function getSalesNoteName(order: any) {
+  const relatedSale = String(order?.customer_sale_name || order?.x_studio_po || '').trim();
+  if (relatedSale) return relatedSale;
+
+  const origin = String(order?.origin || '').trim();
+  return /^(NV\/|S\d|SO\d)/i.test(origin) ? origin : 'Sin NVENTA';
+}
+
 function normalizeSearchText(value: any) {
   return String(value ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -42,6 +50,7 @@ function productionMatchesSearch(order: any, term: string) {
     order?.state,
     getStatusLabel(order?.state),
     getOdooName(order?.product_id, ''),
+    order?.customer_sale_name,
     order?.origin,
     order?.x_studio_po,
     getOdooName(order?.lot_producing_id, ''),
@@ -504,7 +513,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
           type="search"
           value={searchTerm}
           onChange={(event) => setSearchTerm(event.target.value)}
-          placeholder="Buscar por OP, producto, origen, lote, responsable o estado"
+          placeholder="Buscar por OP, NVENTA, producto, lote, responsable o estado"
           className="w-full rounded-md border border-gray-300 bg-white dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-400 p-3 text-sm text-gray-900 shadow-sm focus:border-sky-950 dark:focus:border-sky-400 focus:outline-none"
         />
         <StatusHelpButton module="production" />
@@ -523,7 +532,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                 Producto
               </th>
               <th scope="col" className="px-6 py-3">
-                PO/Origen
+                NVENTA
               </th>
               <th scope="col" className="px-6 py-3">
                 Cantidad
@@ -557,7 +566,7 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                   {getOdooName(order.product_id, 'Sin producto')}
                 </td>
                 <td className="px-3 py-2">
-                 {order?.x_studio_po || order?.origin || 'Sin origen'}
+                 {getSalesNoteName(order)}
                 </td>
                 <td className="px-3 py-2">
                   {order.qty_producing}/{order.product_qty}

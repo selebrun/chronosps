@@ -43,9 +43,12 @@ function ModalOrderQualityDetails({
   const [modalInstructionsOpen, setModalInstructionsOpen] = useState(false);
   const isQualityApproved = selectedOrderQuantity?.quality_state === "pass";
   const isQualityFailed = selectedOrderQuantity?.quality_state === "fail";
-  const canResolveFailedQuality = ["Calidad", "Lider", "Jefe"].includes(user?.role);
-  const canAcceptQuality = !isSubmitting && !isQualityApproved && (!isQualityFailed || canResolveFailedQuality);
-  const canRejectQuality = !isSubmitting && !isQualityApproved && !isQualityFailed;
+  const normalizedRole = String(user?.role || "").trim();
+  const canManageQuality = ["Calidad", "Lider", "Jefe"].includes(normalizedRole);
+  const canResolveFailedQuality = canManageQuality;
+  const isQualityRequested = selectedOrderQuantity?.quality_requested !== false;
+  const canAcceptQuality = canManageQuality && isQualityRequested && !isSubmitting && !isQualityApproved && (!isQualityFailed || canResolveFailedQuality);
+  const canRejectQuality = canManageQuality && isQualityRequested && !isSubmitting && !isQualityApproved && !isQualityFailed;
   const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
     ? selectedOrderQuantity.workorder_id[1]
     : selectedOrderQuantity?.workorder_id || "");

@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import eyeDetails from '@/public/eyeDetails.svg'
 import close from '@/public/close.png'
@@ -84,6 +85,7 @@ function sortProductionsByQualityPriority(qualityChecks: any[]) {
 
 
 export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user: any }) {
+  const router = useRouter();
   const [orderQualityDetail, setOrderQualityDetail] = useState([]);
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalDetailsIsOpen, setModalDetailsIsOpen] = useState(false);
@@ -136,6 +138,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
         if (res?.status) {
           setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'pass', additional_note: observations || '' }))
           setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'pass', additional_note: observations || '' } : item))
+          router.refresh()
         }
         return res
       })
@@ -151,6 +154,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
         if (res?.status) {
           setSelectedOrderQuantity((current: any) => ({ ...current, quality_state: 'fail', additional_note: observations || '' }))
           setOrderQualityDetail((current: any) => current.map((item: any) => item.id === (selectedOrderQuantity as any).id ? { ...item, quality_state: 'fail', additional_note: observations || '' } : item))
+          router.refresh()
         }
         return res
       })

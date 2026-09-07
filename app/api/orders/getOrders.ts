@@ -1,7 +1,7 @@
 'use server'
 import { executeOdooMethod, getOdooData } from '@/app/api/odoo/odooService';
 import { getActiveWorkOrderBlocks } from '@/app/api/workOrderBlocks/workOrderBlocks';
-import { applyWorkOrderTimerSnapshots } from '@/app/api/workOrderTimers/workOrderTimers';
+import { applyWorkOrderTimerSnapshots, getWorkOrderTimerSnapshots } from '@/app/api/workOrderTimers/workOrderTimers';
 import { removeSpecialCharacters } from '@/helper/removeSpecialCharacters';
 
 // `server-only` guarantees any modules that import code in file
@@ -89,6 +89,36 @@ function callOdooMethod(
   return new Promise((resolve) => {
     executeOdooMethod(model, method, args, companyId, (response: any) => resolve(response), kwargs);
   });
+}
+
+const compatibleModelFieldsCache = new Map<string, string[]>();
+
+async function getCompatibleModelFields(
+  model: string,
+  candidateFields: string[],
+  fallbackFields: string[],
+  companyId: string
+) {
+  const cacheKey = `${String(companyId || '').trim()}:${model}:${candidateFields.join(',')}`;
+  const cachedFields = compatibleModelFieldsCache.get(cacheKey);
+  if (cachedFields) return cachedFields;
+
+  const response = await callOdooMethod(
+    model,
+    'fields_get',
+    [],
+    companyId,
+    { attributes: ['type'] }
+  );
+  const availableFields = response?.status && response?.data
+    ? new Set(Object.keys(response.data))
+    : null;
+  const compatibleFields = availableFields
+    ? candidateFields.filter((field) => availableFields.has(field))
+    : fallbackFields;
+
+  compatibleModelFieldsCache.set(cacheKey, compatibleFields);
+  return compatibleFields;
 }
 
 // ─── Resolución de usuario Líder ─────────────────────────────────────────────
@@ -962,7 +992,8 @@ export async function getProductionOrders(user: any) {
                   reject({ status: false, message: "No tiene ninguna orden de produccion asignada." });
                   return;
                 }
-                resolve({ status: true, message: '', data: productions.data });
+                const productionsWithSalesNotes = await addSalesNoteLabelsToProductions(user, productions.data);
+                resolve({ status: true, message: '', data: productionsWithSalesNotes });
               },
               false
             );
@@ -992,7 +1023,8 @@ export async function getProductionOrders(user: any) {
               return;
             }
             const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
-            resolve({ status: true, message: '', data: productionsWithWorkOrders });
+            const productionsWithSalesNotes = await addSalesNoteLabelsToProductions(user, productionsWithWorkOrders);
+            resolve({ status: true, message: '', data: productionsWithSalesNotes });
           },
           false
         )
@@ -1013,7 +1045,8 @@ export async function getProductionOrders(user: any) {
               return;
             }
             const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
-            resolve({ status: true, message: '', data: productionsWithWorkOrders });
+            const productionsWithSalesNotes = await addSalesNoteLabelsToProductions(user, productionsWithWorkOrders);
+            resolve({ status: true, message: '', data: productionsWithSalesNotes });
           },
           false
           )
@@ -1034,7 +1067,8 @@ export async function getProductionOrders(user: any) {
               return;
             }
             const productionsWithWorkOrders = await filterProductionsWithRealWorkOrders(user, productions.data);
-            resolve({ status: true, message: '', data: productionsWithWorkOrders });
+            const productionsWithSalesNotes = await addSalesNoteLabelsToProductions(user, productionsWithWorkOrders);
+            resolve({ status: true, message: '', data: productionsWithSalesNotes });
           },
           false
           )
@@ -1078,8 +1112,9 @@ export async function getWorkOrders(user: any) {
         ),
         enrichWorkOrders(user, workOrders),
       ]);
+      const productionsWithSalesNotes = await addSalesNoteLabelsToProductions(user, productions);
 
-      return { status: true, message: '', data: enrichedWorkOrders, production_data: productions };
+      return { status: true, message: '', data: enrichedWorkOrders, production_data: productionsWithSalesNotes };
     }
 
     case 'Lider': {
@@ -1119,9 +1154,12 @@ export async function getWorkOrders(user: any) {
       const filteredProductions = productions.filter((p: any) => productionIdsWithWorkOrders.has(Number(p.id)));
 
       // 4. Enriquecer OTs en paralelo
-      const enrichedWorkOrders = await enrichWorkOrders(user, workOrders);
+      const [enrichedWorkOrders, productionsWithSalesNotes] = await Promise.all([
+        enrichWorkOrders(user, workOrders),
+        addSalesNoteLabelsToProductions(user, filteredProductions),
+      ]);
 
-      return { status: true, message: '', data: enrichedWorkOrders, production_data: filteredProductions };
+      return { status: true, message: '', data: enrichedWorkOrders, production_data: productionsWithSalesNotes };
     }
 
     case 'Jefe': {
@@ -1156,9 +1194,12 @@ export async function getWorkOrders(user: any) {
       const filteredProductions = productions.filter((p: any) => productionIdsWithWorkOrders.has(Number(p.id)));
 
       // 3. Enriquecer OTs en paralelo
-      const enrichedWorkOrders = await enrichWorkOrders(user, workOrders);
+      const [enrichedWorkOrders, productionsWithSalesNotes] = await Promise.all([
+        enrichWorkOrders(user, workOrders),
+        addSalesNoteLabelsToProductions(user, filteredProductions),
+      ]);
 
-      return { status: true, message: '', data: enrichedWorkOrders, production_data: filteredProductions };
+      return { status: true, message: '', data: enrichedWorkOrders, production_data: productionsWithSalesNotes };
     }
 
     default:
@@ -1213,15 +1254,19 @@ export async function getQualityControl(user: any) {
 
   const allQualityChecks = (Array.isArray(qualityChecksResponse.data) ? qualityChecksResponse.data : [])
     .filter((check: any) => String(check?.test_type || '').trim().toLowerCase() !== 'instructions');
-  const visibleQualityChecks = role === 'Calidad'
-    ? allQualityChecks.filter((check: any) => check?.quality_state !== 'pass')
-    : allQualityChecks;
 
   try {
-    const qualityChecks = await addWorkOrderSequenceToQualityChecks(visibleQualityChecks, user.company_id);
-    return { status: true, message: '', data: qualityChecks, production_data: productions };
+    const qualityChecks = await addWorkOrderSequenceToQualityChecks(allQualityChecks, user.company_id);
+    const checksInCurrentInvocation = await applyQualityInvocationState(user, qualityChecks);
+    const visibleQualityChecks = role === 'Calidad'
+      ? checksInCurrentInvocation.filter((check: any) => check?.quality_state !== 'pass')
+      : checksInCurrentInvocation;
+    return { status: true, message: '', data: visibleQualityChecks, production_data: productions };
   } catch (error) {
     console.error('Error enriqueciendo controles de calidad con sus OT:', error);
+    const visibleQualityChecks = role === 'Calidad'
+      ? allQualityChecks.filter((check: any) => check?.quality_state !== 'pass')
+      : allQualityChecks;
     return { status: true, message: '', data: visibleQualityChecks, production_data: productions };
   }
 }
@@ -1289,6 +1334,42 @@ async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], company
   });
 }
 
+async function applyQualityInvocationState(user: any, qualityChecks: any[]) {
+  const workorderIds = Array.from(new Set(
+    qualityChecks.map((check: any) => Number(asOdooId(check?.workorder_id))).filter(Boolean)
+  ));
+  if (!workorderIds.length) return qualityChecks;
+
+  const snapshots = await getWorkOrderTimerSnapshots(user, workorderIds);
+  const pendingByWorkOrder = new Map<number, any[]>();
+  qualityChecks.forEach((check: any) => {
+    if (['pass', 'fail'].includes(String(check?.quality_state || '').trim().toLowerCase())) return;
+    const workOrderId = Number(asOdooId(check?.workorder_id));
+    if (!workOrderId) return;
+    pendingByWorkOrder.set(workOrderId, [...(pendingByWorkOrder.get(workOrderId) || []), check]);
+  });
+  pendingByWorkOrder.forEach((checks) => checks.sort((left, right) => Number(left?.id) - Number(right?.id)));
+
+  return qualityChecks.flatMap((check: any) => {
+    const workOrderId = Number(asOdooId(check?.workorder_id));
+    const snapshot = snapshots.get(workOrderId);
+    if (!snapshot) return [{ ...check, quality_requested: true }];
+
+    const sharedState = String(snapshot?.workorder_state || '').trim().toLowerCase();
+    const isPending = !['pass', 'fail'].includes(String(check?.quality_state || '').trim().toLowerCase());
+    const isManagedInvocation = ['quality_pending', 'quality_failed_pending', 'quality_cleared'].includes(sharedState);
+    if (!isPending || !isManagedInvocation) {
+      return [{ ...check, quality_requested: true }];
+    }
+
+    const activeQualityCheckId = Number(snapshot?.active_quality_check_id)
+      || (sharedState !== 'quality_cleared' ? Number(pendingByWorkOrder.get(workOrderId)?.[0]?.id) : 0);
+    if (!activeQualityCheckId || Number(check?.id) !== activeQualityCheckId) return [];
+
+    return [{ ...check, quality_requested: true }];
+  });
+}
+
 // ─── Notas de Venta / Cliente ─────────────────────────────────────────────────
 
 function getWorkOrderProgress(workorder: any) {
@@ -1326,14 +1407,51 @@ const CUSTOMER_PRODUCTION_FIELDS = [
   'origin',
   'sale_id',
   'sale_line_id',
+  'reference_ids',
+  'production_group_id',
   'workorder_ids',
 ];
 
+const CUSTOMER_PRODUCTION_REQUIRED_FIELDS = [
+  'id',
+  'name',
+  'state',
+  'product_id',
+  'product_qty',
+  'qty_producing',
+  'origin',
+  'workorder_ids',
+];
+
+const CUSTOMER_SALE_FIELDS = [
+  'id',
+  'name',
+  'partner_id',
+  'date_order',
+  'state',
+  'client_order_ref',
+  'amount_total',
+  'stock_reference_ids',
+];
+
+const CUSTOMER_SALE_REQUIRED_FIELDS = CUSTOMER_SALE_FIELDS.filter((field) => field !== 'stock_reference_ids');
+
+async function getCustomerProductionFields(companyId: string) {
+  return getCompatibleModelFields(
+    'mrp.production',
+    CUSTOMER_PRODUCTION_FIELDS,
+    CUSTOMER_PRODUCTION_REQUIRED_FIELDS,
+    companyId
+  );
+}
+
 async function getProductionsBySaleId(saleIds: number[], companyId: string) {
+  const productionFields = await getCustomerProductionFields(companyId);
+  if (!productionFields.includes('sale_id')) return [];
   const productions = await getOdooRecords(
     'mrp.production',
     [['sale_id', 'in', saleIds]],
-    CUSTOMER_PRODUCTION_FIELDS,
+    productionFields,
     companyId
   );
 
@@ -1349,11 +1467,13 @@ async function getProductionsBySaleLineId(saleLines: any[], companyId: string) {
   );
   const lineIds = saleLines.map((line: any) => line.id).filter(Boolean);
   if (!lineIds.length) return [];
+  const productionFields = await getCustomerProductionFields(companyId);
+  if (!productionFields.includes('sale_line_id')) return [];
 
   const productions = await getOdooRecords(
     'mrp.production',
     [['sale_line_id', 'in', lineIds]],
-    CUSTOMER_PRODUCTION_FIELDS,
+    productionFields,
     companyId
   );
 
@@ -1383,10 +1503,11 @@ async function getProductionsByOriginSales(sales: any[], companyId: string) {
     });
   });
 
+  const productionFields = await getCustomerProductionFields(companyId);
   const productions = await getOdooRecords(
     'mrp.production',
     [['origin', 'in', Array.from(saleByOriginToken.keys())]],
-    CUSTOMER_PRODUCTION_FIELDS,
+    productionFields,
     companyId
   );
 
@@ -1394,6 +1515,61 @@ async function getProductionsByOriginSales(sales: any[], companyId: string) {
     ...production,
     customer_sale_id: saleByOriginToken.get(normalizeText(production.origin)),
   }));
+}
+
+async function getProductionsBySaleReferences(sales: any[], companyId: string) {
+  const saleIds = new Set<number>(sales.map((sale: any) => Number(sale?.id)).filter(Boolean));
+  if (!saleIds.size) return [];
+
+  const referenceFields = await getCompatibleModelFields(
+    'stock.reference',
+    ['id', 'sale_ids'],
+    ['id'],
+    companyId
+  );
+  if (!referenceFields.includes('sale_ids')) return [];
+
+  const references = await getOdooRecords(
+    'stock.reference',
+    [['sale_ids', 'in', Array.from(saleIds)]],
+    referenceFields,
+    companyId
+  );
+  const saleByReferenceId = new Map<number, number>();
+
+  sales.forEach((sale: any) => {
+    (Array.isArray(sale?.stock_reference_ids) ? sale.stock_reference_ids : []).forEach((referenceId: any) => {
+      if (Number(referenceId)) saleByReferenceId.set(Number(referenceId), Number(sale.id));
+    });
+  });
+  references.forEach((reference: any) => {
+    const matchingSaleId = (Array.isArray(reference?.sale_ids) ? reference.sale_ids : [])
+      .map(Number)
+      .find((saleId: number) => saleIds.has(saleId));
+    if (matchingSaleId) saleByReferenceId.set(Number(reference.id), matchingSaleId);
+  });
+
+  const referenceIds = Array.from(saleByReferenceId.keys());
+  if (!referenceIds.length) return [];
+
+  const productionFields = await getCustomerProductionFields(companyId);
+  if (!productionFields.includes('reference_ids')) return [];
+  const productions = await getOdooRecords(
+    'mrp.production',
+    [['reference_ids', 'in', referenceIds]],
+    productionFields,
+    companyId
+  );
+
+  return productions.map((production: any) => {
+    const matchingReferenceId = (Array.isArray(production?.reference_ids) ? production.reference_ids : [])
+      .map(Number)
+      .find((referenceId: number) => saleByReferenceId.has(referenceId));
+    return {
+      ...production,
+      customer_sale_id: matchingReferenceId ? saleByReferenceId.get(matchingReferenceId) : null,
+    };
+  });
 }
 
 function getProductionDirectSaleId(production: any, sales: any[]) {
@@ -1423,10 +1599,11 @@ async function getProductionChildren(productions: any[], user: any) {
   let pendingNames = productions.map((production: any) => production.name).filter(Boolean);
 
   for (let depth = 0; depth < 4 && pendingNames.length; depth += 1) {
+    const productionFields = await getCustomerProductionFields(user.company_id);
     const children = await getOdooRecords(
       'mrp.production',
       [['origin', 'in', pendingNames]],
-      CUSTOMER_PRODUCTION_FIELDS,
+      productionFields,
       user.company_id
     );
 
@@ -1477,6 +1654,129 @@ function getProductionSaleMap(productions: any[], sales: any[]) {
   }
 
   return productionSaleMap;
+}
+
+async function addSalesNoteLabelsToProductions(user: any, productions: any[]) {
+  if (!productions.length) return productions;
+
+  const saleIdsByProduction = new Map<number, Set<number>>();
+  const addSaleId = (productionId: number, saleId: any) => {
+    const normalizedSaleId = Number(saleId);
+    if (!productionId || !normalizedSaleId) return;
+    const saleIds = saleIdsByProduction.get(productionId) || new Set<number>();
+    saleIds.add(normalizedSaleId);
+    saleIdsByProduction.set(productionId, saleIds);
+  };
+
+  productions.forEach((production: any) => {
+    addSaleId(Number(production?.id), asOdooId(production?.customer_sale_id));
+    addSaleId(Number(production?.id), asOdooId(production?.sale_id));
+  });
+
+  const saleLineIds = Array.from(new Set(
+    productions.map((production: any) => Number(asOdooId(production?.sale_line_id))).filter(Boolean)
+  ));
+  if (saleLineIds.length) {
+    const saleLines = await getOdooRecords(
+      'sale.order.line',
+      [['id', 'in', saleLineIds]],
+      ['id', 'order_id'],
+      user.company_id
+    );
+    const saleByLineId = new Map<number, number>(
+      saleLines.map((line: any) => [Number(line.id), Number(asOdooId(line.order_id))])
+    );
+    productions.forEach((production: any) => {
+      const saleLineId = Number(asOdooId(production?.sale_line_id));
+      addSaleId(Number(production?.id), saleByLineId.get(saleLineId));
+    });
+  }
+
+  const referenceIds = Array.from(new Set(
+    productions.flatMap((production: any) => (
+      Array.isArray(production?.reference_ids) ? production.reference_ids.map(Number) : []
+    )).filter(Boolean)
+  ));
+  if (referenceIds.length) {
+    const referenceFields = await getCompatibleModelFields(
+      'stock.reference',
+      ['id', 'sale_ids'],
+      ['id'],
+      user.company_id
+    );
+    if (referenceFields.includes('sale_ids')) {
+      const references = await getOdooRecords(
+        'stock.reference',
+        [['id', 'in', referenceIds]],
+        referenceFields,
+        user.company_id
+      );
+      const salesByReferenceId = new Map<number, number[]>(
+        references.map((reference: any) => [
+          Number(reference.id),
+          (Array.isArray(reference?.sale_ids) ? reference.sale_ids : []).map(Number).filter(Boolean),
+        ])
+      );
+      productions.forEach((production: any) => {
+        (Array.isArray(production?.reference_ids) ? production.reference_ids : []).forEach((referenceId: any) => {
+          (salesByReferenceId.get(Number(referenceId)) || []).forEach((saleId) => addSaleId(Number(production.id), saleId));
+        });
+      });
+    }
+  }
+
+  const originNames = Array.from(new Set(
+    productions.map((production: any) => normalizeText(production?.origin)).filter(Boolean)
+  ));
+  if (originNames.length) {
+    const originSales = await getOdooRecords(
+      'sale.order',
+      [['name', 'in', originNames]],
+      ['id', 'name'],
+      user.company_id
+    );
+    const saleIdByName = new Map<string, number>(
+      originSales.map((sale: any) => [normalizeText(sale.name), Number(sale.id)])
+    );
+    productions.forEach((production: any) => {
+      addSaleId(Number(production?.id), saleIdByName.get(normalizeText(production?.origin)));
+    });
+  }
+
+  const productionByName = new Map(productions.map((production: any) => [production?.name, production]));
+  let changed = true;
+  while (changed) {
+    changed = false;
+    productions.forEach((production: any) => {
+      if (saleIdsByProduction.get(Number(production.id))?.size) return;
+      const parent = findProductionParentByOrigin(production?.origin, productionByName);
+      const parentSaleIds = parent ? saleIdsByProduction.get(Number(parent.id)) : null;
+      if (!parentSaleIds?.size) return;
+      parentSaleIds.forEach((saleId) => addSaleId(Number(production.id), saleId));
+      changed = true;
+    });
+  }
+
+  const saleIds = Array.from(new Set(
+    Array.from(saleIdsByProduction.values()).flatMap((ids) => Array.from(ids))
+  ));
+  const sales = saleIds.length
+    ? await getOdooRecords('sale.order', [['id', 'in', saleIds]], ['id', 'name'], user.company_id)
+    : [];
+  const saleNameById = new Map<number, string>(
+    sales.map((sale: any) => [Number(sale.id), String(sale.name || '')])
+  );
+
+  return productions.map((production: any) => {
+    const saleNames = Array.from(saleIdsByProduction.get(Number(production.id)) || [])
+      .map((saleId) => saleNameById.get(saleId))
+      .filter(Boolean)
+      .sort((left, right) => String(left).localeCompare(String(right), 'es', { numeric: true }));
+    return {
+      ...production,
+      customer_sale_name: saleNames.join(', '),
+    };
+  });
 }
 
 function uniqueByOdooId(records: any[]) {
@@ -1608,12 +1908,18 @@ export async function getCustomerSalesNotes(user: any) {
   const salesDomain = user.role === 'Cliente'
     ? [['partner_id', 'in', partnerIds], ['state', 'in', ['sale', 'done']]]
     : [['state', 'in', ['sale', 'done']]];
+  const saleFields = await getCompatibleModelFields(
+    'sale.order',
+    CUSTOMER_SALE_FIELDS,
+    CUSTOMER_SALE_REQUIRED_FIELDS,
+    user.company_id
+  );
 
   return new Promise((resolve) => {
     getOdooData(
       'sale.order',
       salesDomain,
-      ['id', 'name', 'partner_id', 'date_order', 'state', 'client_order_ref', 'amount_total'],
+      saleFields,
       CUSTOMER_SALES_LIMIT,
       'date_order desc',
       user.company_id,
@@ -1630,12 +1936,25 @@ export async function getCustomerSalesNotes(user: any) {
           ['id', 'order_id', 'name', 'product_id', 'product_uom_qty', 'qty_delivered'],
           user.company_id
         );
-        const productionsBySaleId = await getProductionsBySaleId(saleIds, user.company_id);
-        const productionsBySaleLineId = await getProductionsBySaleLineId(saleLines, user.company_id);
-        const productionsByOrigin = await getProductionsByOriginSales(sales.data, user.company_id);
+        const [
+          productionsBySaleId,
+          productionsBySaleLineId,
+          productionsByReferences,
+          productionsByOrigin,
+        ] = await Promise.all([
+          getProductionsBySaleId(saleIds, user.company_id),
+          getProductionsBySaleLineId(saleLines, user.company_id),
+          getProductionsBySaleReferences(sales.data, user.company_id),
+          getProductionsByOriginSales(sales.data, user.company_id),
+        ]);
         const directProductions = Array.from(
           new Map(
-            [...productionsBySaleId, ...productionsBySaleLineId, ...productionsByOrigin].map((production: any) => [production.id, production])
+            [
+              ...productionsBySaleId,
+              ...productionsBySaleLineId,
+              ...productionsByReferences,
+              ...productionsByOrigin,
+            ].map((production: any) => [production.id, production])
           ).values()
         );
 
@@ -1649,6 +1968,7 @@ export async function getCustomerSalesNotes(user: any) {
           sale_line_count: saleLines.length,
           production_by_sale_id_count: productionsBySaleId.length,
           production_by_sale_line_id_count: productionsBySaleLineId.length,
+          production_by_reference_count: productionsByReferences.length,
           production_by_origin_count: productionsByOrigin.length,
           production_total_count: productionData.length,
           production_ids: productionIds,
