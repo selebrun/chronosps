@@ -1257,10 +1257,10 @@ export async function getQualityControl(user: any) {
 
   try {
     const qualityChecks = await addWorkOrderSequenceToQualityChecks(allQualityChecks, user.company_id);
-    const checksInCurrentInvocation = await applyQualityInvocationState(user, qualityChecks);
+    const checksWithExecutionState = await applyQualityInvocationState(user, qualityChecks);
     const visibleQualityChecks = role === 'Calidad'
-      ? checksInCurrentInvocation.filter((check: any) => check?.quality_state !== 'pass')
-      : checksInCurrentInvocation;
+      ? checksWithExecutionState.filter((check: any) => check?.quality_state !== 'pass')
+      : checksWithExecutionState;
     return { status: true, message: '', data: visibleQualityChecks, production_data: productions };
   } catch (error) {
     console.error('Error enriqueciendo controles de calidad con sus OT:', error);
@@ -1304,7 +1304,7 @@ async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], company
   const workordersResponse = await getOdooResponse(
     'mrp.workorder',
     [['id', 'in', workorderIds]],
-    ['id', 'sequence', 'name'],
+    ['id', 'sequence', 'name', 'state', 'duration'],
     companyId
   );
   if (!workordersResponse?.status) {
@@ -1330,6 +1330,8 @@ async function addWorkOrderSequenceToQualityChecks(qualityChecks: any[], company
       ...qualityCheck,
       workorder_sequence: workorder?.sequence ?? null,
       workorder_name: workorder?.name || (Array.isArray(qualityCheck?.workorder_id) ? qualityCheck.workorder_id[1] : qualityCheck?.workorder_id),
+      related_workorder_state: workorder?.state || '',
+      related_workorder_duration: Number(workorder?.duration) || 0,
     };
   });
 }
@@ -1340,7 +1342,20 @@ async function applyQualityInvocationState(user: any, qualityChecks: any[]) {
   ));
   if (!workorderIds.length) return qualityChecks;
 
-  const snapshots = await getWorkOrderTimerSnapshots(user, workorderIds);
+  const [snapshots, productivityResponse] = await Promise.all([
+    getWorkOrderTimerSnapshots(user, workorderIds),
+    getOdooResponse(
+      'mrp.workcenter.productivity',
+      [['workorder_id', 'in', workorderIds]],
+      ['id', 'workorder_id'],
+      user.company_id
+    ),
+  ]);
+  const startedWorkOrderIds = new Set<number>(
+    (productivityResponse?.status && Array.isArray(productivityResponse?.data) ? productivityResponse.data : [])
+      .map((record: any) => Number(asOdooId(record?.workorder_id)))
+      .filter(Boolean)
+  );
   const pendingByWorkOrder = new Map<number, any[]>();
   qualityChecks.forEach((check: any) => {
     if (['pass', 'fail'].includes(String(check?.quality_state || '').trim().toLowerCase())) return;
@@ -1350,23 +1365,30 @@ async function applyQualityInvocationState(user: any, qualityChecks: any[]) {
   });
   pendingByWorkOrder.forEach((checks) => checks.sort((left, right) => Number(left?.id) - Number(right?.id)));
 
-  return qualityChecks.flatMap((check: any) => {
+  return qualityChecks.map((check: any) => {
     const workOrderId = Number(asOdooId(check?.workorder_id));
     const snapshot = snapshots.get(workOrderId);
-    if (!snapshot) return [{ ...check, quality_requested: true }];
-
     const sharedState = String(snapshot?.workorder_state || '').trim().toLowerCase();
+    const odooWorkOrderState = String(check?.related_workorder_state || '').trim().toLowerCase();
+    const sharedElapsedSeconds = Number(snapshot?.current_elapsed_seconds ?? snapshot?.elapsed_seconds) || 0;
+    const workOrderStarted = startedWorkOrderIds.has(workOrderId)
+      || ['progress', 'done', 'completed'].includes(odooWorkOrderState)
+      || Number(check?.related_workorder_duration) > 0
+      || sharedElapsedSeconds > 0
+      || ['progress', 'quality_pending', 'quality_failed', 'quality_failed_pending', 'quality_cleared', 'done'].includes(sharedState);
     const isPending = !['pass', 'fail'].includes(String(check?.quality_state || '').trim().toLowerCase());
     const isManagedInvocation = ['quality_pending', 'quality_failed_pending', 'quality_cleared'].includes(sharedState);
-    if (!isPending || !isManagedInvocation) {
-      return [{ ...check, quality_requested: true }];
-    }
-
     const activeQualityCheckId = Number(snapshot?.active_quality_check_id)
       || (sharedState !== 'quality_cleared' ? Number(pendingByWorkOrder.get(workOrderId)?.[0]?.id) : 0);
-    if (!activeQualityCheckId || Number(check?.id) !== activeQualityCheckId) return [];
+    const qualityRequested = !isPending
+      || !isManagedInvocation
+      || (Boolean(activeQualityCheckId) && Number(check?.id) === activeQualityCheckId);
 
-    return [{ ...check, quality_requested: true }];
+    return {
+      ...check,
+      quality_requested: qualityRequested,
+      workorder_started: workOrderStarted,
+    };
   });
 }
 

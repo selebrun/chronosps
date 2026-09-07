@@ -47,8 +47,9 @@ function ModalOrderQualityDetails({
   const canManageQuality = ["Calidad", "Lider", "Jefe"].includes(normalizedRole);
   const canResolveFailedQuality = canManageQuality;
   const isQualityRequested = selectedOrderQuantity?.quality_requested !== false;
-  const canAcceptQuality = canManageQuality && isQualityRequested && !isSubmitting && !isQualityApproved && (!isQualityFailed || canResolveFailedQuality);
-  const canRejectQuality = canManageQuality && isQualityRequested && !isSubmitting && !isQualityApproved && !isQualityFailed;
+  const isWorkOrderStarted = selectedOrderQuantity?.workorder_started === true || isQualityApproved || isQualityFailed;
+  const canAcceptQuality = canManageQuality && isWorkOrderStarted && isQualityRequested && !isSubmitting && !isQualityApproved && (!isQualityFailed || canResolveFailedQuality);
+  const canRejectQuality = canManageQuality && isWorkOrderStarted && isQualityRequested && !isSubmitting && !isQualityApproved && !isQualityFailed;
   const rawWorkOrderName = selectedOrderQuantity?.workorder_name || (Array.isArray(selectedOrderQuantity?.workorder_id)
     ? selectedOrderQuantity.workorder_id[1]
     : selectedOrderQuantity?.workorder_id || "");
@@ -164,6 +165,16 @@ function ModalOrderQualityDetails({
         </div>
 
         <div className="min-w-[150px]">
+          {!isQualityApproved && !isQualityFailed && !isWorkOrderStarted && (
+            <div className="rounded-md bg-amber-100 p-3 text-center font-bold text-amber-900">
+              La OT aun no ha sido iniciada
+            </div>
+          )}
+          {!isQualityApproved && !isQualityFailed && isWorkOrderStarted && !isQualityRequested && (
+            <div className="rounded-md bg-amber-100 p-3 text-center font-bold text-amber-900">
+              Pendiente de convocatoria
+            </div>
+          )}
           {isQualityApproved && (
             <div className="rounded-md bg-green-100 p-3 text-center font-bold text-green-800">
               Control aprobado

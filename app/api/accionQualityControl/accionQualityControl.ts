@@ -51,6 +51,56 @@ async function getQualityCheckSummary(workOrderId: number, companyId: string) {
   };
 }
 
+async function getQualityExecutionContext(user: any, qualityControlId: number): Promise<any> {
+  const qualityChecks: any = await getOdooRecords(
+    'quality.check',
+    [['id', '=', qualityControlId]],
+    ['id', 'quality_state', 'test_type', 'workorder_id'],
+    user.company_id
+  );
+  if (!qualityChecks?.status || !qualityChecks?.data?.[0]) {
+    return { status: false, message: 'No se pudo verificar el control de calidad en Odoo.' };
+  }
+
+  const qualityCheck = qualityChecks.data[0];
+  const workOrderId = getMany2OneId(qualityCheck?.workorder_id);
+  if (!workOrderId) {
+    return { status: false, message: 'El control de calidad no tiene una orden de trabajo asociada.' };
+  }
+
+  const [workOrders, productivity, snapshots] = await Promise.all([
+    getOdooRecords(
+      'mrp.workorder',
+      [['id', '=', workOrderId]],
+      ['id', 'state', 'duration'],
+      user.company_id
+    ),
+    getOdooRecords(
+      'mrp.workcenter.productivity',
+      [['workorder_id', '=', workOrderId]],
+      ['id', 'workorder_id'],
+      user.company_id
+    ),
+    getWorkOrderTimerSnapshots(user, [workOrderId]),
+  ]);
+  const workOrder = workOrders?.status && workOrders?.data?.[0] ? workOrders.data[0] : null;
+  if (!workOrder) {
+    return { status: false, message: 'No se pudo verificar la orden de trabajo asociada en Odoo.' };
+  }
+
+  const snapshot = snapshots.get(workOrderId);
+  const sharedState = String(snapshot?.workorder_state || '').trim().toLowerCase();
+  const odooState = String(workOrder?.state || '').trim().toLowerCase();
+  const sharedElapsedSeconds = Number(snapshot?.current_elapsed_seconds ?? snapshot?.elapsed_seconds) || 0;
+  const workOrderStarted = Boolean(productivity?.status && productivity?.data?.length)
+    || ['progress', 'done', 'completed'].includes(odooState)
+    || Number(workOrder?.duration) > 0
+    || sharedElapsedSeconds > 0
+    || ['progress', 'quality_pending', 'quality_failed', 'quality_failed_pending', 'quality_cleared', 'done'].includes(sharedState);
+
+  return { status: true, qualityCheck, workOrderId, snapshot, workOrderStarted };
+}
+
 async function updateQualityControl(
   user: any,
   quality_control: any,
@@ -65,20 +115,38 @@ async function updateQualityControl(
     return { status: false, message: "No se encontro el control de calidad seleccionado." };
   }
 
-  const qualityControlId = quality_control.id;
-  const workOrderId = getMany2OneId(quality_control?.workorder_id);
-  const wasFailed = quality_control?.quality_state === 'fail';
-  const snapshots = workOrderId ? await getWorkOrderTimerSnapshots(user, [workOrderId]) : new Map<number, any>();
-  const timerSnapshot = snapshots.get(workOrderId);
+  const qualityControlId = Number(quality_control.id);
+  const executionContext = await getQualityExecutionContext(user, qualityControlId);
+  if (!executionContext.status) return executionContext;
+
+  const currentQualityState = String(executionContext.qualityCheck?.quality_state || '').trim().toLowerCase();
+  const workOrderId = Number(executionContext.workOrderId);
+  const wasFailed = currentQualityState === 'fail';
+  if (currentQualityState === 'pass') {
+    return { status: false, message: 'Este control de calidad ya esta aprobado y no admite nuevas acciones.' };
+  }
+  if (!executionContext.workOrderStarted && !wasFailed) {
+    return {
+      status: false,
+      message: 'No puede ejecutar este control de calidad porque la orden de trabajo asociada aun no ha sido iniciada.',
+    };
+  }
+
+  const timerSnapshot = executionContext.snapshot;
   const previousSharedState = String(timerSnapshot?.workorder_state || '').trim();
   const wasWaitingForFinalQuality = ['quality_pending', 'quality_failed_pending'].includes(previousSharedState);
+  const hasManagedQualityInvocation = ['quality_pending', 'quality_failed_pending', 'quality_cleared']
+    .includes(previousSharedState);
   let activeQualityCheckId = Number(timerSnapshot?.active_quality_check_id) || null;
 
   if (wasWaitingForFinalQuality && !activeQualityCheckId) {
     const currentSummary = await getQualityCheckSummary(workOrderId, user.company_id);
     activeQualityCheckId = currentSummary.firstPendingId;
   }
-  if (wasWaitingForFinalQuality && activeQualityCheckId && Number(qualityControlId) !== activeQualityCheckId) {
+  if (
+    hasManagedQualityInvocation
+    && (!activeQualityCheckId || Number(qualityControlId) !== activeQualityCheckId)
+  ) {
     return {
       status: false,
       message: 'Este control aun no fue convocado para la orden de trabajo. Complete primero el control activo.',
