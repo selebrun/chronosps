@@ -14,6 +14,7 @@ import { getWorkOrderInstructions, getWorkOrders } from '@/app/api/orders/getOrd
 import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrder/getMaterialsOrder'
 import { applySharedWorkOrderTimer } from '@/helper/applySharedWorkOrderTimer'
 import { applySuccessfulWorkOrderAction } from '@/helper/applySuccessfulWorkOrderAction'
+import { withPromiseTimeout } from '@/helper/withPromiseTimeout'
 
 function asArray(value: any) {
   return Array.isArray(value) ? value : [];
@@ -271,6 +272,8 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   }
 
   const executeWorkOrderAction = async (action: string, block_reason?: any | undefined, qtyDone?: number | undefined, elapsedSeconds?: number | undefined ) => {
+    if (loadigAction) return
+
     const currentWorkOrder = showDetailOrderWork?.id ? showDetailOrderWork : orderWorkSelected;
 
     if (['start_work_order', 'finish_work_order'].includes(action) && user?.role === 'Operario' && currentWorkOrder?.quality_failed) {
@@ -295,49 +298,68 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
 
     setLoadigAction(true)
     setModalIsOpenBlocks(false)
-    const update = await updateOrder(user, currentWorkOrder, action, block_reason, qtyDone, elapsedSeconds).then( res => res).catch((err) => console.log(err))
-    if (update?.status) {
-      const odooOrdersWork: any = await getWorkOrders(user).then( res => res).catch((err) => console.log(err))
-      const optimisticOrder = applySuccessfulWorkOrderAction(currentWorkOrder, action)
-      const refreshedWorkOrders = odooOrdersWork?.status ? asArray(odooOrdersWork?.data) : []
-      const dateilOrden = refreshedWorkOrders.filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(orderProductionSelected?.id))
-
-      let orderWorkSelected1 = optimisticOrder;
-      const refreshedOrder = refreshedWorkOrders.find((item: any) => Number(item?.id) === Number(currentWorkOrder?.id))
-      orderWorkSelected1 = refreshedOrder || optimisticOrder
-
-      seOrderWorkSelected(orderWorkSelected1)
-      setShowDetailOrderWork(orderWorkSelected1)
-      if (odooOrdersWork?.status) {
-        setOrderWorkDetail(dateilOrden)
-        setOrdersWork(odooOrdersWork)
-      } else {
-        setOrderWorkDetail((current: any[]) => asArray(current).map((item: any) => Number(item?.id) === Number(currentWorkOrder?.id) ? optimisticOrder : item))
-        setOrdersWork((current: any) => current?.data
-          ? { ...current, data: current.data.map((item: any) => Number(item?.id) === Number(currentWorkOrder?.id) ? optimisticOrder : item) }
-          : current
-        )
-      }
-      setLoadigAction(false)
-    } else {
-      const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
-      if (action === 'finish_work_order' && isQualityControlError(message)) {
-        const odooOrdersWork: any = await getWorkOrders(user).then(res => res).catch((err) => console.log(err))
-        const refreshedWorkOrders = asArray(odooOrdersWork?.data)
+    try {
+      const update: any = await withPromiseTimeout(
+        updateOrder(user, currentWorkOrder, action, block_reason, qtyDone, elapsedSeconds),
+        30000,
+        'La accion esta tardando demasiado. La pantalla fue liberada; actualice la OT antes de reintentar.'
+      )
+      if (update?.status) {
+        let odooOrdersWork: any = null
+        try {
+          odooOrdersWork = await withPromiseTimeout(
+            getWorkOrders(user),
+            30000,
+            'Odoo confirmo la accion, pero no respondio a tiempo al refrescar la OT.'
+          )
+        } catch (refreshError) {
+          console.warn('No se pudo refrescar la OT despues de la accion:', refreshError)
+        }
+        const optimisticOrder = applySuccessfulWorkOrderAction(currentWorkOrder, action)
+        const refreshedWorkOrders = odooOrdersWork?.status ? asArray(odooOrdersWork?.data) : []
         const dateilOrden = refreshedWorkOrders.filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(orderProductionSelected?.id))
         const refreshedOrder = refreshedWorkOrders.find((item: any) => Number(item?.id) === Number(currentWorkOrder?.id))
-        if (refreshedOrder) {
-          seOrderWorkSelected(refreshedOrder)
-          setShowDetailOrderWork(refreshedOrder)
-        }
-        if (dateilOrden) setOrderWorkDetail(dateilOrden)
-        if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
-        setQualityPauseMessage(update?.qualityPause ? message : getQualityPauseMessage(message))
-        setLoadigAction(false)
-        return
-      }
+        const orderWorkSelected1 = refreshedOrder || optimisticOrder
 
-      setError(message)
+        seOrderWorkSelected(orderWorkSelected1)
+        setShowDetailOrderWork(orderWorkSelected1)
+        if (odooOrdersWork?.status) {
+          setOrderWorkDetail(dateilOrden)
+          setOrdersWork(odooOrdersWork)
+        } else {
+          setOrderWorkDetail((current: any[]) => asArray(current).map((item: any) => Number(item?.id) === Number(currentWorkOrder?.id) ? optimisticOrder : item))
+          setOrdersWork((current: any) => current?.data
+            ? { ...current, data: current.data.map((item: any) => Number(item?.id) === Number(currentWorkOrder?.id) ? optimisticOrder : item) }
+            : current
+          )
+        }
+      } else {
+        const message = update?.faultString || update?.message || 'No se pudo ejecutar la accion.'
+        if (action === 'finish_work_order' && isQualityControlError(message)) {
+          let odooOrdersWork: any = null
+          try {
+            odooOrdersWork = await withPromiseTimeout(getWorkOrders(user), 30000, 'No se pudo refrescar la OT a tiempo.')
+          } catch (refreshError) {
+            console.warn('No se pudo refrescar la OT al solicitar Calidad:', refreshError)
+          }
+          const refreshedWorkOrders = asArray(odooOrdersWork?.data)
+          const dateilOrden = refreshedWorkOrders.filter((orden:any) => Number(getOdooId(orden?.production_id)) === Number(orderProductionSelected?.id))
+          const refreshedOrder = refreshedWorkOrders.find((item: any) => Number(item?.id) === Number(currentWorkOrder?.id))
+          if (refreshedOrder) {
+            seOrderWorkSelected(refreshedOrder)
+            setShowDetailOrderWork(refreshedOrder)
+          }
+          if (odooOrdersWork?.status) setOrderWorkDetail(dateilOrden)
+          if (odooOrdersWork?.data) setOrdersWork(odooOrdersWork)
+          setQualityPauseMessage(update?.qualityPause ? message : getQualityPauseMessage(message))
+          return
+        }
+
+        setError(message)
+      }
+    } catch (actionError: any) {
+      setError(actionError?.message || 'No se pudo ejecutar la accion. La pantalla fue liberada para volver a intentarlo.')
+    } finally {
       setLoadigAction(false)
     }
   }
@@ -472,7 +494,10 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
       {modalIsOpenJobDetail && 
         <ModalDetailWork
          modalIsOpenJobDetail={modalIsOpenJobDetail}
-         setModalIsOpenJobDetail={(close: any) => setModalIsOpenJobDetail(close)}
+         setModalIsOpenJobDetail={(open: boolean) => {
+           setModalIsOpenJobDetail(open)
+           if (!open) setLoadigAction(false)
+         }}
          orderProductionSelected={orderProductionSelected}
          showDetailOrderWork={showDetailOrderWork}
          progress={progress}

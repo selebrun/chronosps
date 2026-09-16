@@ -224,18 +224,24 @@ export async function getMaterialsOrder(user: any, move_raw_ids: any, workorder?
   const productionProducts = productionId
     ? moves.filter((move: any) => Number(getMany2OneId(move?.raw_material_production_id)) === productionId)
     : moves;
-  const selectedMoves = workOrderProducts.length
-    ? workOrderProducts
-    : operationProducts.length
-      ? operationProducts
-      : productionProducts.length
-        ? productionProducts
-        : moves;
-  const selectionScope = workOrderProducts.length
-    ? 'workorder'
-    : operationProducts.length
-      ? 'operation'
-      : 'production';
+  const baseMoves = operationProducts.length
+    ? operationProducts
+    : productionProducts.length
+      ? productionProducts
+      : moves;
+  const selectionScope = operationProducts.length ? 'operation' : 'production';
+
+  // Un material adicional queda vinculado directamente a la OT. Si se usa
+  // esa relacion como filtro exclusivo, despues del primer agregado desaparecen
+  // los demas componentes disponibles. Conservamos el alcance de operacion/OP
+  // y sumamos los materiales directos, sin duplicar productos.
+  const selectedMovesByProduct = new Map<string, any>();
+  [...baseMoves, ...workOrderProducts].forEach((move: any) => {
+    const productId = Number(getMany2OneId(move?.product_id));
+    const key = productId ? `product-${productId}` : `move-${Number(move?.id)}`;
+    if (!selectedMovesByProduct.has(key)) selectedMovesByProduct.set(key, move);
+  });
+  const selectedMoves = Array.from(selectedMovesByProduct.values());
 
   console.log('Consulta materiales OT', {
     workorder_id: workOrderId,

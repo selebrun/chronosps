@@ -90,6 +90,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalDetailsIsOpen, setModalDetailsIsOpen] = useState(false);
   const [selectedOrderQuantity, setSelectedOrderQuantity] = useState({});
+  const [selectedProductionId, setSelectedProductionId] = useState<number | null>(null);
   const [ordersQualityControl, setOrdersQualityControl] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -105,7 +106,31 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
     ).sort(sortProductionsByQualityPriority(qualityChecks))
 
     setOrdersQualityControl(orders)
-  }, [odooOrders?.data, odooOrders?.production_data])
+
+    if (selectedProductionId) {
+      const refreshedDetails = qualityChecks
+        .filter((check: any) => Number(getMany2OneId(check?.production_id)) === selectedProductionId)
+        .sort(sortQualityControlsAsc)
+      setOrderQualityDetail(refreshedDetails)
+      setSelectedOrderQuantity((current: any) => {
+        if (!current?.id) return current
+        const refreshedCheck = refreshedDetails.find((check: any) => Number(check?.id) === Number(current.id))
+        return refreshedCheck || current
+      })
+    }
+  }, [odooOrders?.data, odooOrders?.production_data, selectedProductionId])
+
+  useEffect(() => {
+    const refreshQuality = () => {
+      if (document.visibilityState === 'visible') router.refresh()
+    }
+    const intervalId = window.setInterval(refreshQuality, 5000)
+    window.addEventListener('focus', refreshQuality)
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshQuality)
+    }
+  }, [router])
 
   const filteredQualityOrders = ordersQualityControl.filter((order: any) => productionMatchesSearch(order, searchTerm));
 
@@ -124,6 +149,7 @@ export function QualityOrdersTable({ odooOrders, user }:{ odooOrders: any, user:
       .filter((orden:any) => getMany2OneId(orden.production_id) === order.id)
       .sort(sortQualityControlsAsc)
     setOrderQualityDetail(dateilOrden)
+    setSelectedProductionId(Number(order.id))
     setSelectedOrderQuantity({})
     setModalDetailsIsOpen(false)
   }
