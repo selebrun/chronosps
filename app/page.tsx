@@ -1,8 +1,5 @@
-"use client";
-import SignIn from "./login/SignIn";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return (
-    <SignIn></SignIn>
-  );
+  redirect('/login');
 }

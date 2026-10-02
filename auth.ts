@@ -6,7 +6,7 @@ import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 //Services
 //import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
-import { getUsers, refreshUserOdooLink } from "./app/api/users/users";
+import { getUsersByCompany, refreshUserOdooLink } from "./app/api/users/users";
 
 
 export const config = {
@@ -45,13 +45,20 @@ export const config = {
       
           //const odooUsers: any = await getUsersFromOdoo(company_id);
 
-          const chronosUsers: any = await getUsers();
+          const requestedCompanyId = company_id?.toString?.().trim?.() || '';
+          if (!requestedCompanyId) return null;
+
+          const chronosUsers: any = await getUsersByCompany(requestedCompanyId);
 
   
 
           if (!chronosUsers.length) return null;
        
-          let user = chronosUsers.find((user: any) => removeSpecialCharacters(user.code).trim() === username && user.password.trim() === password );
+          let user = chronosUsers.find((user: any) => (
+            removeSpecialCharacters(user.code).trim() === username
+            && user.password.trim() === password
+            && user.id_company?.toString?.().trim?.() === requestedCompanyId
+          ));
           if (!user) return null;
           const role = user?.rol?.trim();
           const shouldRefreshOdooLink = !Number(user?.odoo_id) || (['Lider', 'Jefe'].includes(role) && !Number(user?.odoo_user_id));
