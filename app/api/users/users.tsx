@@ -174,6 +174,46 @@ function validateRequiredOdooLink(roleValue: any, link: any) {
   }
 }
 
+async function ensureUniqueAccessCredentials(
+  client: Client,
+  codeValue: any,
+  passwordValue: any,
+  companyValue: any,
+  originalCodeValue?: any,
+  originalCompanyValue?: any
+) {
+  const code = removeSpecialCharacters(String(codeValue || '')).trim().toUpperCase();
+  const password = String(passwordValue || '').trim();
+  const companyId = String(companyValue || '').trim();
+  const originalCode = removeSpecialCharacters(String(originalCodeValue || '')).trim().toUpperCase();
+  const originalCompanyId = String(originalCompanyValue || '').trim();
+
+  if (!code || !password || !companyId) return;
+
+  const excludesCurrentUser = Boolean(originalCode && originalCompanyId);
+  const result = await client.query(
+    `SELECT TRIM(id_company) AS id_company
+     FROM users
+     WHERE UPPER(regexp_replace(TRIM(code), '[^A-Za-z0-9]', '', 'g')) = $1
+       AND TRIM(password) = $2
+       AND TRIM(id_company) <> $3
+       ${excludesCurrentUser ? `AND NOT (
+         UPPER(regexp_replace(TRIM(code), '[^A-Za-z0-9]', '', 'g')) = $4
+         AND TRIM(id_company) = $5
+       )` : ''}
+     LIMIT 1`,
+    excludesCurrentUser
+      ? [code, password, companyId, originalCode, originalCompanyId]
+      : [code, password, companyId]
+  );
+
+  if (result.rows[0]) {
+    throw new Error(
+      'Este numero de identificacion y contrasena ya estan registrados en otra empresa. Use una contrasena diferente.'
+    );
+  }
+}
+
 export async function getUsers() {
   const client = new Client(dbConfig);
 
@@ -184,6 +224,32 @@ export async function getUsers() {
   } catch (err) {
     console.error(err);
     throw new Error("There was an error trying to get users");
+  } finally {
+    await client.end();
+  }
+}
+
+export async function getUsersByCredentials(codeValue: any, passwordValue: any) {
+  const client = new Client(dbConfig);
+  const code = removeSpecialCharacters(String(codeValue || '')).trim().toUpperCase();
+  const password = String(passwordValue || '');
+
+  if (!code || !password) return [];
+
+  try {
+    await client.connect();
+    const result = await client.query(
+      `SELECT *
+       FROM users
+       WHERE UPPER(regexp_replace(TRIM(code), '[^A-Za-z0-9]', '', 'g')) = $1
+         AND TRIM(password) = $2
+       LIMIT 2`,
+      [code, password]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error validando credenciales de usuario:', error);
+    throw new Error('No se pudieron validar las credenciales');
   } finally {
     await client.end();
   }
@@ -307,10 +373,11 @@ export async function createUsers(user: any) {
 
   try {
     const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
+    await client.connect();
+    await ensureUniqueAccessCredentials(client, code, password, id_company);
+
     const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
     validateRequiredOdooLink(rol, odooEmployeeLink);
-
-    await client.connect();
 
     const query = `
       INSERT INTO users (code, email, id_company, name, password, rol, x_studio_new_material, odoo_id, odoo_user_id)
@@ -363,6 +430,15 @@ export async function updateUsers(user: any) {
     )) {
       throw new Error('El administrador designado debe permanecer en la misma empresa y conservar el perfil Jefe.');
     }
+
+    await ensureUniqueAccessCredentials(
+      client,
+      code,
+      password,
+      id_company,
+      lookupCode,
+      lookupCompany
+    );
 
     const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
     validateRequiredOdooLink(rol, odooEmployeeLink);

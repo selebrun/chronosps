@@ -6,17 +6,16 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faEyeSlash } from "@fortawesome/free-solid-svg-icons";
 import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
-function SignIn({ companies }: { companies: Array<{ id_company: string, name: string }> }) {
+function SignIn() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [formData, setFormData] = useState({
-    companyId: "",
     dniUser: "",
     password: "",
   });
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
     setFormData({
       ...formData,
@@ -45,7 +44,6 @@ function SignIn({ companies }: { companies: Array<{ id_company: string, name: st
       const res = await signIn("credentials", {
         username: dni,
         password: formData.password,
-        company_id: formData.companyId,
         redirect: false,
       });
 
@@ -81,29 +79,8 @@ function SignIn({ companies }: { companies: Array<{ id_company: string, name: st
 
         <form
           onSubmit={handleSubmit}
-          className="rounded m-3 px-8 pt-5 mb-4 bg-white min-h-[320px]"
+          className="rounded m-3 px-8 pt-5 mb-4 bg-white h-[250px]"
         >
-          <div className="mb-4">
-            <label
-              htmlFor="companyId"
-              className="block text-gray-700 text-sm font-bold mb-1"
-            >
-              Empresa
-            </label>
-            <select
-              id="companyId"
-              name="companyId"
-              value={formData.companyId}
-              onChange={handleChange}
-              className="bg-white shadow border rounded w-full py-2 px-3 text-black leading-tight focus:outline-none focus:shadow-outline"
-              required
-            >
-              <option value="">Seleccione una empresa</option>
-              {companies.map((company) => (
-                <option key={company.id_company} value={company.id_company}>{company.name}</option>
-              ))}
-            </select>
-          </div>
           <div className="mb-4">
             <label
               htmlFor="dniUser"
@@ -148,7 +125,7 @@ function SignIn({ companies }: { companies: Array<{ id_company: string, name: st
               </div>
             </div>
           </div>
-          <button disabled={loading || !formData.companyId || (formData.dniUser === '') || (formData.password === '')} className="bg-[#6BB2D7] flex justify-center font-bold shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline disabled:opacity-50">
+          <button disabled={loading || (formData.dniUser === '') || (formData.password === '')} className="bg-[#6BB2D7] flex justify-center font-bold shadow appearance-none border rounded w-full py-2 px-3 mb-3 leading-tight focus:outline-none focus:shadow-outline disabled:opacity-50">
             <div>Ingresar</div>
             <div role="status" className='relative left-4'>
               {loading && <svg width="20" height="20" fill="currentColor" className="mr-2 animate-spin" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg">

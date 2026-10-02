@@ -6,7 +6,7 @@ import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
 
 //Services
 //import { getUsersFromOdoo } from '@/app/api/odoo/odooUsers';
-import { getUsersByCompany, refreshUserOdooLink } from "./app/api/users/users";
+import { getUsersByCredentials, refreshUserOdooLink } from "./app/api/users/users";
 
 
 export const config = {
@@ -19,7 +19,7 @@ export const config = {
           password: { label: "Password", type: "password" },
         },
         async authorize(credentials: any) {
-          const { username, password, company_id, isChronosAdmin } = credentials;
+          const { username, password, isChronosAdmin } = credentials;
 
           /*
           * La constante isChronosAdmin, es de uso exclusivo
@@ -43,23 +43,19 @@ export const config = {
             return adminUser
           }
       
-          //const odooUsers: any = await getUsersFromOdoo(company_id);
-
-          const requestedCompanyId = company_id?.toString?.().trim?.() || '';
-          if (!requestedCompanyId) return null;
-
-          const chronosUsers: any = await getUsersByCompany(requestedCompanyId);
-
-  
-
-          if (!chronosUsers.length) return null;
-       
-          let user = chronosUsers.find((user: any) => (
-            removeSpecialCharacters(user.code).trim() === username
-            && user.password.trim() === password
-            && user.id_company?.toString?.().trim?.() === requestedCompanyId
-          ));
-          if (!user) return null;
+          const normalizedUsername = removeSpecialCharacters(String(username || '')).trim().toUpperCase();
+          const submittedPassword = String(password || '');
+          const matchingUsers: any[] = await getUsersByCredentials(normalizedUsername, submittedPassword);
+          if (matchingUsers.length !== 1) {
+            if (matchingUsers.length > 1) {
+              console.error('Acceso rechazado por credenciales duplicadas entre empresas:', {
+                document: normalizedUsername,
+                matches: matchingUsers.length,
+              });
+            }
+            return null;
+          }
+          let user = matchingUsers[0];
           const role = user?.rol?.trim();
           const shouldRefreshOdooLink = !Number(user?.odoo_id) || (['Lider', 'Jefe'].includes(role) && !Number(user?.odoo_user_id));
 
