@@ -15,6 +15,7 @@ import { getMaterialsOrder, saveMaterialsOrder } from '@/app/api/getMaterialsOrd
 import { applySharedWorkOrderTimer } from '@/helper/applySharedWorkOrderTimer'
 import { applySuccessfulWorkOrderAction } from '@/helper/applySuccessfulWorkOrderAction'
 import { withPromiseTimeout } from '@/helper/withPromiseTimeout'
+import { assignProductionResponsible, assignWorkOrderOperator } from '@/app/api/orderAssignments/orderAssignments'
 
 function asArray(value: any) {
   return Array.isArray(value) ? value : [];
@@ -76,7 +77,13 @@ function getWorkOrderProgress(workOrder: any) {
   return Math.min(Math.max(Math.floor((duration / expectedDuration) * 100), 0), 100);
 }
 
-export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReasons }: { odooOrders: any, ordersWork: any, user: any, blockReasons: any}) {
+export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReasons, assignmentOptions }: {
+  odooOrders: any,
+  ordersWork: any,
+  user: any,
+  blockReasons: any,
+  assignmentOptions?: any,
+}) {
   const [modalIsOpen, setModalIsOpen] = useState(false);
   const [modalIsOpenJobDetail, setModalIsOpenJobDetail] = useState(false);
   const [orderWorkDetail, setOrderWorkDetail] = useState<any>([]);
@@ -101,12 +108,26 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
   const [error, setError] = useState<string>('');
   const [qualityPauseMessage, setQualityPauseMessage] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [productionOrderData, setProductionOrderData] = useState<any[]>(asArray(odooOrders?.data));
+  const [operatorAssignmentLoadingId, setOperatorAssignmentLoadingId] = useState<number | null>(null);
+  const [responsibleAssignmentLoadingId, setResponsibleAssignmentLoadingId] = useState<number | null>(null);
+  const [assignmentMessage, setAssignmentMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const normalizedRole = String(user?.role || '').trim();
+  const canAssignOperator = ['Admin', 'Administrador', 'chronosAdmin', 'Lider', 'Jefe'].includes(normalizedRole);
+  const canAssignResponsible = ['Admin', 'Administrador', 'chronosAdmin', 'Jefe'].includes(normalizedRole);
+  const employeeOptions = Array.isArray(assignmentOptions?.employees) ? assignmentOptions.employees : [];
+  const responsibleUserOptions = Array.isArray(assignmentOptions?.responsibleUsers) ? assignmentOptions.responsibleUsers : [];
   
   useEffect(()=>{
     if(!user.materiales) {
       setDisabledBtnSaveMaterial(true)
     }
   }, [user?.materiales])
+
+  useEffect(() => {
+    setProductionOrderData(asArray(odooOrders?.data))
+  }, [odooOrders?.data])
 
   const openWorkOrders = () => {
     setModalIsOpen(!modalIsOpen)
@@ -448,11 +469,77 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
     }
   }
 
+  const onAssignOperator = async (workOrder: any, employeeIdValue: string) => {
+    const workOrderId = Number(workOrder?.id)
+    if (!workOrderId || operatorAssignmentLoadingId) return
+
+    const employeeId = Number(employeeIdValue) || 0
+    setOperatorAssignmentLoadingId(workOrderId)
+    setAssignmentMessage(null)
+    try {
+      const response: any = await assignWorkOrderOperator(workOrderId, employeeId)
+      if (!response?.status) {
+        setAssignmentMessage({ type: 'error', text: response?.message || 'No se pudo asignar el operador.' })
+        return
+      }
+
+      const employeeIds = employeeId ? [employeeId] : []
+      const updateAssignment = (order: any) => Number(order?.id) === workOrderId
+        ? { ...order, employee_assigned_ids: employeeIds }
+        : order
+      setOrdersWork((current: any) => current?.data
+        ? { ...current, data: current.data.map(updateAssignment) }
+        : current
+      )
+      setOrderWorkDetail((current: any[]) => asArray(current).map(updateAssignment))
+      seOrderWorkSelected((current: any) => updateAssignment(current))
+      setShowDetailOrderWork((current: any) => updateAssignment(current))
+      setAssignmentMessage({ type: 'success', text: response?.message || 'Operador asignado correctamente.' })
+    } catch (assignmentError: any) {
+      setAssignmentMessage({ type: 'error', text: assignmentError?.message || 'No se pudo asignar el operador.' })
+    } finally {
+      setOperatorAssignmentLoadingId(null)
+    }
+  }
+
+  const onAssignResponsible = async (production: any, responsibleUserIdValue: string) => {
+    const productionId = Number(production?.id)
+    if (!productionId || responsibleAssignmentLoadingId) return
+
+    const responsibleUserId = Number(responsibleUserIdValue) || 0
+    setResponsibleAssignmentLoadingId(productionId)
+    setAssignmentMessage(null)
+    try {
+      const response: any = await assignProductionResponsible(productionId, responsibleUserId)
+      if (!response?.status) {
+        setAssignmentMessage({ type: 'error', text: response?.message || 'No se pudo asignar el responsable.' })
+        return
+      }
+
+      const responsible = responsibleUserId
+        ? [responsibleUserId, response?.responsibleUser?.name || `Usuario ${responsibleUserId}`]
+        : false
+      setProductionOrderData((current: any[]) => current.map((order: any) => Number(order?.id) === productionId
+        ? { ...order, user_id: responsible }
+        : order
+      ))
+      setOrderProductionSelected((current: any) => Number(current?.id) === productionId
+        ? { ...current, user_id: responsible }
+        : current
+      )
+      setAssignmentMessage({ type: 'success', text: response?.message || 'Responsable asignado correctamente.' })
+    } catch (assignmentError: any) {
+      setAssignmentMessage({ type: 'error', text: assignmentError?.message || 'No se pudo asignar el responsable.' })
+    } finally {
+      setResponsibleAssignmentLoadingId(null)
+    }
+  }
+
   const progress = getWorkOrderProgress(showDetailOrderWork);
   const productionIdsWithWorkOrders = new Set(
     asArray(workoOrder?.data).map((workOrder: any) => Number(getOdooId(workOrder?.production_id))).filter(Boolean)
   );
-  const productionOrders = [...asArray(odooOrders?.data)].sort((a: any, b: any) => {
+  const productionOrders = [...productionOrderData].sort((a: any, b: any) => {
     const nameOrder = String(a.name || '').localeCompare(String(b.name || ''), 'es', { numeric: true });
     if (nameOrder !== 0) return nameOrder;
     const dateA = String(a.date_planned_start || '');
@@ -486,6 +573,12 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
            thStatus={'Estado'} 
            thProduct={'Centro de Trabajo'}
            openJobDetail={openJobDetail}
+           canAssignOperator={canAssignOperator}
+           employeeOptions={employeeOptions}
+           assignmentLoadingId={operatorAssignmentLoadingId}
+           onAssignOperator={onAssignOperator}
+           assignmentMessage={assignmentMessage}
+           onCloseAssignmentMessage={() => setAssignmentMessage(null)}
            />}
           {orderWorkDetail.length === 0 && 
              <h5 className="mb-2 text-2xl tracking-tight text-gray-700 dark:text-white flex justify-center">No hay órdenes de trabajo</h5>
@@ -543,6 +636,15 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
         />
         <StatusHelpButton module="production" />
       </div>
+      {assignmentMessage && (
+        <div
+          role="alert"
+          className={`mb-4 flex items-center justify-between rounded-md border px-4 py-3 text-sm ${assignmentMessage.type === 'success' ? 'border-green-300 bg-green-50 text-green-800' : 'border-red-300 bg-red-50 text-red-800'}`}
+        >
+          <span>{assignmentMessage.text}</span>
+          <button type="button" onClick={() => setAssignmentMessage(null)} className="ml-4 font-bold" aria-label="Cerrar mensaje">X</button>
+        </div>
+      )}
       <div className="relative max-h-[calc(100vh-13.5rem)] min-h-[calc(100vh-13.5rem)] max-w-full overflow-x-auto overflow-y-auto rounded">
         <table className="w-full text-sm text-left text-gray-500 dark:text-gray-300 relative overflow-y-auto">
           <thead className="text-xs text-black dark:text-gray-100 uppercase bg-strongCyan dark:bg-sky-900 border-b-8 border-white dark:border-gray-800 sticky top-0">
@@ -600,7 +702,22 @@ export function ProductionOrdersTable({ odooOrders, ordersWork, user, blockReaso
                   {getOdooName(order.lot_producing_id, 'Sin lote')}
                 </td>
                 <td className="px-3 py-2">
-                  {getOdooName(order.user_id, 'Sin responsable')}
+                  {canAssignResponsible ? (
+                    <select
+                      aria-label={`Asignar responsable a ${order.name || `OP ${order.id}`}`}
+                      value={Number(getOdooId(order?.user_id)) || 0}
+                      disabled={responsibleAssignmentLoadingId === Number(order.id)}
+                      onChange={(event) => void onAssignResponsible(order, event.target.value)}
+                      className="min-w-[220px] rounded-md border border-gray-300 bg-white px-2 py-2 text-sm text-gray-900 disabled:cursor-wait disabled:opacity-60 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100"
+                    >
+                      <option value={0}>Sin responsable</option>
+                      {responsibleUserOptions.map((responsibleUser: any) => (
+                        <option key={responsibleUser.id} value={responsibleUser.id}>
+                          {responsibleUser.name}{responsibleUser.login ? ` (${responsibleUser.login})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : getOdooName(order.user_id, 'Sin responsable')}
                 </td>
                 <td className="px-3 py-2">
                   {order.date_planned_start || 'Sin fecha'}

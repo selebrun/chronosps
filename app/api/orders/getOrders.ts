@@ -219,6 +219,23 @@ async function resolveLeaderOdooUserId(user: any) {
   return resolvedUser.userId;
 }
 
+async function resolveOperatorOdooEmployeeId(user: any) {
+  const sessionEmployeeId = Number(user?.odoo_id?.toString?.().trim?.() ?? user?.odoo_id) || 0;
+  if (sessionEmployeeId) return sessionEmployeeId;
+
+  const identificationId = String(user?.code || '').trim();
+  if (!identificationId) return 0;
+
+  const employees = await getOdooRecords(
+    'hr.employee',
+    [['identification_id', '=', identificationId], ['active', '=', true]],
+    ['id', 'identification_id'],
+    user.company_id
+  );
+
+  return Number(employees?.[0]?.id) || 0;
+}
+
 // ─── Dominios ─────────────────────────────────────────────────────────────────
 
 function getLeaderProductionDomain(userId: number, productionIds: number[] | false = false) {
@@ -966,9 +983,15 @@ export async function getProductionOrders(user: any) {
 	switch(user.role) {
     case 'Operario':
       return new Promise(async (resolve, reject) => {
+        const operatorEmployeeId = await resolveOperatorOdooEmployeeId(user);
+        if (!operatorEmployeeId) {
+          resolve({ status: true, message: 'El operario no tiene un empleado Odoo vinculado.', data: [] });
+          return;
+        }
+
         getOdooData(
           'mrp.workorder',
-          [['employee_assigned_ids','=',user.odoo_id], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
+          [['employee_assigned_ids', 'in', [operatorEmployeeId]], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
           ['id', 'state', 'production_id'],
           false,
           false,
@@ -1087,9 +1110,19 @@ export async function getWorkOrders(user: any) {
   switch(user.role) {
     case 'Operario': {
       // 1. Obtener OTs asignadas al operario
+      const operatorEmployeeId = await resolveOperatorOdooEmployeeId(user);
+      if (!operatorEmployeeId) {
+        return {
+          status: true,
+          message: 'El operario no tiene un empleado Odoo vinculado.',
+          data: [],
+          production_data: [],
+        };
+      }
+
       const workOrders = await getOdooRecords(
         'mrp.workorder',
-        [['employee_assigned_ids', '=', user.odoo_id], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
+        [['employee_assigned_ids', 'in', [operatorEmployeeId]], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
         [],
         user.company_id
       );

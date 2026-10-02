@@ -3,30 +3,38 @@ import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
 import { redirect } from 'next/navigation';
 import { WorkOrdersTable } from './components/work-orders-table';
+import { getOrderAssignmentOptions } from '@/app/api/orderAssignments/orderAssignments';
 
 export default async function Page() {
   const session = await getServerSession(config);
   if (!session?.user) redirect('/login');
   const user = session.user;
   if (user.role === 'Calidad') redirect('/dashboard/quality-control');
-  const odooOrders: any = await getWorkOrders(user)
-    .then((res) => res)
-    .catch((err) => {
+  const [odooOrders, blockReasons, assignmentOptions]: any[] = await Promise.all([
+    getWorkOrders(user).catch((err) => {
       console.error('Error consultando ordenes de trabajo:', err);
       return { status: false, message: 'No se pudieron consultar las ordenes de trabajo.', data: [], production_data: [] };
-    });
-  const blockReasons: any = await getBlockReasons(user)
-    .then((res) => res)
-    .catch((err) => {
+    }),
+    getBlockReasons(user).catch((err) => {
       console.error('Error consultando motivos de bloqueo:', err);
       return { status: false, block_reasons: [] };
-    })
+    }),
+    getOrderAssignmentOptions().catch((err) => {
+      console.error('Error consultando opciones de asignacion:', err);
+      return { status: false, employees: [], responsibleUsers: [] };
+    }),
+  ]);
 
   return (
     <div className="prose prose-sm prose-invert max-w-none">
       <h1 className="mb-4 text-xl font-bold text-gray-900">Ordenes de trabajo</h1>
       { odooOrders?.data?.length ? (
-        <WorkOrdersTable odooOrders={odooOrders} user={user} blockReasons={blockReasons} />
+        <WorkOrdersTable
+          odooOrders={odooOrders}
+          user={user}
+          blockReasons={blockReasons}
+          assignmentOptions={assignmentOptions}
+        />
       ) : (
       <div className="text-center block p-6 bg-white border border-gray-200 rounded-lg shadow bg-gray-100">
         <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">No hay órdenes asignadas</h5>

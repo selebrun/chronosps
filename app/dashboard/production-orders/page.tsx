@@ -2,6 +2,7 @@ import { getWorkOrders, getBlockReasons } from '@/app/api/orders/getOrders'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth';
 import { redirect } from 'next/navigation';
+import { getOrderAssignmentOptions } from '@/app/api/orderAssignments/orderAssignments';
 
 
 // UI Components
@@ -12,7 +13,7 @@ export default async function Page() {
   if (!session?.user) redirect('/login');
   const user = session.user;
   if (user.role === 'Calidad') redirect('/dashboard/quality-control');
-  const [odooOrdersWork, blockReasons]: any[] = await Promise.all([
+  const [odooOrdersWork, blockReasons, assignmentOptions]: any[] = await Promise.all([
     getWorkOrders(user).catch((err) => {
       console.error('Error consultando ordenes de trabajo para OP:', err);
       return { status: false, message: err?.message || 'No se pudieron consultar las ordenes de trabajo.', data: [], production_data: [] };
@@ -20,6 +21,10 @@ export default async function Page() {
     getBlockReasons(user).catch((err) => {
       console.error('Error consultando motivos de bloqueo:', err);
       return { status: false, block_reasons: [] };
+    }),
+    getOrderAssignmentOptions().catch((err) => {
+      console.error('Error consultando opciones de asignacion:', err);
+      return { status: false, employees: [], responsibleUsers: [] };
     }),
   ]);
   const odooOrders = {
@@ -37,7 +42,13 @@ export default async function Page() {
           <p className="mb-0 font-normal">{odooOrders.message || 'No se pudieron consultar las ordenes de produccion.'}</p>
         </div>
       ) : odooOrders.data.length ? (
-        <ProductionOrdersTable odooOrders={odooOrders} ordersWork={odooOrdersWork} user={user} blockReasons={blockReasons} />
+        <ProductionOrdersTable
+          odooOrders={odooOrders}
+          ordersWork={odooOrdersWork}
+          user={user}
+          blockReasons={blockReasons}
+          assignmentOptions={assignmentOptions}
+        />
       ) : (
       <div className="text-center block p-6 bg-white border border-gray-200 rounded-lg shadow bg-gray-100">
         <h5 className="mb-2 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">No hay órdenes asignadas</h5>
