@@ -276,6 +276,31 @@ export async function getUsersByCompany(companyId: string) {
   }
 }
 
+export async function getAssignmentUsersByCompany(companyId: string) {
+  const client = new Client(dbConfig);
+
+  try {
+    await client.connect();
+    const result = await client.query(
+      `SELECT TRIM(code) AS code,
+              TRIM(name) AS name,
+              TRIM(rol) AS rol,
+              TRIM(odoo_id) AS odoo_id,
+              TRIM(odoo_user_id) AS odoo_user_id
+       FROM users
+       WHERE TRIM(id_company) = TRIM($1)
+       ORDER BY LOWER(TRIM(name)) ASC`,
+      [companyId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error('Error consultando usuarios asignables de la empresa:', error);
+    throw new Error('No se pudieron consultar los usuarios asignables de la empresa');
+  } finally {
+    await client.end();
+  }
+}
+
 export async function getUserByCompanyAndCode(companyId: string, code: string) {
   const client = new Client(dbConfig);
 

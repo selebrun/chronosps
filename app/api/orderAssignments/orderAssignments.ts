@@ -4,9 +4,12 @@ import { revalidatePath } from 'next/cache'
 import { getServerSession } from 'next-auth'
 import { config } from '@/auth'
 import { getOdooData, setOdooData } from '@/app/api/odoo/odooService'
+import { getAssignmentUsersByCompany } from '@/app/api/users/users'
 
 const WORK_ORDER_ASSIGNMENT_ROLES = new Set(['admin', 'administrador', 'chronosadmin', 'lider', 'jefe'])
 const PRODUCTION_ASSIGNMENT_ROLES = new Set(['admin', 'administrador', 'chronosadmin', 'jefe'])
+const OPERATOR_ROLES = new Set(['operario'])
+const RESPONSIBLE_ROLES = new Set(['lider', 'jefe'])
 
 function normalizeRole(value: any) {
   return String(value || '').trim().toLowerCase()
@@ -41,6 +44,23 @@ async function getAssignmentActor() {
   return { status: true, user, companyId, role }
 }
 
+async function getCompanyAssignmentIds(companyId: string) {
+  const companyUsers = await getAssignmentUsersByCompany(companyId)
+  const employeeIds = companyUsers
+    .filter((user: any) => OPERATOR_ROLES.has(normalizeRole(user?.rol)))
+    .map((user: any) => Number(user?.odoo_id))
+    .filter(Boolean)
+  const responsibleUserIds = companyUsers
+    .filter((user: any) => RESPONSIBLE_ROLES.has(normalizeRole(user?.rol)))
+    .map((user: any) => Number(user?.odoo_user_id))
+    .filter(Boolean)
+
+  return {
+    employeeIds: Array.from(new Set(employeeIds)),
+    responsibleUserIds: Array.from(new Set(responsibleUserIds)),
+  }
+}
+
 export async function getOrderAssignmentOptions() {
   const actor: any = await getAssignmentActor()
   if (!actor.status) {
@@ -53,12 +73,34 @@ export async function getOrderAssignmentOptions() {
     return { status: true, employees: [], responsibleUsers: [] }
   }
 
+  let assignmentIds: { employeeIds: number[], responsibleUserIds: number[] }
+  try {
+    assignmentIds = await getCompanyAssignmentIds(actor.companyId)
+  } catch (error: any) {
+    return {
+      status: false,
+      message: error?.message || 'No se pudieron consultar los usuarios de la empresa.',
+      employees: [],
+      responsibleUsers: [],
+    }
+  }
+
   const [employeesResponse, usersResponse] = await Promise.all([
-    canAssignWorkOrder
-      ? readOdooRecords('hr.employee', [['active', '=', true]], ['id', 'name', 'identification_id', 'user_id'], actor.companyId)
+    canAssignWorkOrder && assignmentIds.employeeIds.length
+      ? readOdooRecords(
+          'hr.employee',
+          [['id', 'in', assignmentIds.employeeIds], ['active', '=', true]],
+          ['id', 'name', 'identification_id', 'user_id'],
+          actor.companyId
+        )
       : Promise.resolve({ status: true, data: [] }),
-    canAssignProduction
-      ? readOdooRecords('res.users', [['active', '=', true]], ['id', 'name', 'login', 'share'], actor.companyId)
+    canAssignProduction && assignmentIds.responsibleUserIds.length
+      ? readOdooRecords(
+          'res.users',
+          [['id', 'in', assignmentIds.responsibleUserIds], ['active', '=', true]],
+          ['id', 'name', 'login', 'share'],
+          actor.companyId
+        )
       : Promise.resolve({ status: true, data: [] }),
   ])
 
@@ -111,6 +153,16 @@ export async function assignWorkOrderOperator(workOrderIdValue: any, employeeIdV
 
   let employee: any = null
   if (employeeId) {
+    let assignmentIds: { employeeIds: number[], responsibleUserIds: number[] }
+    try {
+      assignmentIds = await getCompanyAssignmentIds(actor.companyId)
+    } catch (error: any) {
+      return { status: false, message: error?.message || 'No se pudieron validar los operadores de la empresa.' }
+    }
+    if (!assignmentIds.employeeIds.includes(employeeId)) {
+      return { status: false, message: 'El operador seleccionado no pertenece a los usuarios Operario de esta empresa.' }
+    }
+
     const employeeResponse = await readOdooRecords(
       'hr.employee',
       [['id', '=', employeeId], ['active', '=', true]],
@@ -158,6 +210,16 @@ export async function assignProductionResponsible(productionIdValue: any, respon
 
   let responsibleUser: any = null
   if (responsibleUserId) {
+    let assignmentIds: { employeeIds: number[], responsibleUserIds: number[] }
+    try {
+      assignmentIds = await getCompanyAssignmentIds(actor.companyId)
+    } catch (error: any) {
+      return { status: false, message: error?.message || 'No se pudieron validar los responsables de la empresa.' }
+    }
+    if (!assignmentIds.responsibleUserIds.includes(responsibleUserId)) {
+      return { status: false, message: 'El responsable seleccionado no pertenece a los usuarios Lider o Jefe de esta empresa.' }
+    }
+
     const userResponse = await readOdooRecords(
       'res.users',
       [['id', '=', responsibleUserId], ['active', '=', true]],
