@@ -62,7 +62,12 @@ function applyCompanyScope(body: Record<string, any>, access: UserManagementAcce
 
 function getMutationError(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : fallback;
-  const status = message.includes('administrador designado') ? 409 : 500;
+  const normalizedMessage = message.toLowerCase();
+  const status = message.includes('administrador designado')
+    ? 409
+    : normalizedMessage.includes('odoo') || normalizedMessage.includes('empleado activo')
+      ? 422
+      : 500;
   return NextResponse.json({ message }, { status });
 }
 

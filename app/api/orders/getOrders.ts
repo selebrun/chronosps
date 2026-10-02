@@ -236,6 +236,14 @@ async function resolveOperatorOdooEmployeeId(user: any) {
   return Number(employees?.[0]?.id) || 0;
 }
 
+function isWorkOrderAssignedToEmployee(workOrder: any, employeeId: number) {
+  const assignedEmployeeIds = Array.isArray(workOrder?.employee_assigned_ids)
+    ? workOrder.employee_assigned_ids.map((value: any) => Number(asOdooId(value))).filter(Boolean)
+    : [];
+
+  return assignedEmployeeIds.includes(Number(employeeId));
+}
+
 // ─── Dominios ─────────────────────────────────────────────────────────────────
 
 function getLeaderProductionDomain(userId: number, productionIds: number[] | false = false) {
@@ -991,8 +999,8 @@ export async function getProductionOrders(user: any) {
 
         getOdooData(
           'mrp.workorder',
-          [['employee_assigned_ids', 'in', [operatorEmployeeId]], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
-          ['id', 'state', 'production_id'],
+          [['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
+          ['id', 'state', 'production_id', 'employee_assigned_ids'],
           false,
           false,
           user.company_id,
@@ -1001,7 +1009,18 @@ export async function getProductionOrders(user: any) {
               reject({ status: false, message: 'No se encontraron ordenes de trabajo.', data: false });
               return;
             }
-            const production_order_ids = workorders.data.map((w: any) => w.production_id[0]);
+            const assignedWorkOrders = workorders.data.filter((workOrder: any) => (
+              isWorkOrderAssignedToEmployee(workOrder, operatorEmployeeId)
+            ));
+            const production_order_ids = assignedWorkOrders.map((w: any) => w.production_id[0]);
+
+            console.log('Filtro Operario OP/OT', {
+              code: String(user?.code || '').trim(),
+              employee_id: operatorEmployeeId,
+              candidate_workorders: workorders.data.length,
+              assigned_workorders: assignedWorkOrders.length,
+              production_ids: production_order_ids,
+            });
 
             getOdooData(
               'mrp.production',
@@ -1122,17 +1141,29 @@ export async function getWorkOrders(user: any) {
 
       const workOrders = await getOdooRecords(
         'mrp.workorder',
-        [['employee_assigned_ids', 'in', [operatorEmployeeId]], ['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
+        [['state', 'in', ['pending', 'waiting', 'ready', 'progress']]],
         [],
         user.company_id
       );
 
-      if (!workOrders.length) {
+      const assignedWorkOrders = workOrders.filter((workOrder: any) => (
+        isWorkOrderAssignedToEmployee(workOrder, operatorEmployeeId)
+      ));
+
+      console.log('Filtro Operario OT', {
+        code: String(user?.code || '').trim(),
+        employee_id: operatorEmployeeId,
+        candidate_workorders: workOrders.length,
+        assigned_workorders: assignedWorkOrders.length,
+        assigned_workorder_ids: assignedWorkOrders.map((workOrder: any) => Number(workOrder?.id)).filter(Boolean),
+      });
+
+      if (!assignedWorkOrders.length) {
         return { status: true, message: '', data: [], production_data: [] };
       }
 
       const productionIds = Array.from(new Set<number>(
-        workOrders.map((wo: any) => Number(asOdooId(wo.production_id))).filter(Boolean)
+        assignedWorkOrders.map((wo: any) => Number(asOdooId(wo.production_id))).filter(Boolean)
       ));
 
       // 2. Producciones y enriquecimiento en paralelo
@@ -1143,7 +1174,7 @@ export async function getWorkOrders(user: any) {
           [],
           user.company_id
         ),
-        enrichWorkOrders(user, workOrders),
+        enrichWorkOrders(user, assignedWorkOrders),
       ]);
       const productionsWithSalesNotes = await addSalesNoteLabelsToProductions(user, productions);
 

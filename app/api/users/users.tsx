@@ -1,8 +1,8 @@
 import 'server-only';
 
 import { Client } from "pg";
-import Odoo from "async-odoo-xmlrpc";
 import { removeSpecialCharacters } from "@/helper/removeSpecialCharacters";
+import { getOdooData } from "@/app/api/odoo/odooService";
 
 const dbConfig = {
   user: process.env.CHRONOS_DB_USER || "",
@@ -17,36 +17,6 @@ const dbConfig = {
 
 async function ensureCompanyAdministratorColumn(client: Client) {
   await client.query('ALTER TABLE "company" ADD COLUMN IF NOT EXISTS admin_user_code CHARACTER(20)');
-}
-
-async function getCompanyById(idCompany: string | number) {
-  const client = new Client(dbConfig);
-
-  try {
-    await client.connect();
-    const res = await client.query(
-      `SELECT id_company, name, url, domain, database, user_default, password
-       FROM company
-       WHERE id_company = $1`,
-      [idCompany.toString().trim()]
-    );
-
-    const company = res.rows[0];
-    if (!company) return null;
-
-    return {
-      ...company,
-      id_company: company.id_company?.trim(),
-      name: company.name?.trim(),
-      url: company.url?.trim(),
-      domain: company.domain?.trim(),
-      database: company.database?.trim(),
-      user_default: company.user_default?.trim(),
-      password: company.password?.trim(),
-    };
-  } finally {
-    await client.end();
-  }
 }
 
 function getDocumentCandidates(code: string) {
@@ -66,101 +36,141 @@ function buildOrDomain(conditions: any[]) {
   return [...Array(validConditions.length - 1).fill("|"), ...validConditions];
 }
 
-async function getEmployeeFromOdoo(company: any, code: string) {
-  const odoo = new Odoo({
-    url: company.url,
-    port: "443",
-    db: company.database,
-    username: company.user_default,
-    password: company.password,
+function readOdooRecords(
+  model: string,
+  domain: any[],
+  fields: string[],
+  companyId: string,
+  limit = 0
+): Promise<any> {
+  return new Promise((resolve) => {
+    getOdooData(
+      model,
+      domain,
+      fields,
+      limit || false,
+      false,
+      companyId,
+      (response: any) => resolve(response),
+      false
+    );
   });
-
-  await odoo.connect();
-
-  const candidates = getDocumentCandidates(code);
-  const empleados = await odoo.execute_kw("hr.employee", "search_read", [
-    getIdentificationDomain(candidates),
-    ["id", "identification_id", "name", "user_id"],
-    0,
-    1,
-  ]);
-
-  return empleados.length > 0 ? empleados[0] : null;
 }
 
-async function getUserFromOdoo(company: any, userData: any) {
+async function getEmployeeFromOdoo(companyId: string, code: string) {
+  const candidates = getDocumentCandidates(code);
+  const response = await readOdooRecords(
+    "hr.employee",
+    getIdentificationDomain(candidates),
+    ["id", "identification_id", "name", "user_id"],
+    companyId,
+    1
+  );
+
+  return {
+    status: Boolean(response?.status),
+    message: response?.message,
+    employee: response?.status && Array.isArray(response?.data) ? response.data[0] || null : null,
+  };
+}
+
+async function getUserFromOdoo(companyId: string, userData: any, employeeId?: number | null) {
   const name = userData?.name?.toString?.().trim?.() || "";
   const email = userData?.email?.toString?.().trim?.() || "";
-  const documentCandidates = getDocumentCandidates(userData?.code || userData?.document || userData?.identification_id || "");
-  if (!name && !email && !documentCandidates.length) return null;
-
-  const odoo = new Odoo({
-    url: company.url,
-    port: "443",
-    db: company.database,
-    username: company.user_default,
-    password: company.password,
-  });
-
-  await odoo.connect();
+  if (!name && !email && !employeeId) return { status: true, user: null };
 
   const domain = buildOrDomain([
-    ...documentCandidates.map((candidate) => ["identification_id", "=", candidate]),
+    employeeId ? ["employee_ids", "in", [employeeId]] : null,
     email ? ["login", "=", email] : null,
     email ? ["email", "=", email] : null,
     name ? ["name", "ilike", name] : null,
   ]);
 
-  const users = await odoo.execute_kw("res.users", "search_read", [
+  const response = await readOdooRecords(
+    "res.users",
     domain,
-    ["id", "name", "login", "email", "identification_id", "employee_ids"],
-    0,
-    10,
-  ]);
+    ["id", "name", "login", "email", "employee_ids"],
+    companyId,
+    10
+  );
+  if (!response?.status) return { status: false, message: response?.message, user: null };
 
-  if (!users.length) return null;
+  const users = Array.isArray(response.data) ? response.data : [];
+
+  if (!users.length) return { status: true, user: null };
   const normalizedName = name.toLowerCase();
   const normalizedEmail = email.toLowerCase();
 
-  return users.find((user: any) =>
-    documentCandidates.includes(user.identification_id?.toString?.().trim?.()) ||
+  const matchedUser = users.find((user: any) =>
+    (employeeId && Array.isArray(user.employee_ids) && user.employee_ids.map(Number).includes(Number(employeeId))) ||
     (normalizedEmail && [user.login, user.email].some((value: any) => value?.toString?.().trim?.().toLowerCase?.() === normalizedEmail)) ||
     (normalizedName && user.name?.toString?.().trim?.().toLowerCase?.() === normalizedName)
   ) || users[0];
+
+  return { status: true, user: matchedUser };
 }
 
 async function getOdooEmployeeLink(idCompany: string | number, code: string, userData: any = {}) {
-  if (!idCompany || !code) return { employeeId: null, userId: null };
+  if (!idCompany || !code) {
+    return { status: false, employeeId: null, userId: null, message: 'Faltan la empresa o la identificacion para sincronizar con Odoo.' };
+  }
 
   try {
-    const company = await getCompanyById(idCompany);
-    if (!company) {
-      console.warn("No se encontro empresa para sincronizar usuario:", idCompany);
-      return { employeeId: null, userId: null };
+    const companyId = idCompany.toString().trim();
+    const employeeResponse = await getEmployeeFromOdoo(companyId, code.trim());
+    if (!employeeResponse.status) {
+      const message = employeeResponse?.message?.faultString || employeeResponse?.message?.message || employeeResponse?.message || 'No se pudo consultar hr.employee en Odoo.';
+      console.error('Error consultando empleado Odoo:', message);
+      return { status: false, employeeId: null, userId: null, message };
     }
 
-    const employee = await getEmployeeFromOdoo(company, code.trim());
+    const employee = employeeResponse.employee;
     if (!employee) {
-      const odooUser = await getUserFromOdoo(company, userData);
-      console.log(`Empleado con code ${code} no encontrado en Odoo${odooUser ? `, usuario Odoo ${odooUser.id} encontrado` : ""}`);
-      return { employeeId: null, userId: odooUser?.id || null };
+      console.warn(`Empleado con identificacion ${code} no encontrado en Odoo.`);
+      return {
+        status: false,
+        employeeId: null,
+        userId: null,
+        message: `No se encontro un empleado activo en Odoo con la identificacion ${code}.`,
+      };
     }
 
     let userId = Array.isArray(employee.user_id) ? employee.user_id[0] : employee.user_id || null;
     if (!userId) {
-      const odooUser = await getUserFromOdoo(company, {
+      const userResponse = await getUserFromOdoo(companyId, {
         name: employee.name || userData?.name,
         email: userData?.email,
-        code: employee.identification_id || code,
-      });
-      userId = odooUser?.id || null;
+      }, Number(employee.id));
+      if (!userResponse.status) {
+        const message = userResponse?.message?.faultString || userResponse?.message?.message || userResponse?.message || 'No se pudo consultar res.users en Odoo.';
+        return { status: false, employeeId: employee.id, userId: null, message };
+      }
+      userId = userResponse.user?.id || null;
     }
 
     console.log(`Usuario ${code} vinculado a empleado Odoo ${employee.id}${userId ? ` y usuario Odoo ${userId}` : ""}`);
-    return { employeeId: employee.id, userId };
+    return { status: true, employeeId: employee.id, userId, message: '' };
   } catch (error) {
     console.error("Error al sincronizar usuario con Odoo:", error);
-    return { employeeId: null, userId: null };
+    return {
+      status: false,
+      employeeId: null,
+      userId: null,
+      message: error instanceof Error ? error.message : 'Error inesperado sincronizando el usuario con Odoo.',
+    };
+  }
+}
+
+function validateRequiredOdooLink(roleValue: any, link: any) {
+  const role = String(roleValue || '').trim();
+  const requiresEmployee = ['Operario', 'Lider', 'Jefe', 'Calidad'].includes(role);
+  const requiresOdooUser = ['Lider', 'Jefe'].includes(role);
+
+  if (requiresEmployee && !Number(link?.employeeId)) {
+    throw new Error(link?.message || `El perfil ${role} debe estar vinculado a un empleado activo en Odoo.`);
+  }
+  if (requiresOdooUser && !Number(link?.userId)) {
+    throw new Error(`El perfil ${role} debe estar vinculado a una cuenta de usuario en Odoo desde el empleado.`);
   }
 }
 
@@ -298,6 +308,7 @@ export async function createUsers(user: any) {
   try {
     const { code, email, id_company, name, password, rol, x_studio_new_material } = user;
     const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
+    validateRequiredOdooLink(rol, odooEmployeeLink);
 
     await client.connect();
 
@@ -322,7 +333,7 @@ export async function createUsers(user: any) {
     return result.rows[0];
   } catch (error) {
     console.error("Error al crear usuario:", error);
-    throw new Error("No se pudo crear el usuario");
+    throw error instanceof Error ? error : new Error("No se pudo crear el usuario");
   } finally {
     await client.end();
   }
@@ -354,6 +365,7 @@ export async function updateUsers(user: any) {
     }
 
     const odooEmployeeLink = await getOdooEmployeeLink(id_company, code, { name, email, code });
+    validateRequiredOdooLink(rol, odooEmployeeLink);
 
     const query = `
       UPDATE users
@@ -404,8 +416,7 @@ export async function updateUsers(user: any) {
     return result.rows[0];
   } catch (error) {
     console.error("Error al actualizar usuario:", error);
-    if (error instanceof Error && error.message.includes('administrador designado')) throw error;
-    throw new Error("No se pudo actualizar el usuario");
+    throw error instanceof Error ? error : new Error("No se pudo actualizar el usuario");
   } finally {
     await client.end();
   }
